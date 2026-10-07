@@ -1,0 +1,579 @@
+
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบขออนุญาตใช้สถานที่ โรงเรียนศรียานุสรณ์</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* ซ่อน Scrollbar แต่ยังเลื่อนได้ */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">ขออนุญาตใช้สถานที่</h1>
+            <p class="text-gray-500 mt-2">บันทึกข้อความขออนุญาตใช้สถานที่ โรงเรียนศรียานุสรณ์ จังหวัดจันทบุรี</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
+                    <form id="bookingForm" onsubmit="handleBooking(event)">
+
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800"><i class="fa-solid fa-user text-blue-600 mr-2"></i> ข้อมูลผู้ขออนุญาต</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="requesterName" class="block text-sm font-medium text-gray-700 mb-2">ชื่อ-สกุล (นาย/นาง/นางสาว) <span class="text-red-500">*</span></label>
+                                <input type="text" id="requesterName" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" >
+                            </div>
+                            <div>
+                                <label for="department" class="block text-sm font-medium text-gray-700 mb-2">ฝ่ายงาน<span class="text-red-500">*</span></label>
+                                <input type="text" id="department" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" >
+                            </div>
+
+                        </div>
+
+                        <hr class="my-6 border-gray-100">
+
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800"><i class="fa-solid fa-building text-blue-600 mr-2"></i> สถานที่ที่ต้องการใช้</h3>
+                        <div class="mb-6">
+                            <label for="roomSelect" class="block text-sm font-semibold text-gray-700 mb-2">เลือกสถานที่ <span class="text-red-500">*</span></label>
+                            <div class="relative mb-3">
+                                <select id="roomSelect" required class="block w-full pl-4 pr-10 py-3 text-base border-gray-300 bg-gray-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition" onchange="updateRoomPreview(); toggleOtherRoom();">
+                                    <option value="" disabled selected>-- กรุณาเลือกสถานที่ --</option>
+                                    <option value="หอประชุมชยางกูร">หอประชุมชยางกูร</option>
+                                    <option value="ห้องกันเกรา">ห้องกันเกรา</option>
+                                    <option value="ห้องสารภี">ห้องสารภี</option>
+                                    <option value="ห้องโสตทัศนศึกษา">ห้องโสตทัศนศึกษา</option>
+                                    <option value="อื่นๆ">อื่น ๆ (โปรดระบุ)</option>
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                    <i class="fa-solid fa-chevron-down"></i>
+                                </div>
+                            </div>
+                            <div id="otherRoomContainer" class="hidden">
+                                <label for="otherRoom" class="block text-sm font-medium text-gray-700 mb-2">ระบุสถานที่อื่น ๆ <span class="text-red-500">*</span></label>
+                                <input type="text" id="otherRoom" placeholder="เช่น สนามฟุตบอล, ลานอเนกประสงค์" class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <hr class="my-6 border-gray-100">
+
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800"><i class="fa-regular fa-calendar-days text-blue-600 mr-2"></i> วัตถุประสงค์ และวันเวลา</h3>
+
+                        <div class="mb-4">
+                            <label for="topic" class="block text-sm font-medium text-gray-700 mb-2">เพื่อ (วัตถุประสงค์) <span class="text-red-500">*</span></label>
+                            <input type="text" id="topic" placeholder="เช่น จัดกิจกรรมปฐมนิเทศนักเรียนใหม่" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <div class="mb-6">
+                            <label for="attendees" class="block text-sm font-medium text-gray-700 mb-2">จำนวนผู้มาใช้บริการ (คน) <span class="text-red-500">*</span></label>
+                            <input type="number" id="attendees" min="1" placeholder="ระบุจำนวนคน" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label for="startDate" class="block text-sm font-medium text-gray-700 mb-2">ตั้งแต่วันที่ <span class="text-red-500">*</span></label>
+                                <input type="date" id="startDate" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="endDate" class="block text-sm font-medium text-gray-700 mb-2">ถึงวันที่ <span class="text-red-500">*</span></label>
+                                <input type="date" id="endDate" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="startTime" class="block text-sm font-medium text-gray-700 mb-2">ตั้งแต่เวลา <span class="text-red-500">*</span></label>
+                                <input  type="time" id="startTime" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+
+                            <div>
+                                <label for="endTime" class="block text-sm font-medium text-gray-700 mb-2">ถึงเวลา <span class="text-red-500">*</span></label>
+                                <input type="time" id="endTime" required class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <hr class="my-6 border-gray-100">
+
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800"><i class="fa-solid fa-plug text-blue-600 mr-2"></i> อุปกรณ์โสตทัศนูปกรณ์และบริการ</h3>
+                        <div class="mb-6">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipAudio" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-600">เครื่องเสียง + ไมค์</span>
+                                </label>
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipComputer" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-600">Notebook หรือ Computer</span>
+                                </label>
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipProjector" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-600">เครื่องโปรเจ็คเตอร์</span>
+                                </label>
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipFood" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2 text-sm text-gray-600">ขอรับการจัดอาหารว่างและเครื่องดื่ม</span>
+                                </label>
+                                <hr><hr>
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipOtherCheck2" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleOtherEquip()">
+                                    <span class="ml-2 text-sm text-gray-600">จอ LED (ขึ้นภาพนิ่งหรือพื้นหลังเท่านั้น)</span>
+                                </label>
+
+                                <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition">
+                                    <input type="checkbox" id="equipOtherCheck3" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleOtherEquip()">
+                                    <span class="ml-2 text-sm text-gray-600">จอ LED (เปิดไฟล์อื่นๆ เพื่อประกอบการอบรม/ประชุม)</span>
+                                </label>
+
+                            </div>
+                            <div class="mt-3">
+                                <label class="flex items-center mb-2 cursor-pointer">
+                                    <input type="checkbox" id="equipOtherCheck" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleOtherEquip()">
+                                    <span class="ml-2 text-sm text-gray-600">อื่น ๆ (ระบุ)</span>
+                                </label>
+                                <input type="text" id="equipOtherText" placeholder="ระบุอุปกรณ์เพิ่มเติม" class="hidden w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+
+                        <div class="mb-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
+                            <label class="flex items-start cursor-pointer">
+                                <input type="checkbox" id="agreement" required class="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 flex-shrink-0">
+                                <span class="ml-3 text-sm text-gray-700 leading-relaxed font-medium">
+                                    ในระหว่างการใช้ห้องประชุม และอาคารสถานที่ ข้าพเจ้าขอสัญญาว่าจะควบคุมดูแลให้เป็นไปตาม ระเบียบ ว่าด้วยการใช้อาคารสถานที่ของทางราชการ และยอมรับในความเสียหายที่เกิดขึ้น <span class="text-red-500">*</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                            <button type="button" class="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition w-full sm:w-auto" onclick="document.getElementById('bookingForm').reset(); updateRoomPreview(); toggleOtherRoom(); toggleOtherEquip();">
+                                ล้างข้อมูล
+                            </button>
+                            <button type="submit" class="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/30 transition w-full sm:w-auto flex justify-center items-center">
+                                <i class="fa-solid fa-paper-plane mr-2"></i> ส่งคำขออนุญาต
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden sticky top-24">
+                    <div id="previewImage" class="h-48 bg-gray-200 bg-cover bg-center transition-all duration-300" style="background-image: url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=600');">
+                        <div class="w-full h-full bg-black/20 flex items-center justify-center" id="imageOverlay">
+                            <span class="text-white font-medium drop-shadow-md">กรุณาเลือกสถานที่</span>
+                        </div>
+                    </div>
+
+                    <div class="p-6">
+                        <h2 id="previewTitle" class="text-xl font-bold text-gray-800 mb-2">ข้อมูลสถานที่</h2>
+                        <p id="previewDesc" class="text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">
+                            เลือกสถานที่จากแบบฟอร์มเพื่อดูรายละเอียดและสิ่งอำนวยความสะดวก
+                        </p>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center text-gray-700">
+                                <div class="w-8 flex justify-center text-blue-600"><i class="fa-solid fa-users"></i></div>
+                                <span class="text-sm font-medium">ความจุ: <span id="previewCapacity" class="font-normal text-gray-600">-</span></span>
+                            </div>
+                            <div class="flex items-center text-gray-700">
+                                <div class="w-8 flex justify-center text-blue-600"><i class="fa-solid fa-tv"></i></div>
+                                <span class="text-sm font-medium">อุปกรณ์: <span id="previewEquip" class="font-normal text-gray-600">-</span></span>
+                            </div>
+                            <div class="flex items-center text-gray-700">
+                                <div class="w-8 flex justify-center text-blue-600"><i class="fa-solid fa-location-dot"></i></div>
+                                <span class="text-sm font-medium">ตำแหน่ง: <span id="previewLocation" class="font-normal text-gray-600">-</span></span>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 pt-6 border-t border-gray-100 hidden" id="schedulePreview">
+                            <h4 class="text-sm font-bold text-gray-800 mb-3">สถานะวันนี้</h4>
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-sm p-2 bg-red-50 text-red-700 rounded-lg">
+                                    <span>09:00 - 11:00</span>
+                                    <span class="font-medium text-xs bg-red-100 px-2 py-1 rounded">มีการใช้งาน</span>
+                                </div>
+                                <div class="flex justify-between items-center text-sm p-2 bg-green-50 text-green-700 rounded-lg">
+                                    <span>11:00 - 16:00</span>
+                                    <span class="font-medium text-xs bg-green-100 px-2 py-1 rounded">ว่าง</span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="successModal" class="fixed inset-0 z-[100] hidden">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"></div>
+        <div class="fixed inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center transform scale-100 transition-transform">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fa-solid fa-check text-3xl text-green-500"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">ส่งคำขออนุญาตสำเร็จ!</h3>
+                <p class="text-sm text-gray-500 mb-6">
+                    ระบบได้บันทึกและส่งคำขออนุญาตของท่านไปยังผู้อำนวยการเรียบร้อยแล้ว
+                </p>
+                <button onclick="closeModal()" class="w-full bg-blue-600 text-white font-medium py-3 rounded-xl hover:bg-blue-700 transition">
+                    ตกลง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // จำลองฐานข้อมูลเก็บประวัติการจองในระบบ (เพื่อใช้ตรวจสอบเวลาซ้ำ)
+        let existingBookings = [];
+
+        // ข้อมูลห้องประชุมสำหรับแสดงผลพรีวิว อิงตามแบบฟอร์ม
+        const roomData = {
+            'หอประชุม': {
+                name: 'หอประชุม',
+                desc: 'หอประชุมขนาดใหญ่ สำหรับจัดกิจกรรม งานพิธี และการประชุมรวม',
+                capacity: '500+ ท่าน',
+                equip: 'เวที, ระบบเครื่องเสียงชุดใหญ่, โปรเจคเตอร์',
+                location: 'อาคารหอประชุม',
+                image: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&q=80&w=600'
+            },
+            'ห้องกันเกรา': {
+                name: 'ห้องกันเกรา',
+                desc: 'ห้องประชุมขนาดกลาง เหมาะสำหรับการประชุมกลุ่มย่อย หรือรับรองแขก',
+                capacity: '30 - 50 ท่าน',
+                equip: 'โปรเจคเตอร์, ระบบเสียงพื้นฐาน, โพเดียม',
+                location: 'อาคาร 1',
+                image: 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&q=80&w=600'
+            },
+            'ห้องสารภี': {
+                name: 'ห้องสารภี',
+                desc: 'ห้องประชุมสำหรับคณะกรรมการหรือกลุ่มงานต่างๆ',
+                capacity: '20 - 30 ท่าน',
+                equip: 'สมาร์ททีวี, ไมค์ประชุม',
+                location: 'อาคาร 2',
+                image: 'https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&q=80&w=600'
+            },
+            'ห้องโสตทัศนศึกษา': {
+                name: 'ห้องโสตทัศนศึกษา',
+                desc: 'ห้องสำหรับจัดการเรียนการสอนแบบโสตทัศนูปกรณ์ หรือชมวีดิทัศน์',
+                capacity: '50 - 80 ท่าน',
+                equip: 'จอภาพยนตร์, โปรเจคเตอร์คุณภาพสูง, ระบบเสียงรอบทิศทาง',
+                location: 'อาคารศูนย์การเรียนรู้',
+                image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=600'
+            }
+        };
+        async function submit_bookingroom(event) {
+            // ป้องกันหน้าเว็บรีเฟรช (ถ้าเรียกจาก onsubmit)
+            if (event) event.preventDefault();
+
+            const url = 'api/room_booking.php';
+
+            // --- ดึงค่า user_token จาก Cookie ถ้าไม่มีให้ใช้ '1' เป็นค่าดีฟอลต์ ---
+            var user_token = getCookie("user_token") || getCookie("User_Token") || '1';
+
+            // --- 1. ดึงค่าจากฟอร์มตาม ID ที่คุณตั้งไว้ ---
+            const payload = {
+                user_token: user_token, // ส่ง token ที่ดึงจาก cookie ไปกับ payload
+                requesterName: document.getElementById('requesterName').value,
+                department: document.getElementById('department').value,
+                roomSelect: document.getElementById('roomSelect').value,
+                otherRoom: document.getElementById('otherRoom').value,
+                topic: document.getElementById('topic').value,
+                attendees: document.getElementById('attendees').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
+
+                // สำหรับ Checkbox (เก็บเป็น true/false)
+                equipment: {
+                    audio: document.getElementById('equipAudio').checked,
+                    computer: document.getElementById('equipComputer').checked,
+                    projector: document.getElementById('equipProjector').checked,
+                    food: document.getElementById('equipFood').checked,
+                    otherText: document.getElementById('equipOtherText').value
+                },
+                agreement: document.getElementById('agreement').checked
+            };
+
+            // --- 2. ส่ง Fetch API ---
+            try {
+                // แสดง Loading (ถ้ามีปุ่มส่ง)
+                const submitBtn = event?.target.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = true;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${user_token}`, // ส่ง token ใน Headers
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(errorData ? errorData.message : `HTTP Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                  //  alert('ส่งคำขออนุญาตเรียบร้อยแล้ว!');
+                  document.getElementById('successModal').classList.remove('hidden');
+                    document.getElementById('bookingForm').reset(); // ล้างข้อมูล
+                } else {
+                    alert('⚠️ ' + data.message);
+                }
+
+            } catch (error) {
+                console.error('❌ เกิดข้อผิดพลาด:', error.message);
+                //alert('เกิดข้อผิดพลาด: ' + error.message);
+            } finally {
+                // คืนค่าปุ่มให้กดได้ปกติ
+                const submitBtn = event?.target.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        // แสดงช่องกรอกเมื่อเลือก "อื่นๆ" ในส่วนสถานที่
+        function toggleOtherRoom() {
+            const select = document.getElementById('roomSelect').value;
+            const container = document.getElementById('otherRoomContainer');
+            const input = document.getElementById('otherRoom');
+            if (select === 'อื่นๆ') {
+                container.classList.remove('hidden');
+                input.required = true;
+            } else {
+                container.classList.add('hidden');
+                input.required = false;
+                input.value = '';
+            }
+        }
+
+        // แสดงช่องกรอกเมื่อเลือก "อื่นๆ" ในส่วนอุปกรณ์
+        function toggleOtherEquip() {
+            const isChecked = document.getElementById('equipOtherCheck').checked;  // ช่อง อื่นๆ (เปิดให้พิมพ์เอง)
+            const isChecked2 = document.getElementById('equipOtherCheck2').checked; // ช่อง จอ LED แบบที่ 1
+            const isChecked3 = document.getElementById('equipOtherCheck3').checked; // ช่อง จอ LED แบบที่ 2
+            const input = document.getElementById('equipOtherText');
+
+            // 1. ควบคุมการเปิด-ปิดกล่องข้อความ และการบังคับกรอก (Required)
+            if (isChecked || isChecked2 || isChecked3) {
+                input.classList.remove('hidden');
+                input.classList.add('block');
+                input.required = true;
+            } else {
+                input.classList.add('hidden');
+                input.classList.remove('block');
+                input.required = false;
+                input.value = '';
+                return; // จบฟังก์ชันทันทีหากไม่มีการติ๊กช่องใดๆ เลย
+            }
+
+            // ข้อความระบบอัตโนมัติของช่อง LED ทั้งสองช่อง
+            const text2 = 'จอ LED (ขึ้นภาพนิ่งหรือพื้นหลังเท่านั้น)';
+            const text3 = 'จอ LED (เปิดไฟล์อื่นๆ เพื่อประกอบการอบรม/ประชุม)';
+
+            // 2. ดึงค่าปัจจุบันในกล่องข้อความมา แล้วดึงข้อความระบบ (LED) ออกไปก่อนเพื่อเช็กของเก่า
+            let currentValue = input.value;
+            currentValue = currentValue.replace(text2, '').replace(text3, '');
+
+            let items = [];
+
+            // [จุดที่ปรับปรุง] -> ถ้าช่อง "อื่นๆ" ถูกติ๊กอยู่ ให้ดึงข้อความที่ผู้ใช้พิมพ์เองมาเก็บไว้ใน Array
+            if (isChecked) {
+                items = currentValue.split(',')
+                    .map(item => item.trim())
+                    .filter(item => item !== '');
+            }
+            // (หมายความว่าถ้าช่อง "อื่นๆ" ไม่ถูกติ๊ก ข้อความที่เคยพิมพ์ไว้จะถูกล้างออกโดยอัตโนมัติ)
+
+            // 3. ตรวจสอบสถานะการติ๊กปัจจุบัน ของจอ LED แล้วเติมข้อความต่อท้ายเข้าไปตามจริง
+            if (isChecked2) {
+                items.push(text2);
+            }
+            if (isChecked3) {
+                items.push(text3);
+            }
+
+            // 4. นำข้อความทั้งหมด (ทั้งที่พิมพ์เอง และของระบบ) มารวมกันคั่นด้วยเครื่องหมายจุลภาคอย่างสวยงาม
+            input.value = items.join(', ');
+        }
+
+        // ฟังก์ชันอัปเดตข้อมูลสถานที่ด้านขวา
+        function updateRoomPreview() {
+            const selectedRoom = document.getElementById('roomSelect').value;
+            const previewImage = document.getElementById('previewImage');
+            const overlay = document.getElementById('imageOverlay');
+            const schedule = document.getElementById('schedulePreview');
+
+            if (selectedRoom && roomData[selectedRoom]) {
+                const data = roomData[selectedRoom];
+                document.getElementById('previewTitle').innerText = data.name;
+                document.getElementById('previewDesc').innerText = data.desc;
+                document.getElementById('previewCapacity').innerText = data.capacity;
+                document.getElementById('previewEquip').innerText = data.equip;
+                document.getElementById('previewLocation').innerText = data.location;
+
+                previewImage.style.backgroundImage = `url('${data.image}')`;
+                overlay.style.display = 'none';
+                schedule.classList.remove('hidden');
+            } else {
+                if(selectedRoom === 'อื่นๆ') {
+                    document.getElementById('previewTitle').innerText = 'สถานที่อื่นๆ';
+                    document.getElementById('previewDesc').innerText = 'โปรดระบุสถานที่ที่ต้องการในฟอร์ม';
+                    document.getElementById('previewCapacity').innerText = 'ขึ้นอยู่กับสถานที่';
+                    document.getElementById('previewEquip').innerText = '-';
+                    document.getElementById('previewLocation').innerText = '-';
+                    previewImage.style.backgroundImage = `url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=600')`;
+                    overlay.style.display = 'none';
+                } else {
+                    document.getElementById('previewTitle').innerText = 'ข้อมูลสถานที่';
+                    document.getElementById('previewDesc').innerText = 'เลือกสถานที่จากแบบฟอร์มเพื่อดูรายละเอียดและสิ่งอำนวยความสะดวก';
+                    document.getElementById('previewCapacity').innerText = '-';
+                    document.getElementById('previewEquip').innerText = '-';
+                    document.getElementById('previewLocation').innerText = '-';
+
+                    previewImage.style.backgroundImage = `url('https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=600')`;
+                    overlay.style.display = 'flex';
+                }
+                schedule.classList.add('hidden');
+            }
+        }
+
+        // ฟังก์ชันจัดการตอนกด Submit
+        // ฟังก์ชันจัดการตอนกด Submit
+    function handleBooking(event) {
+        event.preventDefault();
+
+        let selectedRoom = document.getElementById('roomSelect').value;
+        if(selectedRoom === 'อื่นๆ'){
+            selectedRoom = document.getElementById('otherRoom').value;
+        }
+
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        const startTime = document.getElementById('startTime').value;
+        const endTime = document.getElementById('endTime').value;
+
+        const endDateInput = document.getElementById('endDate');
+        const endTimeInput = document.getElementById('endTime');
+
+        // ล้างคลาสแจ้งเตือนสีแดงออกก่อน (เผื่อมีการแก้ไขแล้วกดส่งใหม่)
+        endDateInput.classList.remove('border-red-500', 'ring-red-500');
+        endTimeInput.classList.remove('border-red-500', 'ring-red-500');
+
+        // ตรวจสอบความถูกต้องของวัน-เวลา
+        if (startDate > endDate) {
+            alert("วันที่สิ้นสุดการใช้สถานที่ ต้องไม่น้อยกว่าวันที่เริ่มต้น");
+            endDateInput.classList.add('border-red-500', 'ring-red-500');
+            endDateInput.focus();
+            return;
+        }
+        if (startDate === endDate && startTime >= endTime) {
+            alert("เวลาสิ้นสุด ต้องมากกว่าเวลาเริ่มต้นในวันเดียวกัน");
+            endTimeInput.classList.add('border-red-500', 'ring-red-500'); // เพิ่มขอบแดงแจ้งเตือน
+            endTimeInput.focus(); // เด้งเคอร์เซอร์ไปที่ช่องให้แก้ไข
+            return;
+        }
+
+        existingBookings.push({
+            room: selectedRoom,
+            startDate: startDate,
+            endDate: endDate,
+            startTime: startTime,
+            endTime: endTime
+        });
+
+        submit_bookingroom(event);
+    }
+
+        // ฟังก์ชันปิด Modal
+        function closeModal() {
+            document.getElementById('successModal').classList.add('hidden');
+            document.getElementById('bookingForm').reset();
+            updateRoomPreview();
+            toggleOtherRoom();
+            toggleOtherEquip();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // เซ็ตค่า Default วันที่และตรวจจับ Cookie ชื่อผู้ใช้ตอนโหลดหน้าเว็บ
+        window.onload = function() {
+          if(getCookie("User_DisplayName")){
+              var User_DisplayName = getCookie("User_DisplayName");
+              // ใช้ decodeURIComponent เพื่อแปลง %E0%B8... ให้กลับมาเป็นภาษาไทยปกติ
+              // และใช้ .replace(/\+/g, ' ') เผื่อกรณีที่เว้นวรรคถูกแปลงเป็นเครื่องหมายบวก (+)
+              var decodedName = decodeURIComponent(User_DisplayName).replace(/\+/g, ' ');
+
+              document.getElementById('requesterName').value = decodedName;
+          }
+          const today = new Date().toISOString().split('T')[0];
+          document.getElementById('startDate').setAttribute('min', today);
+          document.getElementById('startDate').value = today;
+          document.getElementById('endDate').setAttribute('min', today);
+          document.getElementById('endDate').value = today;
+
+          // --- ส่วนที่เพิ่มเข้ามาใหม่ ---
+          // อำนวยความสะดวก: เมื่อเลือกเวลาเริ่ม ให้เวลาสิ้นสุดบวกเพิ่ม 1 ชม. อัตโนมัติ
+          document.getElementById('startTime').addEventListener('change', function() {
+              let startVal = this.value;
+              if(startVal) {
+                  let [hours, minutes] = startVal.split(':');
+                  // บวก 1 ชั่วโมง
+                  let endHours = String((parseInt(hours) + 1) % 24).padStart(2, '0');
+
+                  // ปรับค่าให้เฉพาะกรณีที่ผู้ใช้ยังไม่ได้เลือกเวลาสิ้นสุด
+                  // หรือวันที่เริ่มต้นและสิ้นสุดคือวันเดียวกัน
+                  let startD = document.getElementById('startDate').value;
+                  let endD = document.getElementById('endDate').value;
+
+                  if (startD === endD) {
+                      document.getElementById('endTime').value = `${endHours}:${minutes}`;
+                      // ล้างแจ้งเตือนสีแดงออกถ้ามี
+                      document.getElementById('endTime').classList.remove('border-red-500', 'ring-red-500');
+                  }
+              }
+          });
+      };
+
+        function getCookie(name) {
+            // 1. สร้างรูปแบบที่ต้องการค้นหา เช่น "user_id="
+            let nameEQ = name + "=";
+            // 2. แยก cookie ทั้งหมดออกเป็น Array
+            let ca = document.cookie.split(";");
+
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                // ตัดช่องว่างด้านหน้าออก (ถ้ามี)
+                while (c.charAt(0) == " ") c = c.substring(1, c.length);
+                // ถ้าเจอชื่อที่ตรงกัน ให้ส่งค่ากลับไป
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            // ถ้าไม่เจอเลย ให้ส่งค่าว่าง (null) กลับไป
+            return null;
+        }
+    </script>
+</body>
+</html>

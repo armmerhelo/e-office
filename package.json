@@ -1,0 +1,20 @@
+{
+  "name": "e-office",
+  "version": "1.0.0",
+  "main": "OneSignalSDKWorker.js",
+  "scripts": {
+    "test": "node tests/check-syntax.cjs && node tests/integration.cjs",
+    "test:syntax": "node tests/check-syntax.cjs",
+    "test:integration": "node tests/integration.cjs",
+    "build:css": "tailwindcss -i src/input.css -o assets/tailwind.css --minify",
+    "serve:test": "node scripts/serve-test.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
+}

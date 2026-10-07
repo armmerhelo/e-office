@@ -1,0 +1,19 @@
+<meta charset="UTF-8">
+<script>
+const bc = new BroadcastChannel('my_channel');
+
+
+
+function Sender(){
+  var Massege = document.getElementById('Massege').value ;
+bc.postMessage({
+  user: "Gemini",
+  message: Massege,
+  timestamp: Date.now()
+});
+
+}
+</script>
+
+<input  id="Massege">
+<button onclick="Sender();">กด</button>

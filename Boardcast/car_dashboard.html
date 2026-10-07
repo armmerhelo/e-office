@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking Dashboard (API Version)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+        }
+        .slot-transition {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        /* Loading Animation */
+        .loading-pulse {
+            animation: pulse-opacity 1.5s infinite;
+        }
+        @keyframes pulse-opacity {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen w-screen overflow-hidden flex flex-col p-4 md:p-6">
+
+    <!-- Container -->
+    <div class="max-w-7xl mx-auto w-full flex flex-col h-full justify-between">
+
+        <!-- Header -->
+        <header class="flex flex-row justify-between items-center mb-4 bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-100 shrink-0">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="layout-grid" class="w-6 h-6 text-indigo-600"></i>
+                    Smart Parking Dashboard <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">API Mode</span>
+                </h1>
+                <p class="text-slate-500 text-sm mt-0.5">อาคารจอดรถ A (ชั้น 1) - เชื่อมต่อข้อมูล Real-time</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-slate-400 flex items-center gap-2">
+                    <span id="connection-status" class="w-2 h-2 rounded-full bg-green-500"></span>
+                    <span id="lastUpdated">กำลังโหลด...</span>
+                </span>
+                <button onclick="fetchData()" id="refresh-btn" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    รีเฟรช
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-3 gap-4 mb-4 shrink-0">
+            <!-- Total -->
+            <div class="bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+                <div>
+                    <p class="text-slate-500 text-xs font-medium uppercase tracking-wide">ทั้งหมด</p>
+                    <h2 class="text-3xl font-bold text-slate-800" id="stat-total">-</h2>
+                </div>
+                <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <!-- Available -->
+            <div class="bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
+                <div>
+                    <p class="text-slate-500 text-xs font-medium uppercase tracking-wide">ว่าง</p>
+                    <h2 class="text-3xl font-bold text-green-600" id="stat-available">-</h2>
+                </div>
+                <div class="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600">
+                    <i data-lucide="circle-dashed" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <!-- Occupied -->
+            <div class="bg-white px-6 py-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+                <div>
+                    <p class="text-slate-500 text-xs font-medium uppercase tracking-wide">ไม่ว่าง</p>
+                    <h2 class="text-3xl font-bold text-red-600" id="stat-occupied">-</h2>
+                </div>
+                <div class="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center text-red-600">
+                    <i data-lucide="car" class="w-5 h-5"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Zones Area -->
+        <div class="grid grid-cols-2 gap-6 flex-grow min-h-0">
+
+            <!-- Zone A -->
+            <div class="bg-white/50 rounded-2xl p-4 border border-slate-200/60 flex flex-col h-full relative">
+                <h3 class="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2 shrink-0">
+                    <span class="w-2 h-5 bg-indigo-500 rounded-full"></span>
+                    โซน A (ทางเข้าหลัก)
+                </h3>
+                <div class="grid grid-cols-2 gap-4 flex-grow relative" id="grid-zone-a">
+                    <!-- Slots injected here -->
+                    <div class="absolute inset-0 flex items-center justify-center text-slate-400 loading-placeholder">กำลังเชื่อมต่อ API...</div>
+                </div>
+            </div>
+
+            <!-- Zone B -->
+            <div class="bg-white/50 rounded-2xl p-4 border border-slate-200/60 flex flex-col h-full relative">
+                <h3 class="text-lg font-semibold text-slate-700 mb-3 flex items-center gap-2 shrink-0">
+                    <span class="w-2 h-5 bg-orange-500 rounded-full"></span>
+                    โซน B (ด้านหลัง)
+                </h3>
+                <div class="grid grid-cols-2 gap-4 flex-grow relative" id="grid-zone-b">
+                    <!-- Slots injected here -->
+                    <div class="absolute inset-0 flex items-center justify-center text-slate-400 loading-placeholder">กำลังเชื่อมต่อ API...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Legend -->
+        <div class="mt-4 flex flex-wrap gap-6 justify-center text-sm text-slate-600 bg-white py-3 px-6 rounded-lg shadow-sm border border-slate-100 shrink-0">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-green-100 border border-green-300"></div>
+                <span>ว่าง (ทั่วไป)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-blue-100 border border-blue-300"></div>
+                <span>ว่าง (คนพิการ)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded bg-red-100 border border-red-300"></div>
+                <span>มีรถจอด</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚙️ CONFIGURATION (ส่วนตั้งค่า)
+        // ==========================================
+
+        // ใส่ URL ของ API จริงๆ ตรงนี้
+        const API_URL = "https://e-office.siya.ac.th/Boardcast/api.php";
+
+        // ตั้งเป็น true เพื่อทดสอบโดยไม่ต้องมี API จริง (จะใช้ข้อมูลสุ่มแทน)
+        // ตั้งเป็น false เมื่อต้องการดึงจาก API_URL
+        const USE_MOCK_DATA = false;
+
+        // เวลา Refresh อัตโนมัติ (มิลลิวินาที), 0 = ปิด
+        const AUTO_REFRESH_INTERVAL = 5000;
+
+        // ==========================================
+
+        let parkingSlots = [];
+        let isFetching = false;
+
+        // ฟังก์ชันจำลอง API (Mock)
+        // สร้างข้อมูล JSON กลับมาเหมือน Server จริง
+        function mockApiCall() {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    const zones = ['A', 'B'];
+                    const data = [];
+                    zones.forEach(zone => {
+                        for (let i = 1; i <= 4; i++) {
+                            const isOccupied = Math.random() > 0.5;
+                            data.push({
+                                "id": `${zone}-${i.toString().padStart(2, '0')}`,
+                                "zone": zone,
+                                "is_occupied": isOccupied,
+                                "type": (zone === 'A' && i === 1) ? 'disabled' : 'standard',
+                                "last_update": new Date().toLocaleTimeString('th-TH')
+                            });
+                        }
+                    });
+                    resolve(data);
+                }, 600); // Simulate network delay 600ms
+            });
+        }
+
+        // ฟังก์ชันหลักในการดึงข้อมูล
+        async function fetchData() {
+            if (isFetching) return;
+
+            setLoadingState(true);
+
+            try {
+                let data;
+
+                if (USE_MOCK_DATA) {
+                    console.log("Fetching Mock Data...");
+                    data = await mockApiCall();
+                } else {
+                    console.log(`Fetching from API: ${API_URL}`);
+                    const response = await fetch(API_URL);
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    data = await response.json();
+                }
+
+                // ตรวจสอบโครงสร้างข้อมูลเบื้องต้น
+                if (Array.isArray(data)) {
+                    parkingSlots = data;
+                    render();
+                    updateStatus(true);
+                } else {
+                    console.error("Invalid JSON format");
+                }
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                updateStatus(false);
+                alert("ไม่สามารถเชื่อมต่อ API ได้ (ดู Console เพื่อดูรายละเอียด)");
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // UI Helpers
+        function setLoadingState(loading) {
+            isFetching = loading;
+            const btn = document.getElementById('refresh-btn');
+
+            // Fix: Lucide transforms <i> to <svg>, so we must look for svg first, then fallback to i
+            const icon = btn.querySelector('svg') || btn.querySelector('i');
+
+            if (!icon) return; // Safety check if icon is missing
+
+            if (loading) {
+                btn.disabled = true;
+                icon.classList.add('animate-spin');
+                document.body.classList.add('cursor-wait');
+            } else {
+                btn.disabled = false;
+                icon.classList.remove('animate-spin');
+                document.body.classList.remove('cursor-wait');
+            }
+        }
+
+        function updateStatus(success) {
+            const statusDot = document.getElementById('connection-status');
+            const lastUpdated = document.getElementById('lastUpdated');
+
+            if (success) {
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500 animate-pulse";
+                lastUpdated.innerText = `อัปเดตล่าสุด: ${new Date().toLocaleTimeString('th-TH')}`;
+            } else {
+                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                lastUpdated.innerText = "การเชื่อมต่อล้มเหลว";
+            }
+        }
+
+        function getStatusClasses(slot) {
+            // Mapping JSON fields to UI logic
+            // Note: JSON fields might use snake_case like "is_occupied"
+            if (slot.is_occupied) return 'bg-red-100 border-red-300 text-red-700';
+            if (slot.type === 'disabled') return 'bg-blue-100 border-blue-300 text-blue-700';
+            return 'bg-green-100 border-green-300 text-green-700';
+        }
+
+        function render() {
+            // Calculate Stats
+            const total = parkingSlots.length;
+            const occupied = parkingSlots.filter(s => s.is_occupied).length;
+            const available = parkingSlots.filter(s => !s.is_occupied).length;
+
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-occupied').innerText = occupied;
+            document.getElementById('stat-available').innerText = available;
+
+            // Clear placeholders
+            const placeholders = document.querySelectorAll('.loading-placeholder');
+            placeholders.forEach(el => el.remove());
+
+            renderZone('A', 'grid-zone-a');
+            renderZone('B', 'grid-zone-b');
+
+            lucide.createIcons();
+        }
+
+        function renderZone(zone, elementId) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = ''; // Clear old content
+
+            const zoneSlots = parkingSlots.filter(s => s.zone === zone);
+
+            zoneSlots.forEach(slot => {
+                const div = document.createElement('div');
+                div.className = `relative h-full min-h-[140px] rounded-xl border-2 flex flex-col items-center justify-center gap-2 shadow-sm transition-colors duration-300 ${getStatusClasses(slot)}`;
+
+                // ID Label
+                const idLabel = `<div class="absolute top-3 left-3 text-xs font-bold opacity-70 bg-white/50 px-2 py-1 rounded backdrop-blur-sm">${slot.id}</div>`;
+
+                // Disabled Icon
+                let disabledIcon = '';
+                if (slot.type === 'disabled' && !slot.is_occupied) {
+                    disabledIcon = `<div class="absolute bottom-3 right-3 text-xs opacity-70 flex items-center gap-1"><i data-lucide="accessibility" class="w-3 h-3"></i></div>`;
+                }
+
+                // Main Icon
+                let mainIcon = '';
+                if (slot.is_occupied) {
+                    mainIcon = `<i data-lucide="car" class="w-16 h-16 drop-shadow-sm"></i>`;
+                } else {
+                    mainIcon = `<div class="w-14 h-14 rounded-full border-4 border-dashed border-current opacity-30"></div>`;
+                }
+
+                // Status Text
+                const statusText = `<span class="font-semibold text-xl mt-1">${slot.is_occupied ? 'ไม่ว่าง' : 'ว่าง'}</span>`;
+
+                // Time from JSON
+                let timeText = '';
+                if (slot.is_occupied && slot.last_update) {
+                    timeText = `<span class="text-xs opacity-60">อัปเดต: ${slot.last_update}</span>`;
+                }
+
+                div.innerHTML = `${idLabel}${disabledIcon}${mainIcon}${statusText}${timeText}`;
+                container.appendChild(div);
+            });
+        }
+
+        // Init
+        window.onload = () => {
+            fetchData(); // Fetch immediately on load
+
+            // Optional: Auto Refresh
+            if (AUTO_REFRESH_INTERVAL > 0) {
+                setInterval(fetchData, AUTO_REFRESH_INTERVAL);
+            }
+        };
+
+    </script>
+</body>
+</html>

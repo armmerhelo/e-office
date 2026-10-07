@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจัดการและแดชบอร์ดใบแจ้งซ่อม - โรงเรียนศรียานุสรณ์</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="admin.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="header-info">
+                <h1>ระบบจัดการและแดชบอร์ดใบแจ้งซ่อม</h1>
+                <p>กลุ่มบริหารทั่วไป โรงเรียนศรียานุสรณ์ (สำหรับเจ้าหน้าที่)</p>
+            </div>
+            <div class="header-actions">
+                <a href="index.html" class="back-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    หน้าแจ้งซ่อม (สำหรับครู/บุคลากร)
+                </a>
+            </div>
+        </header>
+
+        <!-- Stats Overview Row -->
+        <section class="stats-grid">
+            <div class="stat-card total" id="stat-total-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                </div>
+                <div class="stat-content">
+                    <h3>งานแจ้งซ่อมทั้งหมด</h3>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+            </div>
+            <div class="stat-card pending" id="stat-pending-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
+                <div class="stat-content">
+                    <h3>รอดำเนินการ</h3>
+                    <div class="stat-value" id="stat-pending">0</div>
+                </div>
+            </div>
+            <div class="stat-card active" id="stat-active-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="9"></line><line x1="9" y1="13" x2="15" y2="13"></line><line x1="9" y1="17" x2="13" y2="17"></line></svg>
+                </div>
+                <div class="stat-content">
+                    <h3>กำลังดำเนินการ</h3>
+                    <div class="stat-value" id="stat-active">0</div>
+                </div>
+            </div>
+            <div class="stat-card success" id="stat-success-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <div class="stat-content">
+                    <h3>ซ่อมเสร็จสิ้น</h3>
+                    <div class="stat-value" id="stat-success">0</div>
+                </div>
+            </div>
+            <div class="stat-card failed" id="stat-failed-card">
+                <div class="stat-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                </div>
+                <div class="stat-content">
+                    <h3>ดำเนินการไม่ได้</h3>
+                    <div class="stat-value" id="stat-failed">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Dashboard Section -->
+        <section class="charts-section">
+            <div class="chart-card">
+                <h3>สัดส่วนความคืบหน้าของงาน</h3>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>จำนวนสถิติแยกตามประเภทงาน</h3>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Search & Filter Controls -->
+        <section class="controls-card">
+            <div class="controls-grid">
+                <div class="control-group search">
+                    <label for="searchInput">ค้นหาข้อมูล</label>
+                    <div class="search-wrapper">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="text" id="searchInput" placeholder="ชื่อผู้แจ้ง, อาคาร, ห้อง, หรือรายละเอียด...">
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="filterStatus">กรองสถานะการพิจารณา</label>
+                    <select id="filterStatus">
+                        <option value="all">ทั้งหมด</option>
+                        <option value="pending">รอดำเนินการ (Pending)</option>
+                        <option value="can_proceed">สามารถดำเนินการได้ (Can Proceed)</option>
+                        <option value="cannot_proceed">ไม่สามารถดำเนินการได้ (Cannot Proceed)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="filterResult">กรองผลการซ่อม</label>
+                    <select id="filterResult">
+                        <option value="all">ทั้งหมด</option>
+                        <option value="pending">อยู่ระหว่างดำเนินการ/รอตรวจ (Pending)</option>
+                        <option value="fixed">ซ่อมเรียบร้อยแล้ว (Fixed)</option>
+                        <option value="cannot_fix">ไม่สามารถซ่อมได้ (Cannot Fix)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="filterType">ประเภทงานซ่อม</label>
+                    <select id="filterType">
+                        <option value="all">ทั้งหมด</option>
+                        <option value="ไฟฟ้า">ไฟฟ้า</option>
+                        <option value="เครื่องปรับอากาศ">เครื่องปรับอากาศ</option>
+                        <option value="ประปาและสุขภัณฑ์">ประปาและสุขภัณฑ์</option>
+                        <option value="ประตู หน้าต่าง / กระจก">ประตู หน้าต่าง / กระจก</option>
+                        <option value="โต๊ะ / เก้าอี้">โต๊ะ / เก้าอี้</option>
+                        <option value="สัญญาณอินเตอร์เน็ต">สัญญาณอินเตอร์เน็ต</option>
+                        <option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Requests List Container -->
+        <section class="requests-card">
+            <div class="card-header">
+                <h2>รายการใบแจ้งซ่อมทั้งหมด</h2>
+                <span class="count-badge" id="requests-count">0 รายการ</span>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="requests-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>วันที่แจ้ง</th>
+                            <th>ผู้แจ้งซ่อม / ฝ่าย</th>
+                            <th>ประเภทงาน</th>
+                            <th>สถานที่</th>
+                            <th>สถานะพิจารณา</th>
+                            <th>ผลการซ่อม</th>
+                            <th>จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="requestsTableBody">
+                        <tr>
+                            <td colspan="8" class="loading-placeholder">กำลังโหลดข้อมูล...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile List Layout (shown via CSS on small screens) -->
+            <div class="mobile-requests-list" id="requestsMobileList">
+                <div class="loading-placeholder">กำลังโหลดข้อมูล...</div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Management Modal -->
+    <div class="modal-backdrop hidden" id="editModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>จัดการสถานะใบแจ้งซ่อม #<span id="modalRequestId">0</span></h2>
+                <button class="close-btn" id="closeModalBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Request Info Section (Read Only) -->
+                <div class="info-section">
+                    <h3 class="section-title">ข้อมูลผู้แจ้งซ่อม</h3>
+                    <div class="info-grid">
+                        <div class="info-group">
+                            <label>ชื่อผู้แจ้ง:</label>
+                            <p id="infoName">-</p>
+                        </div>
+                        <div class="info-group">
+                            <label>เบอร์โทรศัพท์ติดต่อ:</label>
+                            <p id="infoPhone">-</p>
+                        </div>
+                        <div class="info-group">
+                            <label>ตำแหน่ง/กลุ่มสาระ:</label>
+                            <p id="infoDept">-</p>
+                        </div>
+                        <div class="info-group">
+                            <label>วันที่แจ้งซ่อม:</label>
+                            <p id="infoDate">-</p>
+                        </div>
+                        <div class="info-group">
+                            <label>สถานที่:</label>
+                            <p id="infoLocation">-</p>
+                        </div>
+                        <div class="info-group full-width">
+                            <label>ประเภทงานซ่อม:</label>
+                            <p id="infoTypes">-</p>
+                        </div>
+                        <div class="info-group full-width">
+                            <label>ลักษณะการชำรุด / รายละเอียด:</label>
+                            <p class="text-block" id="infoDetails">-</p>
+                        </div>
+                        <div class="info-group full-width hidden" id="infoImagesContainer">
+                            <label>ภาพถ่ายชำรุดประกอบการแจ้งซ่อม:</label>
+                            <div class="admin-image-gallery" id="infoImagesGallery"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="modal-divider">
+
+                <!-- Admin Action Form -->
+                <form id="adminActionForm">
+                    <input type="hidden" id="formRequestId">
+
+                    <div class="form-grid">
+                        <!-- Left Block: Consideration -->
+                        <div class="action-card">
+                            <h3 class="action-card-title">1. การพิจารณาเบื้องต้น</h3>
+                            
+                            <div class="form-group-radio">
+                                <label class="radio-label">
+                                    <input type="radio" name="considerationStatus" value="pending" checked>
+                                    <span class="custom-radio"></span>
+                                    อยู่ระหว่างพิจารณา (Pending)
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="considerationStatus" value="can_proceed">
+                                    <span class="custom-radio"></span>
+                                    สามารถดำเนินการได้
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="considerationStatus" value="cannot_proceed">
+                                    <span class="custom-radio"></span>
+                                    ไม่สามารถดำเนินการได้
+                                </label>
+                            </div>
+
+                            <!-- Show if can proceed -->
+                            <div class="conditional-field hidden" id="fieldAssign">
+                                <label for="assignedTo">มอบหมายให้ (ชื่อผู้รับผิดชอบ/ช่าง):</label>
+                                <input type="text" id="assignedTo" placeholder="ระบุชื่อผู้ดำเนินการ">
+                            </div>
+
+                            <!-- Show if cannot proceed -->
+                            <div class="conditional-field hidden" id="fieldCannotProceed">
+                                <label for="reasonCannotProceed">เหตุผลที่ไม่สามารถดำเนินการ:</label>
+                                <input type="text" id="reasonCannotProceed" placeholder="ระบุสาเหตุ/ข้อขัดข้อง">
+                            </div>
+
+                            <!-- Materials List (dynamic) -->
+                            <div class="materials-section mt-4">
+                                <label>วัสดุที่ต้องใช้ซ่อมบำรุง (ถ้ามี)</label>
+                                <div class="materials-list-container" id="modalMaterialsList">
+                                    <!-- Dynamic rows inserted here -->
+                                </div>
+                                <button type="button" class="add-material-btn" id="addMaterialBtn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    เพิ่มวัสดุอุปกรณ์
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right Block: Execution Result -->
+                        <div class="action-card">
+                            <h3 class="action-card-title">2. ผลการดำเนินการ</h3>
+                            
+                            <div class="form-group-radio">
+                                <label class="radio-label">
+                                    <input type="radio" name="actionResult" value="pending" checked>
+                                    <span class="custom-radio"></span>
+                                    รอการดำเนินการ / อยู่ระหว่างซ่อม
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="actionResult" value="fixed">
+                                    <span class="custom-radio"></span>
+                                    ซ่อมเสร็จสิ้น ใช้งานได้ปกติ
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="actionResult" value="cannot_fix">
+                                    <span class="custom-radio"></span>
+                                    ไม่สามารถซ่อมได้
+                                </label>
+                            </div>
+
+                            <!-- Show if cannot fix -->
+                            <div class="conditional-field hidden" id="fieldCannotFix">
+                                <label for="reasonCannotFix">เหตุผลที่ไม่สามารถซ่อมได้:</label>
+                                <input type="text" id="reasonCannotFix" placeholder="ระบุสาเหตุ เช่น อะไหล่เลิกผลิต/ต้องจัดซื้อใหม่">
+                            </div>
+
+                            <div class="form-group mt-3">
+                                <label for="repairDetails">รายละเอียดผลการซ่อม/คำแนะนำ:</label>
+                                <textarea id="repairDetails" class="admin-textarea" rows="4" placeholder="ระบุขั้นตอนการทำงาน หรือหมายเหตุเพิ่มเติม..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="cancel-btn" id="cancelModalBtn">ยกเลิก</button>
+                        <button type="submit" class="save-btn" id="saveBtn">
+                            <span class="btn-text">บันทึกการปรับปรุง</span>
+                            <div class="loader hidden"></div>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

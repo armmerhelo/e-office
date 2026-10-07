@@ -1,0 +1,7 @@
+<?php
+require_once __DIR__.'/../config/bootstrap.php';app_method('GET');$user=app_user();$pdo=app_pdo();$page=max(1,(int)($_GET['page']??1));$limit=max(1,min(200,(int)($_GET['limit']??10)));$year=app_text($_GET,'year',10)?:'all';
+$where="l.recipient_email=? AND l.delivery_status='success' AND d.Is_Delete='active'";$params=[$user['User_Email']];if($year!=='all'){$where.=' AND d.Doc_Year=?';$params[]=$year;}
+$q=$pdo->prepare("SELECT COUNT(DISTINCT d.Doc_Id) FROM email_logs l JOIN t_document d ON l.doc_id=CAST(d.Doc_Id AS CHAR) WHERE $where");$q->execute($params);$total=(int)$q->fetchColumn();$offset=($page-1)*$limit;
+$q=$pdo->prepare("SELECT d.Doc_Id doc_id,MAX(l.file_name) file_name,MAX(l.created_at) date_received,MAX(d.Doc_Name) doc_name,MAX(d.External_Number) external_number,MAX(d.Doc_Year) doc_year FROM email_logs l JOIN t_document d ON l.doc_id=CAST(d.Doc_Id AS CHAR) WHERE $where GROUP BY d.Doc_Id ORDER BY MAX(d.Doc_Year) DESC,MAX(d.External_Number) DESC LIMIT $limit OFFSET $offset");$q->execute($params);$rows=$q->fetchAll();
+$q=$pdo->prepare("SELECT DISTINCT d.Doc_Year FROM email_logs l JOIN t_document d ON l.doc_id=CAST(d.Doc_Id AS CHAR) WHERE l.recipient_email=? AND l.delivery_status='success' AND d.Is_Delete='active' ORDER BY d.Doc_Year DESC");$q->execute([$user['User_Email']]);
+app_json(['status'=>'success','user_name'=>$user['User_Name'],'user_email'=>$user['User_Email'],'years'=>$q->fetchAll(PDO::FETCH_COLUMN),'pagination'=>['current_page'=>$page,'limit'=>$limit,'total_items'=>$total,'total_pages'=>(int)ceil($total/$limit)],'data'=>$rows]);

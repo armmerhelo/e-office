@@ -1,0 +1,59 @@
+# E-Office
+
+ระบบหนังสือราชการ: รับ/ส่งเอกสารและไฟล์แนบ ลงนาม PDF จัดการสมาชิก/กลุ่มงาน จองห้องประชุม จองเลขคำสั่ง แจ้งซ่อม และแจ้งเตือนผ่านอีเมล/Push
+
+## Runtime
+
+- PHP 8.1+ พร้อม PDO MySQL, mysqli/mysqlnd, mbstring, fileinfo, GD, cURL และ OpenSSL
+- MySQL 8 หรือ MariaDB ที่รองรับ InnoDB และ JSON
+- Node.js 22+ สำหรับ build CSS และทดสอบ
+- Apache ที่เปิดใช้ `.htaccess`; สำหรับ local PHP server ใช้ `scripts/router.php`
+
+## ตั้งค่า
+
+1. สร้างฐานข้อมูลจาก schema/backup ของระบบ แล้วตั้งค่าใน environment หรือ `config/local.php` โดยอ้างอิง `config/local.example.php`
+2. กำหนด `APP_URL` ให้ตรงกับ origin ของเว็บ และ `EOFFICE_STORAGE` เป็นโฟลเดอร์เก็บเอกสารนอก web root
+3. รัน migration และสร้าง CSS:
+
+```sh
+php scripts/migrate.php
+npm ci
+npm run build:css
+```
+
+ไฟล์ฐานข้อมูลสำรองและข้อมูลบุคลากรไม่รวมอยู่ใน repository ต้องนำเข้าจากชุดข้อมูลที่ผู้ดูแลมีสิทธิ์ใช้งาน
+
+## ทดสอบ
+
+เตรียมฐานข้อมูลสำเนาที่มีชื่อจบด้วย `_test` ก่อนรัน tests และกำหนด `PHP_BIN` ให้ตรงกับเครื่อง:
+
+```powershell
+$env:PHP_BIN = 'C:\path\to\php.exe'
+$env:TEST_DATABASE = 'eoffice_review_test'
+npm.cmd test
+npm.cmd run serve:test
+```
+
+- Tests ใช้บัญชี QA และเอกสารจำลองในฐานข้อมูลทดสอบเท่านั้น
+- SMTP, Push, AI และ Drive ใช้ adapter จำลองระหว่าง tests
+- `serve:test` เปิดเว็บที่ localhost; ใช้ `DEV_PORT` หากต้องการเปลี่ยนพอร์ต
+- ข้อมูลลับ config จริง เอกสารที่อัปโหลด และข้อมูลบุคลากรถูกกันออกจาก Git
+
+## เอกสาร
+
+- [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
+- [TEST_REPORT.md](TEST_REPORT.md): ผลทดสอบ local
+- [STAGING_DEPLOYMENT.md](STAGING_DEPLOYMENT.md): ผล deployment และทดสอบบน staging
+
+## โครงสร้าง
+
+| โฟลเดอร์ | หน้าที่ |
+| --- | --- |
+| `api/`, `config/` | API, authentication, permissions, configuration และ migrations |
+| `assets/`, `components/` | Frontend และ CSS |
+| `e-sign/` | แสดง PDF ประทับตรา วาดและลงนาม |
+| `management/` | สมาชิกและกลุ่มงาน |
+| `room_booking/`, `external_number_booking/` | จองห้องและเลขคำสั่ง |
+| `maintenance_requests/` | แจ้งซ่อมและการจัดการของเจ้าหน้าที่ |
+| `email_send/`, `Boardcast/` | อีเมลคำสั่งและระบบอุปกรณ์ |
+| `scripts/`, `tests/` | Deployment tools, workers และ automated tests |

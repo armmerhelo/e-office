@@ -1,0 +1,192 @@
+
+
+
+    /* --- สถานะเมื่อถูกคลิก (Active) --- */
+    .menu-item.is-active {
+        background-color: #007bff !important; /* เปลี่ยนเป็นสีน้ำเงิน (หรือสีที่คุณชอบ) */
+        color: white;
+        border-color: #0056b3;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transform: translateY(-2px); /* เด้งขึ้นเล็กน้อยให้ดูมีมิติ */
+        border-radius : 5px;
+    }
+
+
+
+
+/* Icon Wrapper for positioning the badge */
+.icon-wrapper {
+  position: relative;
+  display: inline-block;
+}
+/* Base Envelope Icon Style */
+.envelope-icon {
+  width: 34px;
+  height: 34px;
+  fill: currentColor; /* Allows color to be set by the parent item */
+}
+
+/* Notification Badge (Red Dot) */
+.notification-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 15px;
+  height: 15px;
+  background-color: #ff3b30; /* Bright red */
+  border-radius: 50%;
+  border: 3px solid #ffffff; /* White border to separate from icon */
+}
+.item-unread {
+  color: #007bff; /* Blue color for icon */
+}
+/* Read State */
+.item-read {
+  color: #8e8e93; /* Gray color for icon */
+}
+.item-read .menu-label {
+  color: #8e8e93; /* Gray text */
+}
+
+  @keyframes progress {
+    0% { left: -40%; width: 40%; }
+    100% { left: 100%; width: 40%; }
+  }
+  .animate-progress {
+    animation: progress 2s infinite linear;
+  }
+
+
+.table-arm{
+  border: 1px solid #D4D4D4; border-collapse: collapse;
+
+}
+
+@media screen and (max-width: 1350px) {
+  #detail_pagination {
+    display: none;
+
+
+  }
+
+}
+
+@media screen and (max-width: 970px) {
+#date_update_show{
+    display: none;
+}
+
+#btn_report{
+  display: none !important;
+}
+}
+
+/* โครงสำหรับหน้า iframe ให้ย่อได้ตามความกว้างของหน้าจอ */
+.iframe-view-container {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.iframe-view-frame {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    border: 0;
+}
+
+#main_div,
+#main-content-area {
+    min-width: 0;
+}
+
+/* Desktop navigation occupies its own flex column; mobile is a closed drawer. */
+#app-layout { display: flex; min-width: 0; }
+#sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: 16rem;
+    max-width: calc(100vw - 3rem);
+    height: 100dvh;
+    flex-shrink: 0;
+    translate: none;
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
+    overscroll-behavior: contain;
+}
+#sidebar[data-sidebar-open="true"] {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+}
+#main_div { flex: 1 1 0%; min-width: 0; }
+#overlay { position: fixed; inset: 0; z-index: 40; }
+@media (min-width: 64rem) {
+    #sidebar {
+        position: sticky;
+        inset: auto;
+        top: 0;
+        align-self: flex-start;
+        flex: 0 0 16rem;
+        max-width: none;
+        height: 100dvh;
+        translate: none;
+        transform: none;
+        visibility: visible;
+        pointer-events: auto;
+    }
+    #mobile-header, #overlay { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body #sidebar, body #overlay { transition: none !important; }
+}
+
+#modalOverlay > div,
+#modalOverlay_logout > div {
+    width: calc(100% - 2rem);
+}
+/* สถานะเริ่มต้น: ซ่อนไว้และจาง */
+.modal-fade {
+    opacity: 0;
+    pointer-events: none; /* กดไม่ได้ตอนซ่อน */
+    transition: all 0.5s ease-in-out;
+}
+
+/* สถานะเมื่อเปิด: แสดงผลและนูนออกมา */
+.modal-fade.active {
+    opacity: 1;
+    pointer-events: auto; /* กลับมาให้กดได้ */
+}
+
+/* ตกแต่งเนื้อหาข้างในให้ขยับเล็กน้อยตอนเปิด */
+.modal-fade > div {
+    transform: scale(0.95);
+    transition: transform 0.5s ease-out;
+}
+
+.modal-fade.active > div {
+    transform: scale(1);
+}
+
+/* --- Scrollbar เล็ก (ทั้งเว็บ) --- */
+* {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #cbd5e1 transparent; /* Firefox */
+}
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบจองเลขคำสั่งภายนอก</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SweetAlert2 สำหรับ Message Box ประสิทธิภาพสูง -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Google Fonts - Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- หน้าจอแจ้งเตือนกรณีไม่มีสิทธิ์เข้าใช้งาน (Unauthorized Lock Screen) -->
+    <div id="unauthorizedScreen" class="hidden fixed inset-0 z-50 bg-slate-100 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl border border-red-100 p-8 max-w-md w-full text-center">
+            <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 text-red-600 mb-6">
+                <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m3-9a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM4 10V7a4 4 0 018 0v3m4 0a4 4 0 018 0v3M4 14h16M4 18h16"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">ไม่พบสิทธิ์การเข้าใช้งาน</h3>
+            <p class="text-gray-500 mb-6">กรุณาเข้าสู่ระบบผ่านระบบหลักของหน่วยงานเพื่อลงทะเบียนความปลอดภัยของระบบจองเลข</p>
+            <div class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 break-all">
+                Error Code: AUTH_TOKEN_MISSING
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าจอระบบหลักสำหรับผู้ใช้ที่มี Token -->
+    <div id="mainApp" class="flex-grow">
+
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+            <!-- แบบฟอร์มจองเลข -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-4 sm:p-6 mb-8">
+                <div class="flex items-center space-x-2 mb-4 border-b pb-3 border-slate-100">
+                    <div class="w-2 h-6 bg-blue-600 rounded-full"></div>
+                    <h2 class="text-lg font-bold text-slate-800">ยื่นแบบฟอร์มขอจองเลขคำสั่ง</h2>
+                </div>
+
+                <form id="bookingForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div class="md:col-span-2">
+                        <label for="docDetail" class="block text-sm font-semibold text-slate-600 mb-1.5">เรื่อง / รายละเอียดเอกสาร <span class="text-red-500">*</span></label>
+                        <input type="text" id="docDetail" required
+                            class="w-full border-slate-300 rounded-xl shadow-sm border p-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-150"
+                            placeholder="กรุณากรอกหัวข้อเรื่องหรือรายละเอียดที่ต้องการจองเลขให้ครบถ้วน...">
+                    </div>
+                    <div>
+                        <label for="docYear" class="block text-sm font-semibold text-slate-600 mb-1.5">ปีเอกสาร (พ.ศ.)</label>
+                        <input type="number" id="docYear" required
+                            class="w-full border-slate-200 rounded-xl border p-3 bg-slate-50 text-slate-500 font-semibold cursor-not-allowed" readonly>
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-150">
+                            ลงทะเบียนจองเลข
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ทะเบียนแสดงตารางข้อมูล -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-100 flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center bg-slate-50/50">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">ทะเบียนประวัติจองเลขประจำปี <span id="displayYear" class="text-blue-700"></span></h2>
+                        <p class="text-xs text-slate-400 mt-1">แสดงข้อมูลเรียงลำดับการจองใหม่ล่าสุด</p>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <!-- ตัวเลือกปี พ.ศ. สำหรับดูประวัติย้อนหลัง -->
+                        <select id="yearFilter" onchange="fetchBookings()" class="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-semibold text-slate-700 bg-white shadow-sm cursor-pointer">
+                            <!-- Options สร้างจาก JavaScript -->
+                        </select>
+
+                        <!-- ช่องป้อนค้นหากรองข้อมูลเพื่อความสะดวก -->
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </span>
+                            <input type="text" id="tableSearch" onkeyup="filterTable()" placeholder="ค้นหาตามเรื่อง / เลขที่คำสั่ง..."
+                                class="w-full sm:w-64 pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm">
+                        </div>
+
+                        <button onclick="fetchBookings()" class="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 shadow-sm transition-colors duration-150 flex items-center justify-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            รีเฟรช
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-100" id="bookingsTable">
+                        <thead class="bg-slate-50/70 text-slate-600">
+                            <tr>
+                                <th scope="col" class="px-6 py-4.5 text-left font-bold uppercase tracking-wider w-20">ลำดับ</th>
+                                <th scope="col" class="px-6 py-4.5 text-left  font-bold uppercase tracking-wider w-36">เลขที่คำสั่ง</th>
+                                <th scope="col" class="px-6 py-4.5 text-left  font-bold uppercase tracking-wider">เรื่อง / รายละเอียดเอกสาร</th>
+                                <th scope="col" class="px-6 py-4.5 text-left  font-bold uppercase tracking-wider w-40">ผู้ทำรายการ</th>
+                                <th scope="col" class="px-6 py-4.5 text-center  font-bold uppercase tracking-wider w-24">ปี (พ.ศ.)</th>
+                                <th scope="col" class="px-6 py-4.5 text-center  font-bold uppercase tracking-wider w-32 action-column hidden">จัดการข้อมูล</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="bg-white divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                                    <div class="flex flex-col items-center justify-center space-y-2">
+                                        <svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>กำลังเรียกดูประวัติบันทึก...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Modal สำหรับแก้ไขรายละเอียด (สิทธิ์ Admin เท่านั้น) -->
+    <div id="editModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 hidden transition-all duration-150">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 border border-slate-100">
+            <div class="flex justify-between items-center mb-5 border-b pb-3">
+                <h3 class="text-lg font-bold text-slate-800">แก้ไขรายละเอียดข้อมูลการจอง</h3>
+                <button onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600 p-1 hover:bg-slate-100 rounded-lg transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-600 mb-1.5">เลขที่คำสั่งที่ระบุ</label>
+                    <input type="text" id="editExternalNumber" class="w-full border-slate-200 rounded-xl border p-3 bg-slate-50 text-slate-500 font-bold" readonly>
+                </div>
+                <div class="mb-4">
+                    <label for="editDocDetail" class="block text-sm font-semibold text-slate-600 mb-1.5">รายละเอียดเอกสาร (ใหม่) <span class="text-red-500">*</span></label>
+                    <textarea id="editDocDetail" rows="3" required class="w-full border-slate-300 rounded-xl border p-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" placeholder="ป้อนชื่อเรื่องเพื่ออัปเดตระบบสารบรรณ..."></textarea>
+                </div>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl hover:bg-slate-50 font-semibold transition-all">ยกเลิก</button>
+                    <button type="submit" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 font-semibold transition-all">บันทึกการปรับปรุง</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // กำหนดปีปัจจุบันในโครงสร้างราชการไทย (พ.ศ.)
+        const currentYear = new Date().getFullYear() + 543;
+        document.getElementById('docYear').value = currentYear;
+
+        // สร้างตัวเลือกปีสำหรับดูประวัติย้อนหลัง (สร้างย้อนหลังให้ 5 ปี)
+        const yearFilter = document.getElementById('yearFilter');
+        for (let i = 0; i < 5; i++) {
+            const year = currentYear - i;
+            const option = document.createElement('option');
+            option.value = year;
+            option.text = 'ปี พ.ศ. ' + year;
+            yearFilter.appendChild(option);
+        }
+
+        // ดึงที่ตั้ง API จากจุดเดิม
+        const API_URL = 'external_number_booking.php';
+        let isAdmin = false;
+        let cachedBookings = []; // สำหรับแคชข้อมูลใช้ในการกรองค้นหาที่แม่นยำ
+
+        // ฟังก์ชันดึงค่าคุกกี้ตามชื่อ (getCookie)
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        }
+
+        // ดึง Token ความปลอดภัยจาก Cookie "User_Token"
+        function getToken() {
+            return getCookie('User_Id') ? 'session' : '';
+        }
+
+        // แสดงหน้าล็อกสิทธิ์ (Access Denied)
+        function showUnauthorizedScreen() {
+            document.getElementById('unauthorizedScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+
+        // คัดลอกเลขคำสั่งด่วนลงคลิปบอร์ด
+        window.copyToClipboard = function(text) {
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            // ใช้ความสามารถ SweetAlert2 แจ้งเตือนแบบไม่ขัดจังหวะ
+            Swal.fire({
+                icon: 'success',
+                title: 'คัดลอกสำเร็จ',
+                text: `คัดลอกเลขคำสั่ง ${text} ไปยังคลิปบอร์ดแล้ว`,
+                timer: 1500,
+                showConfirmButton: false,
+                position: 'top-end',
+                toast: true
+            });
+        }
+
+        // โหลดข้อมูลจริงจาก API ฝั่งเซิร์ฟเวอร์
+        async function fetchBookings() {
+            const token = getToken();
+            if (!token) {
+                showUnauthorizedScreen();
+                return;
+            }
+
+            // อ่านค่าปีปัจจุบันที่เลือกจาก Dropdown ถ้าไม่มีให้ใช้ปีปัจจุบัน
+            const selectedYear = document.getElementById('yearFilter').value;
+            document.getElementById('displayYear').innerText = selectedYear;
+
+            // แสดงสถานะกำลังโหลด
+            document.getElementById('tableBody').innerHTML = `
+                <tr>
+                    <td colspan="6" class="px-6 py-8 text-center text-slate-400">
+                        <div class="flex flex-col items-center justify-center space-y-2">
+                            <svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>กำลังเรียกดูประวัติบันทึกปี ${selectedYear}...</span>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            try {
+                // ส่งพารามิเตอร์ year ไปกับ URL เพื่อดึงข้อมูลเฉพาะปีที่เลือก
+                const response = await fetch(`${API_URL}?year=${selectedYear}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+
+                if (response.status === 401) {
+                    showUnauthorizedScreen();
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (response.ok && data.status === 'success') {
+                    isAdmin = data.isAdmin;
+
+                    cachedBookings = data.data; // เก็บข้อมูลลงแคชสำหรับฟังก์ชันค้นหา
+                    renderTable(cachedBookings);
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'ความเข้าถึงล้มเหลว',
+                        text: data.message || 'ไม่สามารถรับส่งข้อมูลกับระบบได้'
+                    });
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'ข้อผิดพลาดระบบเครือข่าย',
+                    text: 'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต หรือเซิร์ฟเวอร์หลักของคุณ'
+                });
+            }
+        }
+
+        // ปรับการจัดแสดง Badge และตัวเลือกจัดการสำหรับแอดมิน
+
+        // แสดงผลรายการลงตารางหลัก
+        function renderTable(bookings) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+
+            if (bookings.length === 0) {
+                const selectedYear = document.getElementById('yearFilter').value;
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">ยังไม่มีรายการจองใดๆ ในปี ${selectedYear}</td></tr>`;
+                return;
+            }
+
+            bookings.forEach((raw, index) => {
+                const item = escapeRecord(raw);
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/50 transition duration-100 h-[50px]';
+
+                const editBtnHtml = isAdmin
+                    ? `<div class="flex justify-center space-x-1.5">
+                           <button onclick="openEditModal(${item.id}, '${item.External_Number}', '${item.Doc_Detail.replace(/'/g, "\\'")}')" class="text-blue-600 hover:text-blue-800 font-semibold text-sm bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200/50 transition">แก้ไข</button>
+                           <button onclick="deleteBooking(${item.id}, '${item.External_Number}')" class="text-red-600 hover:text-red-800 font-semibold text-sm bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg border border-red-200/50 transition">ลบ</button>
+                       </div>`
+                    : ``;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4.5 whitespace-nowrap  text-slate-500 font-medium">${index + 1}</td>
+                    <td class="px-6 py-4.5 whitespace-nowrap   text-slate-700">
+                        <div class="flex items-center space-x-1.5">
+                            <span class="">${item.External_Number}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4.5  text-slate-700">${item.Doc_Detail}</td>
+                    <td class="px-6 py-4.5  text-slate-600">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                                ${(item.User_Name ? item.User_Name.charAt(0) : '?')}
+                            </div>
+                            <span class="font-medium">${item.User_Name || 'ไม่ระบุ'}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4.5 whitespace-nowrap  text-center text-slate-500 font-mono">${item.Doc_Year}</td>
+                    <td class="px-6 py-4.5 whitespace-nowrap text-center  font-medium action-column ${isAdmin ? '' : 'hidden'}">
+                        ${editBtnHtml}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+                const editButton = tr.querySelector('button');
+                if (editButton) {
+                    editButton.removeAttribute('onclick');
+                    editButton.addEventListener('click', () => openEditModal(raw.id, raw.External_Number, raw.Doc_Detail));
+                }
+            });
+        }
+
+        // จัดการส่งคำขอจองเลข
+        document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const token = getToken();
+            const detail = document.getElementById('docDetail').value.trim();
+            const year = document.getElementById('docYear').value;
+
+            if (!token) return showUnauthorizedScreen();
+
+            // แสดงหน้าจอกำลังทำงาน
+            Swal.fire({
+                title: 'กำลังตรวจสอบคิวลงจอง...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ docDetail: detail, docYear: year })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    // เปลี่ยน Select ปีกลับมาเป็นปีปัจจุบันถ้ามีการจอง
+                    document.getElementById('yearFilter').value = year;
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ลงทะเบียนจองเลขเรียบร้อย!',
+                        html: `
+                            <div class="mt-2 text-center">
+                                <p class="text-slate-500 text-sm">เลขที่คำสั่งใหม่ที่คุณได้รับคือ</p>
+                                <div class="my-4 p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center space-x-2">
+                                    <span class="text-3xl font-extrabold  font-mono tracking-wider">${result.data.External_Number}</span>
+                                </div>
+                                <p class="text-xs text-slate-400">เรื่อง: ${result.data.Doc_Detail}</p>
+                                <p class="text-xs text-slate-400 mt-1">ผู้ทำรายการ: <span class="font-semibold text-slate-600">${result.data.User_Name || '-'}</span></p>
+                            </div>
+                        `,
+                        confirmButtonText: 'รับทราบ',
+                        confirmButtonColor: '#2563eb',
+                        customClass: {
+                            confirmButton: 'rounded-xl px-5 py-2.5 font-bold'
+                        }
+                    });
+                    document.getElementById('docDetail').value = '';
+                    fetchBookings(); // อัปเดตตารางเป็นข้อมูลชุดล่าสุด
+                } else {
+                    Swal.fire('การส่งข้อมูลไม่สมบูรณ์', result.message || 'ไม่สามารถทำรายการจองเลขสำเร็จได้', 'warning');
+                }
+            } catch (error) {
+                console.error("Error booking:", error);
+                Swal.fire('ข้อผิดพลาดระบบสารบรรณ', 'ไม่พบการเชื่อมโยงระบบบันทึก โปรดตรวจสอบ PHP API', 'error');
+            }
+        });
+
+        // เปิด Modal แก้ไขของ Admin
+        window.openEditModal = function(id, extNumber, detail) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editExternalNumber').value = extNumber;
+            document.getElementById('editDocDetail').value = detail;
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        // ปิด Modal
+        window.closeEditModal = function() {
+            document.getElementById('editModal').classList.add('hidden');
+        }
+
+        // ส่งการแก้ไขเพื่อบันทึก (สำหรับ Admin เท่านั้น)
+        document.getElementById('editForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const token = getToken();
+            const id = document.getElementById('editId').value;
+            const detail = document.getElementById('editDocDetail').value.trim();
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({ id: id, docDetail: detail })
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'ปรับปรุงเรียบร้อย',
+                        text: 'อัปเดตรายละเอียดเรื่องของการจองแล้ว',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        position: 'top-end',
+                        toast: true
+                    });
+                    closeEditModal();
+                    fetchBookings();
+                } else {
+                    Swal.fire('ไม่สามารถปรับปรุงได้', result.message || 'การเรียกแก้ไขไม่ผ่านการจำลองเซิร์ฟเวอร์', 'error');
+                }
+            } catch (error) {
+                console.error("Error editing:", error);
+                Swal.fire('ข้อผิดพลาดระบบเครือข่าย', 'ไม่สามารถบันทึกและส่งข้อมูลที่แก้ไขได้ในขณะนี้', 'error');
+            }
+        });
+
+        // ฟังก์ชันลบข้อมูล (สำหรับ Admin เท่านั้น)
+        window.deleteBooking = function(id, extNumber) {
+            Swal.fire({
+                title: 'ยืนยันการลบข้อมูล?',
+                text: `คุณต้องการลบรายการจองเลข ${extNumber} ใช่หรือไม่? ข้อมูลนี้ไม่สามารถกู้คืนได้`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#94a3b8',
+                confirmButtonText: 'ใช่, ลบเลย!',
+                cancelButtonText: 'ยกเลิก'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const token = getToken();
+                    try {
+                        const response = await fetch(API_URL, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + token
+                            },
+                            body: JSON.stringify({ id: id })
+                        });
+
+                        const resData = await response.json();
+
+                        if (response.ok && resData.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'ลบสำเร็จ!',
+                                text: 'ข้อมูลถูกลบออกจากระบบเรียบร้อยแล้ว',
+                                timer: 1500,
+                                showConfirmButton: false,
+                                position: 'top-end',
+                                toast: true
+                            });
+                            fetchBookings(); // โหลดข้อมูลตารางใหม่ทันที
+                        } else {
+                            Swal.fire('เกิดข้อผิดพลาด', resData.message || 'ไม่สามารถลบข้อมูลได้', 'error');
+                        }
+                    } catch (error) {
+                        console.error("Error deleting:", error);
+                        Swal.fire('ข้อผิดพลาดระบบเครือข่าย', 'ไม่สามารถส่งคำสั่งลบได้ในขณะนี้', 'error');
+                    }
+                }
+            });
+        }
+
+        // คัดกรองข้อมูลประวัติการจองบนตาราง (Search Engine ในหน้าเดียว)
+        window.filterTable = function() {
+            const keyword = document.getElementById('tableSearch').value.toLowerCase().trim();
+            if (!keyword) {
+                renderTable(cachedBookings);
+                return;
+            }
+
+            const filtered = cachedBookings.filter(item => {
+                const externalNum = item.External_Number ? item.External_Number.toString().toLowerCase() : '';
+                const docDetail = item.Doc_Detail ? item.Doc_Detail.toString().toLowerCase() : '';
+                const docYear = item.Doc_Year ? item.Doc_Year.toString().toLowerCase() : '';
+                const userName = item.User_Name ? item.User_Name.toString().toLowerCase() : '';
+
+                return externalNum.includes(keyword) || docDetail.includes(keyword) || docYear.includes(keyword) || userName.includes(keyword);
+            });
+
+            renderTable(filtered);
+        }
+
+        // เริ่มทำการโหลดข้อมูลการจองทันทีเมื่อ DOM พร้อมทำงาน
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchBookings();
+        });
+    </script>
+</body>
+</html>

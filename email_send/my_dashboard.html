@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แดชบอร์ดคำสั่งของฉัน - E-Office</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --primary: #4f46e5; --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0; --text: #0f172a; }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; font-weight: 300; min-width: 0; }
+
+        .container {  margin: 0 auto; }
+
+        .header-card { background: linear-gradient(135deg, #4f46e5, #3b82f6); color: #fff; padding: 20px 30px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        .header-card h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 5px; }
+        .header-card p { font-size: 0.9rem; font-weight: 300; opacity: 0.9; }
+
+        /* ส่วนควบคุมปุ่มและ Dropdown */
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .select-year { padding: 8px 12px; border: 1px solid rgba(255,255,255,0.3); border-radius: 6px; background: rgba(255,255,255,0.2); color: #fff; font-family: 'Prompt'; font-size: 0.9rem; outline: none; cursor: pointer; transition: 0.2s; }
+        .select-year option { color: var(--text); background: #fff; }
+        .select-year:hover { background: rgba(255,255,255,0.3); }
+
+        .dashboard-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
+
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 15px 20px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+        th { background: #f1f5f9; font-weight: 500; color: #475569; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: #f8fafc; }
+
+        .btn-view { display: inline-flex; align-items: center; gap: 5px; padding: 8px 15px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; text-decoration: none; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; }
+        .btn-view:hover { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+
+        .badge-date { background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 400; }
+        .empty-state { text-align: center; padding: 50px 20px; color: #64748b; }
+
+        .pagination-container { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .pagination-info { font-size: 0.85rem; color: #64748b; }
+        .pagination-buttons { display: flex; gap: 5px; }
+        .btn-page { padding: 6px 12px; background: #fff; border: 1px solid var(--border); border-radius: 6px; color: #334155; font-size: 0.85rem; cursor: pointer; transition: 0.2s; font-family: 'Prompt'; }
+        .btn-page:hover:not(:disabled) { background: #f1f5f9; border-color: #cbd5e1; }
+        .btn-page:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-page.active { background: #4f46e5; color: #fff; border-color: #4f46e5; font-weight: 500; }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .header-card { padding: 14px; }
+            .header-card h1 { font-size: 1.2rem; }
+            .header-actions { width: 100%; flex-wrap: wrap; }
+            .select-year,
+            .header-actions button { flex: 1 1 0; min-width: 0; }
+            .pagination-container { flex-direction: column; align-items: flex-start; }
+            .pagination-buttons { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-card">
+        <div>
+            <h1>📋 ประวัติคำสั่งแต่งตั้งของฉัน</h1>
+            <p id="userInfo">กำลังโหลดข้อมูลผู้ใช้...</p>
+        </div>
+        <div class="header-actions">
+            <select id="yearSelect" class="select-year" onchange="filterByYear()">
+                <option value="all">📅 ประวัติทั้งหมด</option>
+            </select>
+
+            <button onclick="fetchMyDocuments(currentPage)" style="padding:8px 15px; border:none; border-radius:6px; background:rgba(255,255,255,0.2); color:#fff; cursor:pointer; font-family:'Prompt'; font-size:0.9rem; transition:0.2s;">
+                🔄 รีเฟรช
+            </button>
+        </div>
+    </div>
+
+    <div class="dashboard-card">
+        <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+
+                    <th style="width: 20%;">เลขที่คำสั่ง (เลขที่/ปี)</th>
+                    <th style="width: 40%;">ชื่อคำสั่ง / รายละเอียด</th>
+                    <th style="width: 20%; text-align: right;">เปิดเอกสาร</th>
+                </tr>
+            </thead>
+            <tbody id="myDocTableBody">
+                <tr><td colspan="4" class="empty-state">⏳ กำลังโหลดประวัติคำสั่งของคุณ...</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+    <div class="pagination-container">
+        <div class="pagination-info" id="pageInfo">รายการที่ 0-0 จากทั้งหมด 0 รายการ</div>
+        <div class="pagination-buttons" id="paginationBtns"></div>
+    </div>
+</div>
+
+<script>
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;',
+        '"': '&quot;', "'": '&#039;'
+    })[character]);
+}
+
+let currentPage = 1;
+const itemsPerPage = 10;
+
+document.addEventListener('DOMContentLoaded', () => fetchMyDocuments(currentPage));
+
+// ฟังก์ชันดึงข้อมูเมื่อมีการเปลี่ยนปีใน Dropdown
+function filterByYear() {
+    fetchMyDocuments(1); // เมื่อกรองปีใหม่ ให้กลับไปเริ่มแสดงที่หน้า 1 เสมอ
+}
+
+async function fetchMyDocuments(page = 1) {
+    currentPage = page;
+    const tbody = document.getElementById('myDocTableBody');
+    const userInfo = document.getElementById('userInfo');
+    const yearSelect = document.getElementById('yearSelect');
+
+    const selectedYear = yearSelect.value; // ดึงค่าปีที่เลือกส่งไปหลังบ้านด้วย
+
+    tbody.innerHTML = `<tr><td colspan="4" class="empty-state">⏳ กำลังโหลดข้อมูล...</td></tr>`;
+
+    try {
+        // เพิ่มพารามิเตอร์ &year=${selectedYear} ส่งให้ PHP
+        const response = await fetch(`api_get_my_docs.php?page=${page}&limit=${itemsPerPage}&year=${selectedYear}`);
+        const result = await response.json();
+
+        if (result.status === 'error') throw new Error(result.message);
+
+        userInfo.textContent = `👤 ${result.user_name} (${result.user_email})`;
+
+        // 📌 ทำการสร้างตัวเลือกปีใน Dropdown อัตโนมัติ (ทำเฉพาะตอนหน้าเว็บยังไม่มีตัวเลือกปี)
+        if (yearSelect.options.length <= 1 && result.years && result.years.length > 0) {
+            result.years.forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = `ปี พ.ศ. ${y}`;
+                yearSelect.appendChild(opt);
+            });
+        }
+
+        const data = result.data;
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="empty-state">📭 ไม่พบประวัติคำสั่งแต่งตั้งตามเงื่อนไขที่เลือก</td></tr>`;
+            renderPagination(0, 1);
+            return;
+        }
+
+        data.forEach(item => {
+            const docId = Number.parseInt(item.doc_id, 10);
+            if (!Number.isInteger(docId) || docId <= 0) return;
+            const docYear = String(item.doc_year || '');
+            const fileName = String(item.file_name || '');
+            const fileLink = `../api/view_file.php?Doc_Id=${docId}&File_Path=${encodeURIComponent(fileName)}&Year=${encodeURIComponent(docYear)}`;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+
+                <td>
+                    <strong style="color: #374151; font-size: 1rem;">${escapeHtml(item.external_number)}/${escapeHtml(docYear)}</strong>
+                    <div style="font-size: 0.75rem; color: #374151;">(ระบบอ้างอิง ID: ${escapeHtml(docId)})</div>
+                </td>
+                <td>
+                    <div style="font-weight: 500; color: #1F2937  ; line-height: 1.4; white-space: normal; word-break: break-word;">
+                        ${escapeHtml(item.doc_name)}
+                    </div>
+                    <div style="font-size: 0.75rem; color: #64748b; word-break: break-all; margin-top: 3px;">
+                        📄 ไฟล์: ${escapeHtml(fileName)}
+                    </div>
+                </td>
+                <td style="text-align: right;">
+                    <a href="${fileLink}" target="_blank" class="btn-view">
+                        📄 เปิดไฟล์ PDF
+                    </a>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        renderPagination(result.pagination.total_items, result.pagination.total_pages);
+
+    } catch (error) {
+        userInfo.innerText = "❌ ไม่สามารถระบุตัวตนได้";
+        tbody.innerHTML = `<tr><td colspan="4" class="empty-state" style="color:#ef4444;">❌ ข้อผิดพลาด: ${escapeHtml(error.message)}</td></tr>`;
+    }
+}
+
+function renderPagination(totalItems, totalPages) {
+    const pageInfo = document.getElementById('pageInfo');
+    const btnContainer = document.getElementById('paginationBtns');
+    btnContainer.innerHTML = '';
+
+    if (totalItems === 0) {
+        pageInfo.innerText = "ไม่มีรายการที่จะแสดง";
+        return;
+    }
+
+    const startItem = ((currentPage - 1) * itemsPerPage) + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+    pageInfo.innerText = `แสดงรายการที่ ${startItem}-${endItem} จากทั้งหมด ${totalItems} รายการ (หน้า ${currentPage}/${totalPages})`;
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'btn-page';
+    prevBtn.innerText = '◀ ก่อนหน้า';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => fetchMyDocuments(currentPage - 1);
+    btnContainer.appendChild(prevBtn);
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = `btn-page ${i === currentPage ? 'active' : ''}`;
+        pageBtn.innerText = i;
+        pageBtn.onclick = () => fetchMyDocuments(i);
+        btnContainer.appendChild(pageBtn);
+    }
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'btn-page';
+    nextBtn.innerText = 'ถัดไป ▶';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => fetchMyDocuments(currentPage + 1);
+    btnContainer.appendChild(nextBtn);
+}
+</script>
+
+</body>
+</html>

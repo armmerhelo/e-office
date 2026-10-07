@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการข้อมูลการจองห้องประชุม</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+        /* Custom Scrollbar for table */
+        ::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-gray-800 p-4 md:p-8">
+
+    <div class=" mx-auto">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center gap-2">
+                    <i class="ph ph-calendar-check text-4xl"></i>
+                    รายการจองห้องประชุมของฉัน
+                </h1>
+                <p class="text-gray-500 mt-1 flex items-center gap-2">
+                    <i class="ph ph-user"></i>
+                    ผู้ใช้งาน: <span id="currentUserDisplay" class="font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full text-xs">กำลังโหลดข้อมูล...</span>
+                </p>
+            </div>
+            <div class="w-full md:w-auto flex gap-2">
+                <div class="relative w-full md:w-64">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="searchInput" placeholder="ค้นหาหัวข้อการประชุม..."
+                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full  text-sm text-left table-fixed">
+                    <thead class="bg-indigo-50 text-indigo-800 font-semibold uppercase text-xs">
+                        <tr>
+                          <th class="px-6 py-4 w-[180px]">สถานะ</th>
+                                      <th class="px-6 py-4 w-[200px]">ห้องประชุม</th>
+                                      <th class="px-6 py-4 w-[350px]">หัวข้อการประชุม</th>
+                                      
+                                      <th class="px-6 py-4 w-[190px]">เวลาเริ่ม - สิ้นสุด</th>
+                                      <th class="px-2 py-4 w-[150px]">อุปกรณ์</th>
+                                      <th class="px-2 py-4 text-center w-[110px]">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-gray-200">
+                        </tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12">
+                <i class="ph ph-folder-open text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 text-lg">ไม่พบข้อมูลการจองห้องของคุณในขณะนี้</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-indigo-50">
+                <h2 class="text-xl font-bold text-indigo-800 flex items-center gap-2">
+                    <i class="ph ph-pencil-simple text-2xl"></i> แก้ไขข้อมูลการจอง
+                </h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 transition-colors">
+                    <i class="ph ph-x text-2xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
+                <form id="editForm" class="space-y-5">
+                    <input type="hidden" id="edit_id">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ห้องประชุม</label>
+                            <select id="edit_room_name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                                <option value="" disabled selected>-- เลือกห้องประชุม --</option>
+                                <option value="หอประชุมชยางกูร">หอประชุมชยางกูร</option>
+                                <option value="ห้องกันเกรา">ห้องกันเกรา</option>
+                                <option value="ห้องสารภี">ห้องสารภี</option>
+                                <option value="ห้องโสตทัศนศึกษา">ห้องโสตทัศนศึกษา</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ผู้จอง</label>
+                            <input type="text" id="edit_requester_name" required  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none  ">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">ฝ่ายงาน</label>
+                            <input type="text" id="edit_department" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none  ">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">จำนวนผู้มาใช้บริการ (คน)</label>
+                            <input type="number" id="edit_attendees" min="1" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">หัวข้อการประชุม</label>
+                        <input type="text" id="edit_topic" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วัน-เวลา เริ่มต้น</label>
+                            <input type="datetime-local" id="edit_start_datetime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">วัน-เวลา สิ้นสุด</label>
+                            <input type="datetime-local" id="edit_end_datetime" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-200">
+                        <label class="block text-sm font-medium text-gray-700 mb-3">อุปกรณ์และบริการเสริม</label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_audio" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm">เครื่องเสียง/ไมค์</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_computer" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm">คอมพิวเตอร์</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_projector" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm">โปรเจคเตอร์</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_food" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm">อาหาร/เครื่องดื่ม</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_led1" onchange="toggleLedEquip()" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">จอ LED (ภาพนิ่ง/พื้นหลัง)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="edit_eq_led2" onchange="toggleLedEquip()" class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">จอ LED (เปิดไฟล์ประกอบ)</span>
+                            </label>
+                        </div>
+                        <div class="mt-3">
+                            <label class="block text-sm text-gray-500 mb-1">อื่นๆ (ระบุ) <span class="text-xs text-gray-400">(ท่านสามารถพิมพ์รายละเอียดเพิ่มเองได้อย่างอิสระ)</span></label>
+                            <input type="text" id="edit_eq_other" placeholder="เช่น กระดานไวท์บอร์ด, ปลั๊กพ่วง..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                <button type="button" onclick="closeModal()" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">ยกเลิก</button>
+                <button type="button" onclick="saveChanges()" class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                    <i class="ph ph-floppy-disk text-lg"></i> บันทึกข้อมูล
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 z-[60]">
+        <i class="ph ph-check-circle text-2xl"></i>
+        <span id="toastMessage" class="font-medium">บันทึกข้อมูลสำเร็จ</span>
+    </div>
+
+    <script>
+
+
+
+        function getCookie(name) {
+            let matches = document.cookie.match(new RegExp(
+                "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+            ));
+            return matches ? decodeURIComponent(matches[1]) : undefined;
+        }
+
+        let bookings = [];
+
+        function renderTable(data = bookings) {
+            const tbody = document.getElementById('tableBody');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.parentNode.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                tbody.parentNode.classList.remove('hidden');
+                emptyState.classList.add('hidden');
+            }
+
+            data.forEach(raw => {
+                const booking = escapeRecord(raw);
+                const start = new Date(booking.start_datetime);
+                const end = new Date(booking.end_datetime);
+                const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
+                const timeOptions = { hour: '2-digit', minute: '2-digit' };
+
+                const isSameDay = start.toDateString() === end.toDateString();
+                let dateTimeHtml = '';
+
+                if (isSameDay) {
+                    // กรณีวันเดียวกัน แยกบรรทัดวันที่ และบรรทัดช่วงเวลาออกจากกัน
+                    const dateStr = start.toLocaleDateString('th-TH', dateOptions);
+                    const timeStr = `${start.toLocaleTimeString('th-TH', timeOptions)} - ${end.toLocaleTimeString('th-TH', timeOptions)} น.`;
+                    dateTimeHtml = `
+                        <div class="text-gray-900 font-medium">${dateStr}</div>
+                        <div class="text-gray-500 text-xs mt-0.5"><i class="ph ph-clock inline-block align-middle mr-0.5 text-indigo-500"></i> ${timeStr}</div>
+                    `;
+                } else {
+                    // กรณีคนละวัน แยกข้อมูลเริ่มต้นและสิ้นสุด โดยในแต่ละกลุ่มแยกบรรทัด วัน และ เวลา ออกจากกันชัดเจน
+                    const startDateStr = start.toLocaleDateString('th-TH', dateOptions);
+                    const endDateStr = end.toLocaleDateString('th-TH', dateOptions);
+                    const startTimeStr = start.toLocaleTimeString('th-TH', timeOptions);
+                    const endTimeStr = end.toLocaleTimeString('th-TH', timeOptions);
+                    dateTimeHtml = `
+                        <div class="space-y-1.5">
+                            <div>
+                                <div class="text-gray-900 text-xs font-medium"><span class="text-indigo-600 font-semibold">เริ่ม:</span> ${startDateStr}</div>
+                                <div class="text-gray-500 text-[11px] pl-7">เวลา ${startTimeStr} น.</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-900 text-xs font-medium"><span class="text-rose-600 font-semibold">ถึง:</span> ${endDateStr}</div>
+                                <div class="text-gray-500 text-[11px] pl-7">เวลา ${endTimeStr} น.</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                let eqHtml = '<div class="flex gap-1 flex-wrap">';
+                if(booking.equipment_audio == 1) eqHtml += `<span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full" title="เครื่องเสียง"><i class="ph ph-speaker-high"></i></span>`;
+                if(booking.equipment_computer == 1) eqHtml += `<span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full" title="คอมพิวเตอร์"><i class="ph ph-desktop"></i></span>`;
+                if(booking.equipment_projector == 1) eqHtml += `<span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full" title="โปรเจคเตอร์"><i class="ph ph-projector-screen"></i></span>`;
+                if(booking.equipment_food == 1) eqHtml += `<span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full" title="อาหาร/เครื่องดื่ม"><i class="ph ph-coffee"></i></span>`;
+                if(booking.equipment_other) eqHtml += `<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full truncate max-w-[100px]" title="${booking.equipment_other}">อื่นๆ</span>`;
+                if(eqHtml === '<div class="flex gap-1 flex-wrap">') eqHtml += '<span class="text-gray-400 text-xs">- ไม่มี -</span>';
+                eqHtml += '</div>';
+
+                let statusHtml = '';
+                const currentStatus = booking.status ? booking.status.toLowerCase() : 'pending';
+
+                if (currentStatus === 'confirm' || currentStatus === 'confirmed') {
+                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200 transition-colors cursor-pointer w-28 justify-center">
+                                    <i class="ph ph-check-circle-fill text-emerald-600"></i> อนุมัติแล้ว
+                                  </button>
+                                    <p class="text-xs pt-2">${booking.created_at}</p>
+                                  `;
+                } else if (currentStatus === 'cancel' || currentStatus === 'cancelled') {
+                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 transition-colors cursor-pointer w-28 justify-center">
+                                    <i class="ph ph-x-circle-fill text-red-600"></i> ยกเลิก
+                                  </button>
+                                  <p class="text-xs pt-2">${booking.created_at}</p>
+                                  `;
+                } else {
+                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200 transition-colors cursor-pointer w-28 justify-center">
+                                    <i class="ph ph-clock-fill text-amber-600"></i> รอดำเนินการ
+                                  </button>
+                                    <p class="text-xs pt-2">${booking.created_at}</p>
+                                  `;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-indigo-50/50 transition-colors group";
+                tr.innerHTML = `
+                    <td class="px-6 py-4">
+                        ${statusHtml}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-gray-900">${booking.room_name}</div>
+                    </td>
+                    <td class="px-6 py-4 max-w-[550px]">
+                        <div class="text-gray-800 break-words overflow-hidden">${booking.topic}</div>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <i class="ph ph-users"></i> ผู้มาใช้บริการ: <span class="font-medium text-indigo-600">${booking.attendees || 0} คน</span>
+                        </div>
+                        <div class="flex items-center gap-2 py-2">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
+                                ${booking.requester_name ? booking.requester_name.substring(0, 2) : '??'}
+                            </div>
+                            <span class="text-gray-600">${booking.requester_name || '-'}</span>
+                        </div>
+                    </td>
+
+                    <td class="px-6 py-4">
+                        ${dateTimeHtml}
+                    </td>
+                    <td class="px-2 py-4  w-[150px]">
+                        ${eqHtml}
+                    </td>
+                    <td class="px-2 py-4 text-center w-[110px]">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button onclick="openEditModal('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-colors" title="แก้ไข">
+                                <i class="ph ph-pencil-simple text-lg"></i>
+                            </button>
+                            <button onclick="printSlip('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors" title="พิมพ์ใบจอง">
+                                <i class="ph ph-printer text-lg"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function changeStatus(id, currentStatus) {
+            let nextStatus = 'pending';
+            if (currentStatus === 'pending') {
+                nextStatus = 'confirmed';
+            } else if (currentStatus === 'confirm' || currentStatus === 'confirmed') {
+                nextStatus = 'cancelled';
+            } else {
+                nextStatus = 'pending';
+            }
+
+            try {
+                const response = await fetch('api/update_status.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=UTF-8'
+                    },
+                    body: JSON.stringify({
+                        id: parseInt(id),
+                        status: nextStatus
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const index = bookings.findIndex(b => String(b.id) === String(id));
+                    if (index !== -1) {
+                        bookings[index].status = nextStatus;
+                    }
+                    renderTable();
+                    showToast('เปลี่ยนสถานะเรียบร้อยแล้ว', 'success');
+                } else {
+                    showToast(result.message || 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะ', 'error');
+                }
+            } catch (error) {
+                console.error('Error changing status:', error);
+                showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            }
+        }
+
+        const modal = document.getElementById('editModal');
+        const modalContent = modal.querySelector('.bg-white');
+
+        function formatDatetimeForInput(dtString) {
+            if(!dtString) return '';
+            const cleanDt = dtString.replace(' ', 'T');
+            const dt = new Date(cleanDt);
+            if (isNaN(dt.getTime())) return '';
+            dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset());
+            return dt.toISOString().slice(0,16);
+        }
+
+        // [เพิ่มจุดที่ 2] ฟังก์ชันควบคุมจัดการข้อความอัตโนมัติเมื่อกดติ๊กเข้า/ออกช่อง LED โดยรักษาค่าที่ผู้ใช้พิมพ์เพิ่มเองไว้
+        function toggleLedEquip() {
+            const isChecked2 = document.getElementById('edit_eq_led1').checked;
+            const isChecked3 = document.getElementById('edit_eq_led2').checked;
+            const input = document.getElementById('edit_eq_other');
+
+            const text2 = 'จอ LED (ขึ้นภาพนิ่งหรือพื้นหลังเท่านั้น)';
+            const text3 = 'จอ LED (เปิดไฟล์อื่นๆ เพื่อประกอบการอบรม/ประชุม)';
+
+            let currentValue = input.value;
+            // ดึงข้อความระบบ (LED) ชุดเก่าออกไปเพื่อแยกส่วนคำนวณใหม่
+            currentValue = currentValue.replace(text2, '').replace(text3, '');
+
+            // แปลงข้อความที่ผู้ใช้พิมพ์ไว้เองให้กลายเป็น Array เพื่อความสะอาดของข้อความ
+            let items = currentValue.split(',')
+                .map(item => item.trim())
+                .filter(item => item !== '');
+
+            // ตรวจสอบสถานะการติ๊กของปัจจุบันแล้วเติมข้อมูลต่อท้ายเข้าไปใหม่ตามจริง
+            if (isChecked2) {
+                items.push(text2);
+            }
+            if (isChecked3) {
+                items.push(text3);
+            }
+
+            // นำ Array กลับมารวมเป็น String คั่นด้วยเครื่องหมายจุลภาคอย่างเป็นระเบียบ
+            input.value = items.join(', ');
+        }
+
+        function openEditModal(id) {
+            const booking = bookings.find(b => String(b.id) === String(id));
+
+            if (!booking) {
+                console.error("หา ID ข้อมูลไม่เจอ:", id);
+                return;
+            }
+
+            document.getElementById('edit_id').value = booking.id;
+
+            const roomSelect = document.getElementById('edit_room_name');
+            roomSelect.value = booking.room_name;
+            if (roomSelect.selectedIndex === -1) {
+                const opt = document.createElement('option');
+                opt.value = booking.room_name;
+                opt.text = booking.room_name;
+                opt.selected = true;
+                roomSelect.add(opt);
+            }
+
+            document.getElementById('edit_topic').value = booking.topic;
+            document.getElementById('edit_requester_name').value = booking.requester_name;
+            document.getElementById('edit_department').value = booking.department;
+            document.getElementById('edit_attendees').value = booking.attendees || '';
+
+            document.getElementById('edit_start_datetime').value = formatDatetimeForInput(booking.start_datetime);
+            document.getElementById('edit_end_datetime').value = formatDatetimeForInput(booking.end_datetime);
+
+            document.getElementById('edit_eq_audio').checked = (booking.equipment_audio == 1);
+            document.getElementById('edit_eq_computer').checked = (booking.equipment_computer == 1);
+            document.getElementById('edit_eq_projector').checked = (booking.equipment_projector == 1);
+            document.getElementById('edit_eq_food').checked = (booking.equipment_food == 1);
+
+            // [เพิ่มจุดที่ 3] ตรวจสอบความถูกต้องและสั่งงานติ๊กของปุ่ม จอ LED เมื่อโหลดฟอร์มแก้ไขขึ้นมาใหม่
+            const otherText = booking.equipment_other || '';
+            const text2 = 'จอ LED (ขึ้นภาพนิ่งหรือพื้นหลังเท่านั้น)';
+            const text3 = 'จอ LED (เปิดไฟล์อื่นๆ เพื่อประกอบการอบรม/ประชุม)';
+
+            document.getElementById('edit_eq_led1').checked = otherText.includes(text2);
+            document.getElementById('edit_eq_led2').checked = otherText.includes(text3);
+            document.getElementById('edit_eq_other').value = otherText;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                modalContent.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-95');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('editForm').reset();
+            }, 300);
+        }
+
+        async function saveChanges() {
+            const id = document.getElementById('edit_id').value;
+            const room_name = document.getElementById('edit_room_name').value;
+            const topic = document.getElementById('edit_topic').value;
+            const requester_name = document.getElementById('edit_requester_name').value;
+            const start_datetime = document.getElementById('edit_start_datetime').value;
+            const end_datetime = document.getElementById('edit_end_datetime').value;
+            const department = document.getElementById('edit_department').value;
+            const attendees = document.getElementById('edit_attendees').value;
+
+            if(!room_name || !topic || !requester_name || !start_datetime || !end_datetime || !attendees) {
+                showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'error');
+                return;
+            }
+            if(new Date(start_datetime) >= new Date(end_datetime)){
+                showToast('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่มต้น', 'error');
+                return;
+            }
+
+            const payload = {
+                id: parseInt(id),
+                room_name: room_name,
+                topic: topic,
+                requester_name: requester_name,
+                start_datetime: start_datetime.replace('T', ' ') + ':00',
+                end_datetime: end_datetime.replace('T', ' ') + ':00',
+                equipment_audio: document.getElementById('edit_eq_audio').checked ? 1 : 0,
+                equipment_computer: document.getElementById('edit_eq_computer').checked ? 1 : 0,
+                equipment_projector: document.getElementById('edit_eq_projector').checked ? 1 : 0,
+                equipment_food: document.getElementById('edit_eq_food').checked ? 1 : 0,
+                equipment_other: document.getElementById('edit_eq_other').value, // ดึงค่าจากกล่องข้อความไปเซฟเข้า Database ได้โดยตรง
+                department: document.getElementById('edit_department').value,
+                attendees: parseInt(attendees) || 0
+            };
+
+            try {
+                const response = await fetch('api/update_booking.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=UTF-8'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const index = bookings.findIndex(b => b.id === payload.id);
+                    if(index !== -1) {
+                        bookings[index] = { ...bookings[index], ...payload };
+                    }
+                    renderTable();
+                    closeModal();
+                    showToast(result.message || 'บันทึกข้อมูลสำเร็จ', 'success');
+                } else {
+                    showToast(result.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating data:', error);
+                showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกข้อมูลได้', 'error');
+            }
+        }
+
+        function printSlip(id) {
+            const source = bookings.find(b => String(b.id) === String(id));
+            const booking = source ? escapeRecord(source) : null;
+            if (!booking) return;
+
+            const start = new Date(booking.start_datetime);
+            const end = new Date(booking.end_datetime);
+            const thMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+            const startStr = `${start.getDate()} ${thMonths[start.getMonth()]} ${start.getFullYear() + 543} เวลา ${start.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})} น.`;
+            const endStr = `${end.getDate()} ${thMonths[end.getMonth()]} ${end.getFullYear() + 543} เวลา ${end.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})} น.`;
+
+            let eqList = [];
+            if(booking.equipment_audio == 1) eqList.push('เครื่องเสียง/ไมค์');
+            if(booking.equipment_computer == 1) eqList.push('คอมพิวเตอร์');
+            if(booking.equipment_projector == 1) eqList.push('โปรเจคเตอร์');
+            if(booking.equipment_food == 1) eqList.push('อาหาร/เครื่องดื่ม');
+            if(booking.equipment_other) eqList.push(booking.equipment_other);
+            const eqStr = eqList.length > 0 ? eqList.join(', ') : '- ไม่มี -';
+
+            const printTimeStr = new Date().toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' น.';
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>ใบสรุปการจอง - ${booking.topic}</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+                    <style>
+                        body { font-family: 'Prompt', sans-serif; padding: 40px; color: #333; line-height: 1.6; }
+                        .ticket { max-width: 650px; margin: 0 auto; border: 2px dashed #cbd5e1; padding: 30px; border-radius: 12px; }
+                        .title { text-align: center; font-size: 22px; font-weight: 600; color: #4f46e5; margin-bottom: 5px; }
+                        .print-time { text-align: center; font-size: 12px; color: #6b7280; margin-bottom: 25px; padding-bottom: 12px; border-bottom: 2px solid #f3f4f6; }
+                        .row { display: flex; margin-bottom: 12px; align-items: flex-start; }
+                        .label { width: 180px; font-weight: 500; color: #6b7280; flex-shrink: 0; }
+                        .value { flex: 1; color: #111827; }
+                        .footer { margin-top: 30px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 10px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="ticket">
+                        <div class="title">รายละเอียดการจองสถานที่</div>
+                        <div class="print-time">เวลาที่พิมพ์เอกสาร: ${printTimeStr}</div>
+                        <div class="row"><div class="label">หัวข้อการประชุม/กิจกรรม:</div><div class="value" style="font-weight:600; color:#4f46e5;">${booking.topic}</div></div>
+                        <div class="row"><div class="label">ห้องประชุม:</div><div class="value">${booking.room_name}</div></div>
+                        <div class="row"><div class="label">ผู้ขออนุญาต:</div><div class="value">${booking.requester_name}</div></div>
+                        <div class="row"><div class="label">ฝ่ายงาน/แผนก:</div><div class="value">${booking.department || '-'}</div></div>
+                        <div class="row"><div class="label">จำนวนผู้มาใช้บริการ:</div><div class="value" style="font-weight:600;">${booking.attendees || 0} คน</div></div>
+                        <div class="row"><div class="label">เวลาเริ่มต้น:</div><div class="value">${startStr}</div></div>
+                        <div class="row"><div class="label">เวลาสิ้นสุด:</div><div class="value">${endStr}</div></div>
+                        <div class="row"><div class="label">อุปกรณ์เสริม:</div><div class="value">${eqStr}</div></div>
+                        <div class="footer">ระบบจัดการจองห้องประชุมออนไลน์ - Booking ID: ${booking.id}</div>
+                    </div>
+                    <script>
+                        window.onload = function() { window.print(); setTimeout(function(){ window.close(); }, 500); }
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+
+        let toastTimeout;
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toastMessage');
+            const icon = toast.querySelector('i');
+
+            msgEl.textContent = message;
+
+            if (type === 'error') {
+                toast.classList.replace('bg-green-500', 'bg-red-500');
+                icon.className = 'ph ph-warning-circle text-2xl';
+            } else {
+                toast.classList.replace('bg-red-500', 'bg-green-500');
+                icon.className = 'ph ph-check-circle text-2xl';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const keyword = e.target.value.toLowerCase();
+            const filteredData = bookings.filter(b =>
+                (b.topic && b.topic.toLowerCase().includes(keyword)) ||
+                (b.room_name && b.room_name.toLowerCase().includes(keyword))
+            );
+            renderTable(filteredData);
+        });
+
+        async function fetchBookings() {
+            const currentUserId = getCookie('User_Id')|| '';
+            const currentUserDisplay = escapeHTML(getCookie('User_DisplayName') || 'ผู้ใช้งานระบบ');
+
+            document.getElementById('currentUserDisplay').innerHTML = `
+                <i class="ph ph-identification-card inline-block align-middle mr-1"></i>
+                ${currentUserDisplay} (ID: ${currentUserId})
+            `;
+
+            try {
+                const response = await fetch(`api/my_bookings.php`);
+                const result = await response.json();
+
+                if (result.status === 'success' && Array.isArray(result.data)) {
+                    bookings = result.data;
+                } else {
+                    bookings = [];
+                    showToast(result.message || 'ไม่พบข้อมูลการจองของท่าน', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching bookings:', error);
+                showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงข้อมูลได้', 'error');
+            } finally {
+                renderTable();
+            }
+        }
+
+        window.onload = () => {
+            fetchBookings();
+        };
+    </script>
+</body>
+</html>

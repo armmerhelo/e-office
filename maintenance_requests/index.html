@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ใบแจ้งซ่อม - โรงเรียนศรียานุสรณ์</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-header">
+            <h1>ใบแจ้งซ่อม</h1>
+            <p>กลุ่มบริหารทั่วไป โรงเรียนศรียานุสรณ์</p>
+        </div>
+
+        <form id="maintenanceForm">
+            <!-- ส่วนของผู้แจ้ง -->
+            <section class="form-section">
+                <div class="section-title">ส่วนที่ 1: ข้อมูลผู้แจ้งซ่อม</div>
+                
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label for="requesterName">ชื่อ - นามสกุล (นาย/นาง/นางสาว)</label>
+                        <input type="text" id="requesterName" name="requesterName" placeholder="กรอกชื่อ-นามสกุล" required>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="position">ตำแหน่ง</label>
+                        <input type="text" id="position" name="position" placeholder="กรอกตำแหน่ง" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="department">กลุ่มสาระการเรียนรู้ / งาน / ฝ่าย</label>
+                        <input type="text" id="department" name="department" placeholder="กรอกกลุ่มสาระฯ/งาน/ฝ่าย" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="requestDate">วันที่แจ้ง</label>
+                        <input type="date" id="requestDate" name="requestDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">เบอร์โทรศัพท์ติดต่อ</label>
+                        <input type="text" id="phone" name="phone" placeholder="กรอกเบอร์โทรศัพท์" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>มีความประสงค์จะขอแจ้งซ่อม/ปรับปรุง (เลือกได้มากกว่า 1 ข้อ)</label>
+                    <div class="checkbox-grid">
+                        <label class="checkbox-container">ไฟฟ้า
+                            <input type="checkbox" name="repairType" value="ไฟฟ้า">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">เครื่องปรับอากาศ
+                            <input type="checkbox" name="repairType" value="เครื่องปรับอากาศ">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">ประปาและสุขภัณฑ์
+                            <input type="checkbox" name="repairType" value="ประปาและสุขภัณฑ์">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">ประตู หน้าต่าง / กระจก
+                            <input type="checkbox" name="repairType" value="ประตู หน้าต่าง / กระจก">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">โต๊ะ / เก้าอี้
+                            <input type="checkbox" name="repairType" value="โต๊ะ / เก้าอี้">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">สัญญาณอินเตอร์เน็ต
+                            <input type="checkbox" name="repairType" value="สัญญาณอินเตอร์เน็ต">
+                            <span class="checkmark"></span>
+                        </label>
+                        <label class="checkbox-container">อื่นๆ
+                            <input type="checkbox" name="repairType" id="otherTypeCheckbox" value="อื่นๆ">
+                            <span class="checkmark"></span>
+                        </label>
+                    </div>
+                    <div class="form-group hidden" id="otherTypeContainer">
+                        <input type="text" id="otherTypeDetail" name="otherTypeDetail" placeholder="โปรดระบุรายละเอียดอื่นๆ">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="building">อาคาร</label>
+                        <input type="text" id="building" name="building" placeholder="ระบุอาคาร" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="room">ห้อง</label>
+                        <input type="text" id="room" name="room" placeholder="ระบุห้อง" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="damageDetails">ลักษณะการชำรุด / รายละเอียดการชำรุด / สถานที่ / บริเวณที่ขอซ่อม</label>
+                    <textarea id="damageDetails" name="damageDetails" rows="4" placeholder="อธิบายรายละเอียดการชำรุด หรือระบุจุดที่ชัดเจน" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>ภาพประกอบการแจ้งซ่อม (ถ้ามี - เลือกได้หลายรูป)</label>
+                    <div class="file-upload-wrapper">
+                        <label for="imageFiles" class="file-upload-label">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>คลิกที่นี่เพื่อเลือกรูปภาพ</span>
+                        </label>
+                        <input type="file" id="imageFiles" name="imageFiles[]" accept="image/*" multiple style="display: none;">
+                    </div>
+                    <div class="image-preview-container" id="imagePreviewContainer"></div>
+                </div>
+            </section>
+            <div class="form-actions">
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <span class="btn-text">ส่งใบแจ้งซ่อม</span>
+                    <div class="loader hidden"></div>
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

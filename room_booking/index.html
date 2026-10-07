@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ปฏิทินจองห้องประชุมภาษาไทย Fullsize</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            /* ปรับให้ช่องปฏิทินในมือถือเล็กลง เพื่อไม่ให้กินพื้นที่มากเกินไป */
+            grid-auto-rows: minmax(55px, 1fr);
+        }
+        @media (min-width: 768px) {
+            .calendar-grid {
+                /* ความสูงช่องปฏิทินสำหรับหน้าจอคอมพิวเตอร์ */
+                grid-auto-rows: minmax(120px, 1fr);
+            }
+        }
+        /* ซ่อน Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .fade-in {
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .event-container {
+            scrollbar-width: thin;
+            max-height: calc(100% - 28px);
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 flex flex-col md:flex-row h-auto min-h-screen md:h-screen overflow-y-auto md:overflow-hidden">
+
+    <main class="flex-1 flex flex-col bg-gray-50 p-3 md:p-6 min-w-0 order-1 md:order-2 border-b md:border-b-0 border-gray-200 min-h-[450px] md:h-full">
+
+        <header class="flex justify-between items-center mb-3 md:mb-6 bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex-shrink-0">
+            <div>
+                <h2 class="text-lg md:text-2xl font-bold text-gray-800" id="current-month-display">กุมภาพันธ์ 2569</h2>
+            </div>
+            <div class="flex items-center space-x-1.5 md:space-x-3">
+                <button onclick="changeMonth(-1)" class="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <button onclick="goToToday()" class="px-3 py-1.5 text-xs md:text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition border border-indigo-100">
+                    วันนี้
+                </button>
+                <button onclick="changeMonth(1)" class="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-7 mb-1 text-center flex-shrink-0 text-xs md:text-sm">
+            <div class="text-red-500 font-bold py-1">อา.</div>
+            <div class="text-gray-500 font-bold py-1">จ.</div>
+            <div class="text-gray-500 font-bold py-1">อ.</div>
+            <div class="text-gray-500 font-bold py-1">พ.</div>
+            <div class="text-gray-500 font-bold py-1">พฤ.</div>
+            <div class="text-gray-500 font-bold py-1">ศ.</div>
+            <div class="text-indigo-500 font-bold py-1">ส.</div>
+        </div>
+
+        <div class="flex-1 bg-white rounded-2xl shadow-inner border border-gray-200 overflow-hidden relative">
+            <div id="calendar-body" class="calendar-grid h-full w-full overflow-y-auto">
+            </div>
+        </div>
+    </main>
+
+    <aside class="w-full md:w-1/3 lg:w-1/4 bg-white p-4 md:p-6 flex flex-col shadow-lg z-10 order-2 md:order-1 min-h-[350px] md:h-full relative">
+        <div class="mb-3 hidden md:block">
+            <h1 class="text-2xl md:text-3xl font-bold text-indigo-600 mb-1 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                ปฏิทินงานจอง
+            </h1>
+            <p class="text-xs md:text-sm text-gray-500">จัดการตารางเวลาและการใช้ห้องประชุม</p>
+        </div>
+
+        <div class="bg-indigo-50 rounded-2xl p-3 md:p-6 mb-3 text-center border border-indigo-100 shadow-sm flex-shrink-0 flex md:flex-col items-center justify-between md:justify-center px-4 md:px-6">
+            <div class="text-left md:text-center">
+                <h2 class="text-indigo-800 text-xs md:text-lg font-medium" id="selected-weekday">วันจันทร์</h2>
+                <p class="text-indigo-800 text-xs md:text-xl" id="selected-month-year">กุมภาพันธ์ 2569</p>
+            </div>
+            <div class="text-2xl md:text-6xl font-bold text-indigo-600 leading-none md:mt-1" id="selected-day">10</div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto pr-1 pb-4">
+          <h3 class="font-semibold text-gray-700 mb-2 flex items-center sticky top-0 bg-white py-1 z-10 text-xs md:text-base">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 md:h-5 md:w-5 mr-1.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span id="list-title-text">กำหนดการและรายการจองวันนี้</span>
+          </h3>
+            <ul id="event-list" class="space-y-2">
+            </ul>
+        </div>
+
+        <a href="new_room.html" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 md:py-4 rounded-xl font-semibold transition duration-200 shadow-md flex items-center justify-center gap-2 flex-shrink-0 text-sm md:text-base">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            ขออนุญาตใช้สถานที่ใหม่
+        </a>
+    </aside>
+
+    <div id="toast" class="hidden fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-xl z-50 flex items-center gap-2 fade-in">
+        <span id="toast-message">บันทึกสำเร็จ</span>
+    </div>
+
+    <script>
+        const monthNamesTh = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+        const dayNamesTh = ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"];
+
+        let currentDate = new Date();
+        let selectedDate = new Date();
+
+        // ตัวแปรสำหรับเก็บข้อมูลจากการจอง
+        let dbEvents = {};
+
+        // กำหนดสีประจำห้องประชุมแต่ละห้อง
+        const roomColors = {
+            'หอประชุมชยางกูร': 'bg-red-100 text-red-700 border-red-200',
+            'ห้องกันเกรา': 'bg-blue-100 text-blue-700 border-blue-200',
+            'ห้องสารภี': 'bg-green-100 text-green-700 border-green-200',
+            'ห้องโสตทัศนศึกษา': 'bg-purple-100 text-purple-700 border-purple-200',
+            'default': 'bg-gray-100 text-gray-700 border-gray-200'
+        };
+
+        const fallbackMockData = [
+            {
+                room_name: "ห้องกันเกรา",
+                topic: "ประชุมแผนกลยุทธ์ประจำปีและสรุปผลงานไตรมาสแรก (ด่วน)",
+                requester_name: "ดร.ณรงค์ศักดิ์",
+                start_datetime: "2026-02-10 10:00:00",
+                end_datetime: "2026-02-10 12:00:00"
+            },
+            {
+                room_name: "ห้องสารภี",
+                topic: "ประชุมย่อยฝ่ายขายและพัฒนาตลาด",
+                requester_name: "คุณวิภาวรรณ",
+                start_datetime: "2026-02-10 13:30:00",
+                end_datetime: "2026-02-10 15:30:00"
+            },
+            {
+                room_name: "หอประชุมชยางกูร",
+                topic: "ส่งรายงานสรุปยอดขายรายเดือนและเทรนนิ่งทีมใหม่",
+                requester_name: "ผอ.สมศักดิ์",
+                start_datetime: "2026-02-10 16:00:00",
+                end_datetime: "2026-02-10 18:00:00"
+            },
+            {
+                room_name: "ห้องกันเกรา",
+                topic: "ประชุมการใช้งานแผนการสอนใหม่",
+                requester_name: "อาจารย์กิตติภพ",
+                start_datetime: "2026-02-11 10:00:00",
+                end_datetime: "2026-02-11 12:30:00"
+            },
+            {
+                room_name: "ห้องโสตทัศนศึกษา",
+                topic: "วันวาเลนไทน์และเตรียมโปรเจกต์พิเศษ",
+                requester_name: "ฝ่ายจัดกิจกรรม",
+                start_datetime: "2026-02-14 09:00:00",
+                end_datetime: "2026-02-14 16:00:00"
+            }
+        ];
+
+        async function fetchBookings() {
+            try {
+                const monthToFetch = currentDate.getMonth() + 1;
+                const yearToFetch = currentDate.getFullYear();
+
+                const response = await fetch(`api/get_bookings.php?month=${monthToFetch}&year=${yearToFetch}`);
+                const result = await response.json();
+
+                if (result.status === 'success' && Array.isArray(result.data)) {
+                    processBookingsData(result.data);
+                } else {
+                    console.warn("ไม่พบข้อมูลสำเร็จจาก API หรือฟอร์แมตไม่ถูกต้อง, กำลังใช้ข้อมูลชุดทดสอบ...");
+                    document.getElementById('calendar-body').textContent = 'โหลดปฏิทินไม่สำเร็จ กรุณาลองใหม่';
+                }
+            } catch (error) {
+                console.warn("ไม่พบโฟลเดอร์ API / หรือมีข้อผิดพลาดเครือข่าย, กำลังใช้ข้อมูลชุดทดสอบแทน...");
+                document.getElementById('calendar-body').textContent = 'ไม่สามารถติดต่อเซิร์ฟเวอร์ กรุณาลองใหม่';
+            }
+        }
+
+        function processBookingsData(bookingsArray) {
+            dbEvents = {};
+
+            bookingsArray.forEach(booking => {
+                const startDateStr = booking.start_datetime.split(' ')[0];
+                const endDateStr = booking.end_datetime.split(' ')[0];
+                const startTimeStr = booking.start_datetime.split(' ')[1].substring(0, 5);
+                const endTimeStr = booking.end_datetime.split(' ')[1].substring(0, 5);
+                const colorClass = roomColors[booking.room_name] || roomColors['default'];
+
+                const eventItem = {
+                    id: booking.id,
+                    title: escapeHTML(`${booking.room_name}: ${booking.topic} (${booking.requester_name})`),
+                    time: `${startTimeStr} - ${endTimeStr}`,
+                    color: colorClass
+                };
+
+                if (!dbEvents[startDateStr]) {
+                    dbEvents[startDateStr] = [];
+                }
+                dbEvents[startDateStr].push(eventItem);
+
+                if (startDateStr !== endDateStr) {
+                    let currentLoopDate = new Date(startDateStr);
+                    const lastDate = new Date(endDateStr);
+
+                    while (currentLoopDate < lastDate) {
+                        currentLoopDate.setDate(currentLoopDate.getDate() + 1);
+                        const nextDateKey = currentLoopDate.toISOString().split('T')[0];
+
+                        if (!dbEvents[nextDateKey]) {
+                            dbEvents[nextDateKey] = [];
+                        }
+
+                        const isDuplicate = dbEvents[nextDateKey].some(e => e.id === booking.id);
+                        if (!isDuplicate) {
+                            dbEvents[nextDateKey].push({
+                                id: booking.id,
+                                title: escapeHTML(`(ต่อเนื่อง) ${booking.room_name}: ${booking.topic}`),
+                                time: `ถึง ${endTimeStr}`,
+                                color: colorClass
+                            });
+                        }
+                    }
+                }
+            });
+
+            renderCalendar();
+            updateSidebar(selectedDate);
+        }
+
+        function init() {
+            fetchBookings();
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            const yearTh = year + 543;
+            document.getElementById('current-month-display').innerText = `${monthNamesTh[month]} ${yearTh}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const prevMonthDays = new Date(year, month, 0).getDate();
+
+            const calendarBody = document.getElementById('calendar-body');
+            calendarBody.innerHTML = '';
+
+            for (let i = firstDay; i > 0; i--) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'border-b border-r border-gray-100 p-2 bg-gray-50/50 text-gray-300 select-none';
+                dayDiv.innerHTML = `<span class="text-xs md:text-sm font-medium">${prevMonthDays - i + 1}</span>`;
+                calendarBody.appendChild(dayDiv);
+            }
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayDiv = document.createElement('div');
+                const dateKey = formatDateKey(year, month, i);
+
+                const isToday = i === new Date().getDate() && month === new Date().getMonth() && year === new Date().getFullYear();
+                const isSelected = i === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear();
+
+                const hasEvent = dbEvents[dateKey];
+
+                let classes = 'border-b border-r border-gray-100 p-1 md:p-3 relative hover:bg-gray-50 transition cursor-pointer fade-in flex flex-col items-center md:items-start justify-start overflow-hidden';
+
+                if (isSelected) classes += ' bg-indigo-50/50 ring-inset ring-2 ring-indigo-500 z-10';
+                else if (isToday) classes += ' bg-blue-50/50';
+                else classes += ' bg-white';
+
+                dayDiv.className = classes;
+                dayDiv.onclick = () => selectDay(i);
+
+                let htmlContent = `<span class="font-bold text-xs md:text-base mb-0.5 md:mb-1 inline-block text-center min-w-[20px] md:min-w-[24px] ${isToday ? 'text-white bg-indigo-600 px-1.5 rounded-md' : 'text-gray-700'}">${i}</span>`;
+
+                if (hasEvent && hasEvent.length > 0) {
+                    htmlContent += `<div class="w-full space-y-1 overflow-y-auto pr-1 event-container flex-1">`;
+                    hasEvent.forEach(evt => {
+                        htmlContent += `<div class="hidden md:block text-[10px] lg:text-xs truncate px-1.5 py-0.5 rounded-md border ${evt.color} w-full shadow-sm" title="${evt.title}">${evt.title}</div>`;
+                    });
+
+                    // สร้างจุดสีวงกลมแจ้งเตือนในหน้าจอมือถือ
+                    htmlContent += `<div class="md:hidden flex flex-wrap justify-center gap-0.5 mt-0.5 w-full">`;
+                    hasEvent.forEach(() => {
+                        htmlContent += `<div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>`;
+                    });
+                    htmlContent += `</div></div>`;
+                }
+
+                dayDiv.innerHTML = htmlContent;
+                calendarBody.appendChild(dayDiv);
+            }
+
+            const totalCells = firstDay + daysInMonth;
+            const remainingCells = totalCells > 35 ? 42 - totalCells : 35 - totalCells;
+
+            for (let i = 1; i <= remainingCells; i++) {
+                const dayDiv = document.createElement('div');
+                dayDiv.className = 'border-b border-r border-gray-100 p-2 bg-gray-50/50 text-gray-300 select-none';
+                dayDiv.innerHTML = `<span class="text-xs md:text-sm font-medium">${i}</span>`;
+                calendarBody.appendChild(dayDiv);
+            }
+        }
+
+        function changeMonth(step) {
+            currentDate.setMonth(currentDate.getMonth() + step);
+            fetchBookings();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            selectedDate = new Date();
+            fetchBookings();
+        }
+
+        function selectDay(day) {
+            selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+            renderCalendar();
+            updateSidebar(selectedDate);
+        }
+
+        function updateSidebar(date) {
+          const dayName = dayNamesTh[date.getDay()];
+          const day = date.getDate();
+          const month = monthNamesTh[date.getMonth()];
+          const year = date.getFullYear() + 543;
+
+          document.getElementById('selected-weekday').innerText = dayName;
+          document.getElementById('selected-day').innerText = day;
+          document.getElementById('selected-month-year').innerText = `${month} ${year}`;
+
+          const today = new Date();
+          const isToday = date.getDate() === today.getDate() &&
+                          date.getMonth() === today.getMonth() &&
+                          date.getFullYear() === today.getFullYear();
+
+          const listTitleText = document.getElementById('list-title-text');
+          if (listTitleText) {
+              if (isToday) {
+                  listTitleText.innerText = "กำหนดการและรายการจองวันนี้";
+              } else {
+                  listTitleText.innerText = `รายการจองวันที่ ${day} ${month}`;
+              }
+          }
+
+          const eventList = document.getElementById('event-list');
+          const dateKey = formatDateKey(date.getFullYear(), date.getMonth(), date.getDate());
+          const events = dbEvents[dateKey];
+
+          eventList.innerHTML = '';
+
+          if (events && events.length > 0) {
+              events.forEach(evt => {
+                  const li = document.createElement('li');
+                  li.className = `p-2.5 md:p-4 rounded-2xl border flex items-start gap-2.5 md:gap-4 ${evt.color} fade-in shadow-sm`;
+                  li.innerHTML = `
+                      <div class="mt-0.5 font-bold text-[10px] md:text-[11px] bg-white/60 px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg border border-current/20 whitespace-nowrap">${evt.time}</div>
+                      <div class="min-w-0 flex-1 text-xs md:text-sm">
+                          <div class="font-bold break-words leading-snug">${evt.title}</div>
+                      </div>
+                  `;
+                  eventList.appendChild(li);
+              });
+          } else {
+              eventList.innerHTML = `
+                  <li class="text-center py-6 md:py-12 text-gray-400 fade-in border-2 border-dashed border-gray-200 rounded-3xl">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 md:h-12 md:w-12 mx-auto mb-2 opacity-25" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p class="font-medium text-[11px] md:text-sm">ไม่มีกิจกรรมการจองในวันนี้</p>
+                  </li>
+              `;
+          }
+      }
+
+        function formatDateKey(year, month, day) {
+            const m = String(month + 1).padStart(2, '0');
+            const d = String(day).padStart(2, '0');
+            return `${year}-${m}-${d}`;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<meta charset="UTF-8">
+<script>
+
+    const bc = new BroadcastChannel('my_channel');
+    bc.onmessage = (event) => {
+  console.log("ได้รับข้อมูลใหม่:", event.data);
+  // คุณสามารถเอา event.data ไปอัปเดตหน้าเว็บได้เลย
+  document.writeln("<br>ได้รับข้อมูลใหม่:",event.data.message);
+};
+</script>

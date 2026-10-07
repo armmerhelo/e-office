@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการกลุ่มงาน</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&family=Inter:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root { font-family: 'Noto Sans Thai', 'Prompt', sans-serif; }
+        body { background-color: transparent; padding: 15px; }
+        .management-data-table { min-width: 560px; }
+        .management-modal-actions { flex-wrap: wrap; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+<div class="w-full" id="main-content">
+
+    <div class="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6 border border-gray-100">
+        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">จัดการกลุ่มงาน</h1>
+                <p class="text-sm text-gray-500 mt-1">เพิ่ม ลบ และแก้ไขข้อมูลกลุ่มงาน/แผนกในระบบ</p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div class="relative w-full sm:w-64">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input id="search_txt_dept" type="text" onkeyup="searchDepartments(this.value)" class="h-11 block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 sm:text-sm transition-colors" placeholder="ค้นหากลุ่มงาน...">
+                </div>
+
+                <button onclick="openModal('add')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition duration-200 flex items-center justify-center whitespace-nowrap">
+                    <svg class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    เพิ่มกลุ่มงาน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto hide-scrollbar">
+            <table class="management-data-table w-full whitespace-nowrap text-left text-sm text-gray-600">
+                <thead class="bg-gray-50 text-gray-700 uppercase font-semibold border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-4 text-center w-16">รหัส</th>
+                        <th class="px-6 py-4 w-1/4">ชื่อกลุ่มงาน</th>
+                        <th class="px-6 py-4">รายละเอียด</th>
+                        <th class="px-6 py-4 text-center w-24">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody id="deptTableBody" class="divide-y divide-gray-200">
+                    <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="deptPagination" class="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-200"></div>
+    </div>
+
+</div>
+
+<div id="modal_dept" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden flex items-center justify-center transition-opacity opacity-0 backdrop-blur-sm">
+    <div class="bg-white rounded-xl shadow-2xl w-11/12 md:w-2/3 lg:w-1/2 max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-300 relative">
+
+        <div class="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center rounded-t-xl shrink-0">
+            <h3 id="modal_title" class="text-xl font-bold text-indigo-800">จัดการกลุ่มงาน</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto hide-scrollbar p-6 grow">
+            <form id="form_dept_data" autocomplete="off" class="space-y-5">
+                <input id="edit_id" type="hidden" name="Department_Id" value="">
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <label class="font-medium text-gray-700 md:text-right pr-2">ชื่อกลุ่มงาน <span class="text-red-500">*</span></label>
+                    <div class="md:col-span-3">
+                        <input id="edit_name" type="text" name="Department_Name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="ระบุชื่อกลุ่มงาน...">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                    <label class="font-medium text-gray-700 md:text-right pr-2 pt-2">รายละเอียด</label>
+                    <div class="md:col-span-3">
+                        <textarea id="edit_detail" name="Department_Detail" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="รายละเอียดหรือคำอธิบายของกลุ่มงาน (ถ้ามี)..."></textarea>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="management-modal-actions bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl shrink-0">
+            <button type="button" id="btn_delete_dept" onclick="submit_delete()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm hidden w-full sm:w-auto">ลบกลุ่มงาน</button>
+            <button type="button" onclick="closeModal()" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm w-full sm:w-auto">ยกเลิก</button>
+            <button type="button" onclick="submit_save()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm w-full sm:w-auto">บันทึกข้อมูล</button>
+        </div>
+
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    if (name === 'User_Token') return document.cookie.includes('User_Id=') ? 'session' : null;
+    let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    if (match) return match[2];
+    return null;
+}
+
+function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    }[tag] || tag));
+}
+
+// 1. โหลดข้อมูล (รองรับ pagination)
+let currentPage = 1;
+const perPage = 20;
+let totalDepts = 0;
+
+function loadDepartments(searchQuery = '') {
+    const tbody = document.getElementById('deptTableBody');
+    const token = getCookie("User_Token");
+
+    if (!token) {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 font-medium">ไม่พบ Token กรุณาเข้าสู่ระบบ</td></tr>`;
+        return;
+    }
+
+    fetch(`get_departments_api.php?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&limit=${perPage}`, {
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.status === 'error') {
+            tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 font-medium">${res.message}</td></tr>`;
+            renderPagination();
+            return;
+        }
+        totalDepts = res.total || 0;
+        if (res.page) currentPage = res.page; // sync กลับ (API ตัดหน้าเกินให้เอง เช่น หลังลบแถวสุดท้าย)
+        if (res.data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">ไม่พบข้อมูลกลุ่มงาน</td></tr>`;
+            renderPagination();
+            return;
+        }
+
+        let html = '';
+        res.data.forEach((dept) => {
+            html += `
+            <tr class="hover:bg-indigo-50/50 transition-colors">
+                <td class="px-6 py-4 text-center font-medium text-gray-500">#${dept.Department_Id}</td>
+                <td class="px-6 py-4 font-semibold text-gray-800">${escapeHTML(dept.Department_Name)}</td>
+                <td class="px-6 py-4 text-gray-600 text-sm whitespace-normal break-words">${escapeHTML(dept.Department_Detail || '-')}</td>
+                <td class="px-6 py-4 text-center">
+                    <button onclick="openModal('edit', '${dept.Department_Id}', '${escapeHTML(dept.Department_Name)}', '${escapeHTML(dept.Department_Detail || '')}')" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1.5 rounded shadow-sm text-sm font-medium transition-colors inline-flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        แก้ไข
+                    </button>
+                </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        tbody.querySelectorAll('button').forEach((button, index) => {
+            button.removeAttribute('onclick');
+            const dept = res.data[index];
+            button.addEventListener('click', () => openModal('edit', dept.Department_Id, dept.Department_Name, dept.Department_Detail || ''));
+        });
+        renderPagination();
+    }).catch(() => {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 font-medium">เกิดข้อผิดพลาดในการเชื่อมต่อ</td></tr>`;
+        renderPagination();
+    });
+}
+
+// ค้นหา: รีเซ็ตกลับหน้าแรกทุกครั้ง
+function searchDepartments(q) {
+    currentPage = 1;
+    loadDepartments(q);
+}
+
+// วาดแถบ pagination ใต้ตาราง
+function renderPagination() {
+    const el = document.getElementById('deptPagination');
+    if (!el) return;
+    const totalPages = Math.max(1, Math.ceil(totalDepts / perPage));
+    const startItem = totalDepts === 0 ? 0 : ((currentPage - 1) * perPage) + 1;
+    const endItem = Math.min(totalDepts, currentPage * perPage);
+    const searchVal = document.getElementById('search_txt_dept').value;
+
+    el.innerHTML = '';
+    const info = document.createElement('div');
+    info.className = 'text-sm text-gray-500';
+    info.innerText = totalDepts === 0 ? 'ไม่พบข้อมูล' : `แสดง ${startItem}–${endItem} จาก ${totalDepts} รายการ (หน้า ${currentPage}/${totalPages})`;
+    el.appendChild(info);
+
+    const btns = document.createElement('div');
+    btns.className = 'flex items-center gap-1.5';
+    const mkBtn = (label, page, disabled, isActive) => {
+        const b = document.createElement('button');
+        b.innerText = label;
+        b.disabled = !!disabled;
+        b.className = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ' +
+            (isActive ? 'bg-indigo-600 text-white' :
+             disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' :
+             'bg-white border border-gray-300 text-gray-700 hover:bg-indigo-50');
+        if (!disabled && !isActive) b.onclick = () => { currentPage = page; loadDepartments(searchVal); };
+        btns.appendChild(b);
+        return b;
+    };
+    mkBtn('‹ ก่อนหน้า', currentPage - 1, currentPage === 1, false);
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + 4);
+    if (end - start < 4) start = Math.max(1, end - 4);
+    for (let i = start; i <= end; i++) mkBtn(String(i), i, false, i === currentPage);
+    mkBtn('ถัดไป ›', currentPage + 1, currentPage === totalPages, false);
+    el.appendChild(btns);
+}
+
+// 2. จัดการ Modal
+function openModal(mode, id = '', name = '', detail = '') {
+    const modal = document.getElementById('modal_dept');
+    const content = modal.querySelector('div');
+
+    document.getElementById('form_dept_data').reset();
+
+    if (mode === 'add') {
+        document.getElementById('modal_title').innerText = "เพิ่มกลุ่มงานใหม่";
+        document.getElementById('edit_id').value = "";
+        document.getElementById('btn_delete_dept').classList.add('hidden');
+    } else {
+        document.getElementById('modal_title').innerText = "แก้ไขกลุ่มงาน";
+        document.getElementById('edit_id').value = id;
+        document.getElementById('edit_name').value = name.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        document.getElementById('edit_detail').value = detail.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        document.getElementById('btn_delete_dept').classList.remove('hidden');
+    }
+
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        content.classList.remove('scale-95');
+        content.classList.add('scale-100');
+    }, 10);
+}
+
+function closeModal() {
+    const modal = document.getElementById('modal_dept');
+    const content = modal.querySelector('div');
+    modal.classList.add('opacity-0');
+    content.classList.remove('scale-100');
+    content.classList.add('scale-95');
+    setTimeout(() => { modal.classList.add('hidden'); }, 300);
+}
+
+// 3. บันทึกข้อมูล (เพิ่ม/แก้ไข)
+function submit_save() {
+    let name = document.getElementById('edit_name').value;
+    if(name.trim() === '') {
+        alert("กรุณาระบุชื่อกลุ่มงาน"); return;
+    }
+
+    let formData = new FormData(document.getElementById("form_dept_data"));
+
+    fetch("save_department_api.php", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + getCookie("User_Token") },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.status === "success") {
+            closeModal();
+            loadDepartments();
+        } else { alert("ข้อผิดพลาด: " + res.message); }
+    }).catch(err => {
+        alert("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
+    });
+}
+
+// 4. ลบข้อมูล
+function submit_delete() {
+    if (confirm("คุณต้องการลบกลุ่มงานนี้ใช่หรือไม่?\n\n* หากลบไปแล้ว บุคลากรที่อยู่ในกลุ่มงานนี้จะถูกถอดออกจากกลุ่มงานด้วย")) {
+        let id = document.getElementById('edit_id').value;
+        let formData = new FormData();
+        formData.append('Department_Id', id);
+
+        fetch("delete_department_api.php", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + getCookie("User_Token") },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(res => {
+            if(res.status === "success") {
+                closeModal();
+                loadDepartments();
+            } else { alert("ลบไม่สำเร็จ: " + res.message); }
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => loadDepartments());
+</script>
+
+</body>
+</html>

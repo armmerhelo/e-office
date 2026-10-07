@@ -1,0 +1,29 @@
+/config/local.php
+/config/*.private.*
+/config/*manifest.json
+/file_document/*
+!/file_document/.htaccess
+/node_modules/
+/test-results/
+/email_send/User_Data*.json
+/email_send/backup/
+/e-office ftp and db.*
+/Boardcast/New Text Document.txt
+/e-sign/uploads/
+/e-sign/generated_images/*
+!/e-sign/generated_images/.htaccess
+/e-sign/e-sign-v1.php
+/e-sign/e-sign_backup.php
+/e-sign/e-sign_error.php
+/e-sign/e-sign_6_10_69.php
+/=f8573b7e-458c-4631-82a9-d7d0ca86927c
+.env
+.env.*
+!.env.example
+*.private.json
+*.private.php
+*.pem
+*.key
+__pycache__/
+*.pyc
+*.log

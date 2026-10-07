@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No Internet Connection</title>
+    <meta name="theme-color" content="#ffffff">
+    <style>
+        /* จัดหน้าให้อยู่ตรงกลางเสมอ */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 400px;
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* ไอคอน WiFi */
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            fill: #adb5bd;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin: 0 0 10px 0;
+            color: #212529;
+        }
+
+        p {
+            font-size: 16px;
+            color: #6c757d;
+            margin: 0 0 30px 0;
+            line-height: 1.5;
+        }
+
+        /* ปุ่มกด */
+        .retry-btn {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            outline: none;
+        }
+
+        .retry-btn:hover {
+            background-color: #0b5ed7;
+        }
+
+        .retry-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+    <img src="img/Offline.png" width="50px">
+        <h1>ขาดการเชื่อมต่อ</h1>
+        <p>ดูเหมือนว่าอินเทอร์เน็ตของคุณจะหลุด<br>โปรดตรวจสอบสัญญาณแล้วลองใหม่อีกครั้ง</p>
+
+        <button class="retry-btn" onclick="retryConnection()">ลองใหม่อีกครั้ง</button>
+    </div>
+
+    <script>
+        function retryConnection() {
+            // เปลี่ยนข้อความปุ่มให้ User รู้ว่ากำลังทำงาน
+            const btn = document.querySelector('.retry-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "กำลังเชื่อมต่อ...";
+            btn.style.opacity = "0.7";
+
+            // ลอง Reload หน้าเว็บ
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
+
+        // เช็คอัตโนมัติ: ถ้าเน็ตกลับมา ให้รีเฟรชเองเลย
+        window.addEventListener('online', () => {
+            window.location.reload();
+        });
+    </script>
+
+</body>
+</html>
