@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "main": "OneSignalSDKWorker.js",
   "scripts": {
-    "test": "node tests/check-syntax.cjs && node tests/integration.cjs",
+    "test": "node tests/check-syntax.cjs && node tests/check-staged.cjs && node tests/google-auth.cjs && node tests/integration.cjs",
     "test:syntax": "node tests/check-syntax.cjs",
     "test:integration": "node tests/integration.cjs",
+    "test:google": "node tests/google-auth.cjs",
     "build:css": "tailwindcss -i src/input.css -o assets/tailwind.css --minify",
     "serve:test": "node scripts/serve-test.cjs"
   },

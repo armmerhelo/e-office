@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/bootstrap.php';
+require_once __DIR__ . '/../config/auth.php';
 app_method('POST');
 $data = app_input();
 $email = app_text($data, 'username', 255, true);
@@ -21,8 +21,5 @@ if (!$isHash || password_needs_rehash($stored, PASSWORD_DEFAULT)) {
     $q = $pdo->prepare('UPDATE t_user SET User_Password=? WHERE User_Id=?'); $q->execute([password_hash($password, PASSWORD_DEFAULT), $user['User_Id']]);
 }
 $pdo->prepare('DELETE FROM eoffice_login_attempts WHERE identity_hash=?')->execute([$key]);
-$token = bin2hex(random_bytes(32)); $expires = time() + 86400 * 30;
-$pdo->prepare('INSERT INTO eoffice_sessions VALUES (?,?,?)')->execute([hash('sha256', $token), $user['User_Id'], date('Y-m-d H:i:s', $expires)]);
-app_cookie('User_Token', $token, $expires, true);
-foreach (['User_Status'=>'User_Status', 'User_DisplayName'=>'User_Name', 'User_Id'=>'User_Id'] as $cookie=>$field) app_cookie($cookie, (string)$user[$field], $expires);
+app_login_session($user);
 app_json(['status'=>'success', 'user_name'=>$user['User_Name'], 'user_status'=>$user['User_Status']]);

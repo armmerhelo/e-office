@@ -13,6 +13,7 @@ const keyPatterns = [
     /\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}/,
     /\bAIza[A-Za-z0-9_-]{30,}/,
     /\bAQ\.[A-Za-z0-9_-]{20,}/,
+    /\bGOCSPX-[A-Za-z0-9_-]{20,}/,
     /\bos_v2_app_[a-z0-9]{30,}/,
     /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
 ];

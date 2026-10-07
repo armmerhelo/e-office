@@ -1,9 +1,14 @@
-<?php $web_settings = require __DIR__.'/config/settings.php'; ?>
+<?php
+require_once __DIR__.'/config/google-auth.php';
+$web_settings = app_settings();
+header('Cache-Control: no-store');
+?>
 <!DOCTYPE html>
 <html lang="th">
 
 <head>
   <script>window.EOFFICE_MOCK_SERVICES = <?= json_encode($web_settings['mock']) ?>;</script>
+  <script>window.EOFFICE_GOOGLE_LOGIN_ENABLED = <?= json_encode(app_google_enabled()) ?>;</script>
   <?php if (!$web_settings['mock']): ?>
   <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-1G9FYB9951"></script>
@@ -585,6 +590,7 @@ window.addEventListener('message', function(event) {
   <div id="add_new_doc_html"></div>
   <div id="report_html"></div>
   <script src="components/components.js?v=<?php echo filemtime(__DIR__.'/components/components.js'); ?>"></script>
+  <script src="assets/google-login.js?v=<?php echo filemtime(__DIR__.'/assets/google-login.js'); ?>"></script>
 
   <script src="assets/security.js?v=<?php echo filemtime(__DIR__.'/assets/security.js'); ?>"></script>
   <script src="assets/api-service.js?v=<?php echo filemtime(__DIR__.'/assets/api-service.js'); ?>"></script>

@@ -41,6 +41,7 @@ npm.cmd run serve:test
 
 ## เอกสาร
 
+- [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
 - [TEST_REPORT.md](TEST_REPORT.md): ผลทดสอบ local
 - [STAGING_DEPLOYMENT.md](STAGING_DEPLOYMENT.md): ผล deployment และทดสอบบน staging
