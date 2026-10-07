@@ -9,6 +9,7 @@ switch($action){
  case 'access':$q=$pdo->prepare('SELECT * FROM t_access_rights WHERE Doc_Id=?');$q->execute([(int)$value]);$result=$q->fetchAll();break;
  case 'history':$q=$pdo->prepare('SELECT snapshot FROM eoffice_access_history WHERE Doc_Id=?');$q->execute([(int)$value]);$result=array_map(fn($v)=>json_decode($v,true),$q->fetchAll(PDO::FETCH_COLUMN));break;
  case 'outbox':$q=$pdo->query('SELECT payload,status FROM eoffice_outbox ORDER BY id DESC LIMIT 1000');$result=array_map(fn($v)=>['payload'=>json_decode($v['payload'],true),'status'=>$v['status']],$q->fetchAll());break;
+ case 'outbox_count':$result=(int)$pdo->query('SELECT COUNT(*) FROM eoffice_outbox')->fetchColumn();break;
  case 'previous_year':$pdo->prepare("UPDATE t_document SET Doc_Year='2568' WHERE Doc_Id=?")->execute([(int)$value]);$result=true;break;
  case 'remove_template':$filename=basename($value);if(!preg_match('/^\d+_[a-f0-9]{32}\.png$/',$filename))throw new RuntimeException('Invalid test filename');$file=__DIR__.'/../e-sign/generated_images/'.$filename;$result=is_file($file)?unlink($file):false;break;
  default:throw new RuntimeException('Unknown inspection');

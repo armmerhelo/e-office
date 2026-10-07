@@ -45,6 +45,8 @@ npm.cmd run serve:test
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
 - [TEST_REPORT.md](TEST_REPORT.md): ผลทดสอบ local
 - [STAGING_DEPLOYMENT.md](STAGING_DEPLOYMENT.md): ผล deployment และทดสอบบน staging
+- [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md): ผล deployment production
+- [REVIEW_FIXES.md](REVIEW_FIXES.md): บั๊กจากรีวิวที่แก้และ regression tests
 
 ## โครงสร้าง
 
@@ -56,5 +58,5 @@ npm.cmd run serve:test
 | `management/` | สมาชิกและกลุ่มงาน |
 | `room_booking/`, `external_number_booking/` | จองห้องและเลขคำสั่ง |
 | `maintenance_requests/` | แจ้งซ่อมและการจัดการของเจ้าหน้าที่ |
-| `email_send/`, `Boardcast/` | อีเมลคำสั่งและระบบอุปกรณ์ |
+| `email_send/` | อีเมลคำสั่ง |
 | `scripts/`, `tests/` | Deployment tools, workers และ automated tests |

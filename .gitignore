@@ -8,7 +8,7 @@
 /email_send/User_Data*.json
 /email_send/backup/
 /e-office ftp and db.*
-/Boardcast/New Text Document.txt
+/Boardcast/
 /e-sign/uploads/
 /e-sign/generated_images/*
 !/e-sign/generated_images/.htaccess

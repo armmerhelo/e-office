@@ -39,16 +39,19 @@ function addNewInputFile(name, file_id,doc_id,path,year) {
   fileIndex++; // เพิ่มลำดับทุกครั้งที่กดปุ่มบวก
   const safeName = escapeHtml(name);
   const safeFileId = escapeHtml(file_id);
+  const safeFileVersion = escapeHtml(path ?? '');
   const safeDocId = escapeHtml(doc_id);
   const safeFilePath = encodeURIComponent(String(path ?? ''));
   const safeYear = encodeURIComponent(String(year ?? ''));
   var loop_file = "";
   if (name || file_id) {
     loop_file = `
-        <input type="hidden" name="file_id[]" value="${safeFileId}">`;
+        <input type="hidden" name="file_id[]" value="${safeFileId}">
+        <input type="hidden" name="file_version[]" value="${safeFileVersion}">`;
   }else{
     loop_file = `
-        <input type="hidden" name="file_id[]" value="">`;
+        <input type="hidden" name="file_id[]" value="">
+        <input type="hidden" name="file_version[]" value="">`;
     name = ``;
   }
   if (doc_id && doc_id != '') {

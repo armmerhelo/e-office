@@ -148,15 +148,19 @@ function get_year_folder_id(int $year): string
     return $folderId;
 }
 
-function upload_maintenance_image(int $year, string $base64Data, string $filename, string $mimeType): string
-{
+function validate_maintenance_image(string $base64Data): string {
     $bytes = base64_decode($base64Data, true);
     if ($bytes === false || strlen($bytes) > 5 * 1024 * 1024) throw new RuntimeException('Invalid image size');
     $info = @getimagesizefromstring($bytes);
     if (!$info || $info[0] * $info[1] > 16000000 || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG], true)) throw new RuntimeException('Invalid image');
-    $mimeType = $info['mime'];
+    return $info['mime'];
+}
+
+function upload_maintenance_image(int $year, string $base64Data, string $filename, string $mimeType): string
+{
+    $mimeType = validate_maintenance_image($base64Data);
     if (app_settings()['mock']) {
-        app_queue(['type'=>'drive_image','year'=>$year,'bytes'=>strlen($bytes)]);
+        app_queue(['type'=>'drive_image','year'=>$year,'bytes'=>strlen(base64_decode($base64Data,true))]);
         return 'https://drive.google.com/file/d/mock-' . bin2hex(random_bytes(8)) . '/view';
     }
     $folderId = get_year_folder_id($year);

@@ -21,8 +21,6 @@ Use environment variables or copy `config/local.example.php` to `config/local.ph
 | ONESIGNAL_APP_ID / ONESIGNAL_REST_API_KEY | Notification worker configuration |
 | GEMINI_API_KEY / GEMINI_MODEL | Production PDF recipient matching; model default gemini-2.5-flash |
 | DRIVE_APPS_SCRIPT_URL | HTTPS Drive adapter deployment for production image upload |
-| BOARDCAST_DB_DATABASE / BOARDCAST_DB_USERNAME / BOARDCAST_DB_PASSWORD | Separate parking/sensor database |
-| BOARDCAST_DEVICE_KEY | Required Bearer credential for device writes |
 | EOFFICE_SIGN_ROUTES | JSON assistant-to-supervisor map; default preserves the existing routing |
 
 All exposed database, mail, AI and push credentials from the previous source must be rotated by their owner. Setting new environment variables does not revoke the old credentials.
@@ -33,14 +31,14 @@ All exposed database, mail, AI and push credentials from the previous source mus
 2. Configure the database/origin/storage. Existing original PDFs belong under `original/{year}/`; existing signed files under `e-sign/{year}/`.
 3. Run `php scripts/migrate.php` using the same environment as the app. The migration is additive/idempotent and adds sessions, counters, signed-file revisions, an outbox and access-history archive.
 4. Existing users must log in again. Legacy database tokens are no longer accepted over HTTP. Plaintext passwords are rehashed only after successful, type-safe authentication. Password resets revoke all sessions for that user.
-5. Schedule `php scripts/notifications.php` to process pending document notifications. Failed jobs remain visible as `failed`; inspect configuration before retrying. It is not safe to blindly retry SMTP jobs after an ambiguous delivery failure.
+5. Document notifications are processed after successful responses; authenticated email staff also drain the queue from the browser. Schedule `php scripts/notifications.php` as an additional fallback for unattended delivery. Uncertain/exhausted deliveries remain visible as `manual`/`partial`; inspect the per-channel result before retrying. It is not safe to blindly retry SMTP jobs after an ambiguous delivery failure.
 6. Verify Apache blocks config, scripts, tests, backups, staff JSON and direct document storage. On non-Apache hosts, implement equivalent web-server restrictions before rollout.
 
 Recipients can update only their own receipt number/date, not document content, file attachments or recipients. Owners/Admins manage the shared document. Group membership grants access dynamically. Revoked direct access is archived in eoffice_access_history, preserving read/sign data.
 
 Staff privileges are stored in `eoffice_permissions`. The first migration imports the existing room/maintenance/email staff (IDs 1,14) and external-number staff (IDs 1,18) without changing their global role. Admins have all capabilities. Later staff assignments should be changed in this table; the migration marker prevents re-granting revoked legacy privileges on reruns.
 
-Remote legacy files must be migrated into EOFFICE_STORAGE before signing: revision-checked saves require a local authoritative source. Public orders remain public by design.
+When legacy remote reads are explicitly enabled, document-bound files from the fixed trusted origin are cached atomically in EOFFICE_STORAGE before signing. Revision-checked saves use those same authoritative bytes. Public orders remain public by design.
 
 ## Automated tests
 
@@ -62,6 +60,10 @@ Browser checks additionally cover actual landscape PDF rendering/stamping/export
 
 ## Verified shared-host staging
 
-See `STAGING_DEPLOYMENT.md` for the verified deployment at `https://e-office-test.siya.ac.th/`. The host uses FTPS on `ftp.siya.ac.th:2121` and MySQL/MariaDB through **localhost:3306** from PHP. Production has not been deployed; `config/production.example.php` is a preparation template only.
+See `STAGING_DEPLOYMENT.md` for the verified staging deployment and `PRODUCTION_DEPLOYMENT.md` for the production release at `https://e-office.siya.ac.th/`. The host uses FTPS on `ftp.siya.ac.th:2121` and MySQL/MariaDB through **localhost:3306** from PHP. `config/production.example.php` remains a credential-free template.
 
 Service settings support either process environment variables or the protected `config/local.php`; environment variables take precedence. FTP credentials are read only by the local staging deployment tool from the user's external credential file and are not bundled with the application.
+
+## Review hotfix and queue states
+
+See `REVIEW_FIXES.md` for authorization/attachment/public-response and notification regression coverage. Notification channel results are stored under `payload.delivery`. `pending` jobs with a due `retry_at` are eligible; `manual` includes orphan-image cleanup and uncertain SMTP/legacy sends; `partial` means one channel exhausted retries; `recorded` is a mock trace. Accepted email is never automatically repeated for a Push retry. Investigate manual/partial records before changing their state; do not bulk-reset SMTP-uncertain jobs to pending.

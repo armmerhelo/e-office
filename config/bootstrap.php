@@ -65,7 +65,7 @@ function app_pdo(): PDO {
     $s = app_settings();
     return $pdo = new PDO("mysql:host={$s['host']};port={$s['port']};dbname={$s['database']};charset=utf8mb4", $s['username'], $s['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]);
 }
-function app_user(bool $required = true): ?array {
+function app_user(bool $required = true, bool $locking = false): ?array {
     $token = $_COOKIE['User_Token'] ?? '';
     if ($token === '') {
         $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -73,7 +73,7 @@ function app_user(bool $required = true): ?array {
     }
     $user = null;
     if (is_string($token) && preg_match('/^[a-f0-9]{64}$/', $token)) {
-        $q = app_pdo()->prepare('SELECT u.* FROM eoffice_sessions s JOIN t_user u ON u.User_Id=s.User_Id WHERE s.token_hash=? AND s.expires_at>NOW()');
+        $q = app_pdo()->prepare('SELECT u.* FROM eoffice_sessions s JOIN t_user u ON u.User_Id=s.User_Id WHERE s.token_hash=? AND s.expires_at>NOW()' . ($locking ? ' LOCK IN SHARE MODE' : ''));
         $q->execute([hash('sha256', $token)]);
         $user = $q->fetch() ?: null;
     }
@@ -101,6 +101,15 @@ function app_date(string $value): string {
     if (!$d || $d->format('Y-m-d') !== $value) app_fail('Invalid date');
     return $value;
 }
+function app_document_date(string $value): string {
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return app_date($value);
+    $months=['ม.ค.'=>1,'ก.พ.'=>2,'มี.ค.'=>3,'เม.ย.'=>4,'พ.ค.'=>5,'มิ.ย.'=>6,'ก.ค.'=>7,'ส.ค.'=>8,'ก.ย.'=>9,'ต.ค.'=>10,'พ.ย.'=>11,'ธ.ค.'=>12];
+    if (preg_match('/^(\d{1,2})\s+([^\s\d]+)\s*(\d{4})$/u', $value, $m)) {
+        $year=(int)$m[3];if($year>=2400)$year-=543;
+        if(isset($months[$m[2]])&&checkdate($months[$m[2]],(int)$m[1],$year))return $value;
+    }
+    app_fail('วันที่เอกสารไม่ถูกต้อง');
+}
 function app_password(array $input, string $key, bool $required = false): string {
     $value=$input[$key]??'';
     if(!is_string($value)||strlen($value)>4096||($required&&$value===''))app_fail('Invalid password');
@@ -123,6 +132,44 @@ function app_document(int $id, array $user, bool $edit = false): array {
         $q = app_pdo()->prepare('SELECT 1 FROM t_access_rights WHERE Doc_Id=? AND User_Id=? UNION SELECT 1 FROM t_access_rights_department a JOIN t_user_department u ON u.Department_Id=a.Department_Id WHERE a.Doc_Id=? AND u.User_Id=?');
         $q->execute([$id, $user['User_Id'], $id, $user['User_Id']]);
         if ($q->fetchColumn()) return $doc;
+    }
+    app_fail('คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้', 403);
+}
+function app_document_transaction(): PDO {
+    $pdo = app_pdo();
+    if ($pdo->inTransaction()) throw new RuntimeException('Document transaction already active');
+    // Locking reads see committed revocations. READ COMMITTED also avoids taking
+    // gap locks for recipients whose direct access row has not been created yet.
+    $pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    $pdo->beginTransaction();
+    return $pdo;
+}
+function app_locked_document(int $id, array &$user, bool $edit = false): array {
+    $pdo = app_pdo();
+    if (!$pdo->inTransaction()) throw new RuntimeException('Document lock requires a transaction');
+    $q = $pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active' FOR UPDATE");
+    $q->execute([$id]); $doc = $q->fetch();
+    if (!$doc) app_fail('ไม่พบเอกสาร', 404);
+    // All document writes lock in the same order: document -> user -> session
+    // -> access rows. Re-check authentication/role AFTER a possible lock wait.
+    $q = $pdo->prepare('SELECT User_Id FROM t_user WHERE User_Id=? LOCK IN SHARE MODE');
+    $q->execute([$user['User_Id']]);
+    if (!$q->fetchColumn()) app_fail('กรุณาเข้าสู่ระบบใหม่', 401);
+    $user = app_user(true, true);
+    if ((int)$doc['User_Id'] === (int)$user['User_Id'] || $user['User_Status'] === 'Admin') return $doc;
+    if (!$edit) {
+        $q = $pdo->prepare('SELECT 1 FROM t_access_rights WHERE Doc_Id=? AND User_Id=? LIMIT 1 LOCK IN SHARE MODE');
+        $q->execute([$id, $user['User_Id']]);
+        if ($q->fetchColumn()) return $doc;
+        // Match the administration write order (memberships -> group access)
+        // explicitly instead of leaving lock order to the JOIN query planner.
+        $q = $pdo->prepare('SELECT Department_Id FROM t_user_department WHERE User_Id=? LOCK IN SHARE MODE');
+        $q->execute([$user['User_Id']]);$departments=array_values(array_unique($q->fetchAll(PDO::FETCH_COLUMN)));
+        if($departments){
+            $marks=implode(',',array_fill(0,count($departments),'?'));
+            $q=$pdo->prepare("SELECT 1 FROM t_access_rights_department WHERE Doc_Id=? AND Department_Id IN ($marks) LIMIT 1 LOCK IN SHARE MODE");
+            $q->execute([$id,...$departments]);if($q->fetchColumn())return $doc;
+        }
     }
     app_fail('คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้', 403);
 }

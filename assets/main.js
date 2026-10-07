@@ -67,6 +67,15 @@ window.addEventListener('pageshow', function (event) {
 
 window.onload = async () => {
     await window.sessionReady;
+    if (!window.EOFFICE_MOCK_SERVICES && window.eofficeUser?.permissions?.includes('email')) {
+        const processNotifications = () => {
+            if (document.visibilityState === 'visible') fetch('api/process_notifications.php', {
+                method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
+            }).catch(console.error);
+        };
+        setTimeout(processNotifications, 5000);
+        setInterval(processNotifications, 60000);
+    }
     if ((window.EOFFICE_MOCK_SERVICES || location.hostname === 'localhost') && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(console.error);
     document.getElementById('menu-logout').style.display = window.eofficeUser ? 'flex' : 'none';
     document.getElementById('openModal').style.display = window.eofficeUser ? 'none' : 'flex';

@@ -151,7 +151,7 @@ def ensure_dir(ftp, directory):
 
 
 def deployment_files():
-    excluded={'node_modules','tests','test-results','.git','__pycache__','file_document'}
+    excluded={'node_modules','tests','test-results','.git','__pycache__','file_document','Boardcast'}
     for path in ROOT.rglob('*'):
         if not path.is_file():continue
         relative=path.relative_to(ROOT)
@@ -217,11 +217,12 @@ def prepare_tests(ftp):
     inspect=inspect.replace('<?php','',1).replace("if(PHP_SAPI!=='cli')exit;",'').replace("require __DIR__.'/../config/bootstrap.php';",'').replace("__DIR__.'/../e-sign/generated_images/'","__DIR__.'/e-sign/generated_images/'")
     worker=(ROOT/'scripts/notifications.php').read_text(encoding='utf-8')
     worker=worker.replace('<?php','',1).replace("if(PHP_SAPI!=='cli'){http_response_code(404);exit;}",'').replace("require __DIR__.'/../config/services.php';",'')
+    notifications=(ROOT/'tests/notification-queue.php').read_text(encoding='utf-8').replace('<?php','',1).replace("if(PHP_SAPI!=='cli')exit;",'').replace("require __DIR__.'/../config/services.php';",'')
     source=protected_php(key)+"""
 require __DIR__.'/config/services.php';
 if(app_settings()['database']!=='siyaacth_eoffice_test'||!app_settings()['mock']){http_response_code(403);exit;}
 $request=json_decode(file_get_contents('php://input'),true);$operation=$request['operation']??'';
-"""+"if($operation==='seed'){\n"+seed+"\nexit;}\n"+"if($operation==='inspect'){$argv=[null,$request['action']??'', $request['value']??''];\n"+inspect+"\nexit;}\n"+"if($operation==='worker'){\n"+worker+"\nexit;}\nhttp_response_code(400);"
+"""+"if($operation==='seed'){\n"+seed+"\nexit;}\n"+"if($operation==='inspect'){$argv=[null,$request['action']??'', $request['value']??''];\n"+inspect+"\nexit;}\n"+"if($operation==='worker'){\n"+worker+"\nexit;}\n"+"if($operation==='notifications'){\n"+notifications+"\nexit;}\nhttp_response_code(400);"
     ftp.storbinary('STOR '+name,io.BytesIO(source.encode('utf-8')))
     details={'url':'https://e-office-test.siya.ac.th/'+name,'key':key,'remote_file':name,'password':password}
     folder=Path.home()/'AppData/Local/Temp/opencode'
@@ -246,7 +247,7 @@ def helper_request(payload):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['inspect', 'certificate', 'probe', 'backup', 'deploy', 'prepare-tests', 'test-helper', 'finish-tests', 'sync', 'verify'])
+    parser.add_argument('action', choices=['inspect', 'certificate', 'probe', 'backup', 'deploy', 'prepare-tests', 'test-helper', 'finish-tests', 'sync', 'verify', 'migrate'])
     parser.add_argument('--credentials', default=str(DEFAULT_CREDENTIALS))
     parser.add_argument('--ftp-host', default='ftp.siya.ac.th')
     parser.add_argument('--files', nargs='+', help='Application-relative paths for a targeted staging sync')
@@ -255,7 +256,7 @@ def main():
     args = parser.parse_args()
     if args.action=='test-helper':
         action=args.helper_action
-        payload={'operation':action} if action in ['seed','worker'] else {'operation':'inspect','action':action,'value':args.helper_value}
+        payload={'operation':action} if action in ['seed','worker','notifications'] else {'operation':'inspect','action':action,'value':args.helper_value}
         print(json.dumps(helper_request(payload),ensure_ascii=True))
         return
     account, database = credentials(args.credentials)
@@ -281,6 +282,7 @@ def main():
         if args.action=='verify':
             mismatches=[];count=0
             for name,content in deployment_files():
+                if args.files and name not in args.files:continue
                 try:actual=retrieve(ftp,name)
                 except ftplib.error_perm:mismatches.append(name);continue
                 count+=1
@@ -295,7 +297,9 @@ def main():
             folder=Path.home()/'AppData/Local/Temp/opencode'
             file=folder/'eoffice-staging-qa.private.json'
             details=json.loads(file.read_text());ftp.delete(details['remote_file']);file.unlink()
-            manifest={'deployed_at':time.strftime('%Y-%m-%dT%H:%M:%S'),'files':{name:hashlib.sha256(content).hexdigest() for name,content in deployment_files()}}
+            manifest=json.loads(retrieve(ftp,'config/staging-manifest.json').decode('utf-8'))
+            manifest['verified_at']=time.strftime('%Y-%m-%dT%H:%M:%S')
+            manifest['files']={name:hashlib.sha256(retrieve(ftp,name)).hexdigest() for name in manifest['files']}
             ftp.storbinary('STOR config/staging-manifest.json',io.BytesIO(json.dumps(manifest).encode()))
             (folder/'eoffice-staging-manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
             unexpected=[name for name,facts in ftp.mlsd() if name.startswith(('.qa-','.deploy-'))]
@@ -316,11 +320,21 @@ def main():
             if 'EOFFICE_SIGN_ROUTES' not in local:
                 local=local.rstrip().removesuffix(';')+" + ['EOFFICE_SIGN_ROUTES' => '{}'];\n"
                 ftp.storbinary('STOR config/local.php',io.BytesIO(local.encode('utf-8')))
-            manifest={'deployed_at':time.strftime('%Y-%m-%dT%H:%M:%S'),'files':{name:hashlib.sha256(retrieve(ftp,name)).hexdigest() for name,_ in deployment_files()}}
+            if selected:
+                manifest=json.loads(retrieve(ftp,'config/staging-manifest.json').decode('utf-8'))
+                manifest['updated_at']=time.strftime('%Y-%m-%dT%H:%M:%S')
+                for name in selected:manifest['files'][name]=hashlib.sha256(retrieve(ftp,name)).hexdigest()
+            else:
+                manifest={'deployed_at':time.strftime('%Y-%m-%dT%H:%M:%S'),'files':{name:hashlib.sha256(retrieve(ftp,name)).hexdigest() for name,_ in deployment_files()}}
             ftp.storbinary('STOR config/staging-manifest.json',io.BytesIO(json.dumps(manifest).encode()))
             folder=Path.home()/'AppData/Local/Temp/opencode'
             (folder/'eoffice-staging-manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
             print(json.dumps({'application_synced':True}))
+            return
+        if args.action=='migrate':
+            key=secrets.token_hex(32)
+            source=protected_php(key)+"require __DIR__.'/config/bootstrap.php';require __DIR__.'/config/migrations.php';if(app_settings()['database']!=='siyaacth_eoffice_test'||!app_settings()['mock']){http_response_code(403);exit;}app_migrate(app_pdo());echo json_encode(['migrated'=>true,'database'=>app_settings()['database']]);"
+            print(json.dumps(invoke_probe(ftp,source,key)))
             return
         if args.action=='deploy':
             deploy(ftp,database)

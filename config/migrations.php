@@ -6,6 +6,7 @@ function app_migrate(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_counters (counter_key VARCHAR(100) PRIMARY KEY, value INT NOT NULL) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_signed_files (Doc_Id INT NOT NULL, file_name VARCHAR(255) NOT NULL, revision CHAR(64) NOT NULL, signed_at DATETIME NOT NULL, PRIMARY KEY(Doc_Id,file_name), FOREIGN KEY(Doc_Id) REFERENCES t_document(Doc_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_outbox (id BIGINT AUTO_INCREMENT PRIMARY KEY, payload JSON NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, status VARCHAR(20) NOT NULL DEFAULT 'pending') ENGINE=InnoDB");
+    if(!$pdo->query("SHOW INDEX FROM eoffice_outbox WHERE Key_name='idx_eoffice_outbox_status'")->fetch())$pdo->exec('ALTER TABLE eoffice_outbox ADD INDEX idx_eoffice_outbox_status (status,id)');
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_access_history (id BIGINT AUTO_INCREMENT PRIMARY KEY, Doc_Id INT NOT NULL, User_Id INT NOT NULL, snapshot JSON NOT NULL, archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_permissions (User_Id INT NOT NULL, permission VARCHAR(50) NOT NULL, PRIMARY KEY(User_Id,permission), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_migrations (name VARCHAR(100) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");

@@ -1,5 +1,12 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteCond %{HTTP_HOST} ^(?:e-office|e-office-test)\.siya\.ac\.th$ [NC]
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{REQUEST_URI} !^/Boardcast(?:/|$)
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=308,L]
+    RewriteCond %{HTTP_HOST} ^www\.e-office\.siya\.ac\.th$ [NC]
+    RewriteCond %{REQUEST_URI} !^/Boardcast(?:/|$)
+    RewriteRule ^ https://e-office.siya.ac.th%{REQUEST_URI} [R=308,L]
 
     # ถ้ามีการเรียก document_new/file/xxxxx.pdf
     # ให้ส่งไปที่ api/file_request.php?Doc_Id=xxxxx.pdf
@@ -7,6 +14,7 @@
     RewriteRule ^(?:scripts|tests|test-results|email_send/backup)(?:/|$) - [F,L]
     RewriteRule ^email_send/(?:User_Data.*\.json|process_pdf_bup\.php)$ - [F,L,NC]
     RewriteRule ^e-sign/(?:e-sign-v1|e-sign_backup|e-sign_error|e-sign_6_10_69)\.php$ - [F,L]
+    RewriteRule ^=f8573b7e-458c-4631-82a9-d7d0ca86927c$ - [F,L]
 </IfModule>
 Options -Indexes
 DirectoryIndex index.php index.html
