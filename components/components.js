@@ -345,8 +345,30 @@ var login_html = `
     </svg>
     เข้าสู่ระบบด้วย Google
   </a>
-  <p class="text-gray-500 pt-3">ใช้บัญชี @siya.ac.th ที่ลงทะเบียนแล้ว</p>
+  <p class="text-gray-500 pt-3">บัญชีโรงเรียนสมัครผ่าน Google ได้ · อีเมลอื่นใช้ได้เมื่อมีบัญชีในระบบแล้ว</p>
 </div>
+</div>
+
+<div id="google_signup_part" class="px-6 py-4 text-gray-600" hidden>
+  <p id="google_signup_intro" class="pb-3">ยืนยันข้อมูลเพื่อสร้างบัญชี E-Office</p>
+  <p id="google_signup_email" class="pb-3" style="overflow-wrap:anywhere"></p>
+  <form id="google_signup_form">
+    <div id="google_signup_name_part">
+      <label for="google_signup_name">ชื่อ นามสกุล</label>
+      <input id="google_signup_name" name="name" type="text" maxlength="255" autocomplete="name" class="mt-1 block w-full rounded-lg p-2 border" required>
+    </div>
+    <div id="google_link_password_part" hidden>
+      <label for="google_link_password">รหัสผ่านบัญชี E-Office</label>
+      <input id="google_link_password" type="password" autocomplete="current-password" class="mt-1 block w-full rounded-lg p-2 border">
+    </div>
+    <div id="google_signup_agreement" class="mt-3" style="max-height:160px;overflow:auto;text-align:left"></div>
+    <label id="google_signup_consent_part" class="flex items-center justify-center gap-2 pt-3">
+      <input id="google_signup_consent" type="checkbox" required> ยอมรับข้อตกลงการสมัครสมาชิก
+    </label>
+    <p id="google_signup_status" class="text-red-500 pt-3" role="alert" aria-live="polite"></p>
+    <button id="google_signup_submit" type="submit" class="px-4 py-2 mt-3 bg-blue-600 text-white rounded-md">ยืนยันและเข้าสู่ระบบ</button>
+    <a id="google_signup_change_account" href="api/auth_google.php" class="block pt-3">เปลี่ยนบัญชี Google</a>
+  </form>
 </div>
 
 <div id="register_part" class="pl-6 pr-6 pt-6 text-gray-600" style="display:none">

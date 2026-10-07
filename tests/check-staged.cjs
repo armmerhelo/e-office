@@ -28,11 +28,16 @@ try {
     assert.ok(!JSON.stringify(rejected).includes(fakeSecret));
     git('add', '--', 'fixture.js');
     assert.deepEqual(check(0).errors, []);
+    fs.writeFileSync(path.join(repo, 'oauth.yaml'), `google_client_secret: ${fakeSecret}\n`);
+    git('add', '--', 'oauth.yaml');
+    assert.ok(check(1).errors.some(e=>e.file==='oauth.yaml' && e.reason==='embedded private key/token'));
+    fs.writeFileSync(path.join(repo, 'oauth.yaml'), 'google_client_secret: YOUR_CLIENT_SECRET\n');
+    git('add', '--', 'oauth.yaml');
     fs.mkdirSync(path.join(repo, 'config'));
     fs.writeFileSync(path.join(repo, 'config/local.php'), '<?php return [];\n');
     git('add', '--force', '--', 'config/local.php');
     assert.ok(check(1).errors.some(e=>e.file==='config/local.php' && e.reason==='private/runtime file'));
-    console.log('PASS staged Google secret detection, staged-vs-working-tree protection, clean placeholders and private config rejection');
+    console.log('PASS staged Google secret detection across JS/YAML, staged-vs-working-tree protection, clean placeholders and private config rejection');
 } finally {
     fs.rmSync(repo, {recursive:true, force:true});
 }

@@ -4,6 +4,7 @@ app_method('GET');
 if (!app_google_enabled()) app_google_redirect('not_configured');
 app_google_session();
 session_regenerate_id(true);
+unset($_SESSION['google_signup']);
 $documentId = $_GET['id'] ?? null;
 $flow = app_google_flow(is_string($documentId) ? $documentId : null);
 $_SESSION['google_login'] = $flow;

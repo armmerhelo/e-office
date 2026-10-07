@@ -9,7 +9,7 @@ if (logic.status !== 0) throw Error(logic.stdout + logic.stderr);
 
 const script = fs.readFileSync('assets/google-login.js', 'utf8');
 function ui(enabled, query) {
-    const nodes = {google_login_part:{hidden:true}, google_login_btn:{href:'api/auth_google.php'}, login_status:{textContent:''}};
+    const nodes = {google_login_part:{hidden:true}, google_login_btn:{href:'api/auth_google.php'}, google_signup_change_account:{href:'api/auth_google.php'}, login_status:{textContent:''}};
     const window = {EOFFICE_GOOGLE_LOGIN_ENABLED:enabled, location:{href:'http://localhost/' + query}, history:{state:null,replaceState(_state,_title,url){this.url=url;}}};
     vm.runInNewContext(script, {window, URL, document:{getElementById:id=>nodes[id]}});
     return {nodes,window};
@@ -18,7 +18,9 @@ assert.equal(ui(false, '').nodes.google_login_part.hidden, true);
 const enabled = ui(true, '?id=123&google_login=not_registered');
 assert.equal(enabled.nodes.google_login_part.hidden, false);
 assert.equal(enabled.nodes.google_login_btn.href, 'api/auth_google.php?id=123');
-assert.match(enabled.nodes.login_status.textContent, /สมัครสมาชิก/);
+assert.equal(enabled.nodes.google_signup_change_account.href, 'api/auth_google.php?id=123');
+assert.equal(ui(true, '?id=https://attacker.example').nodes.google_signup_change_account.href, 'api/auth_google.php');
+assert.match(enabled.nodes.login_status.textContent, /ผู้ดูแล/);
 assert.equal(enabled.window.history.url, '/?id=123');
 assert.ok(!ui(true, '?google_login=%3Cscript%3E').nodes.login_status.textContent.includes('<script>'));
 for (const error of ['__proto__', 'constructor', 'toString', '<script>', 'unknown']) {
@@ -77,7 +79,7 @@ async function run() {
     assert.equal(new URL(r.headers.get('Location')).searchParams.get('google_login'), 'invalid_state');
     assert.ok(!r.headers.getSetCookie().some(c=>c.startsWith('User_Token=')));
     r = await get('/api/auth_google_callback.php?state='+flow.state+'&error=access_denied', flow.cookie);
-    assert.equal(new URL(r.headers.get('Location')).searchParams.get('google_login'), 'invalid_state');
+    assert.equal(new URL(r.headers.get('Location')).searchParams.get('google_login'), 'cancelled');
     const cancelled = await begin('?id=123');
     r = await get('/api/auth_google_callback.php?state='+cancelled.state+'&error=access_denied', cancelled.cookie);
     assert.equal(r.headers.get('Location'), base+'/?id=123&google_login=cancelled');

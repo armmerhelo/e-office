@@ -21,10 +21,8 @@ for (const file of files) {
     if (forbidden.test(file)) errors.push({file,reason:'private/runtime file'});
     const blob = cp.execFileSync('git', ['show', ':' + file], {maxBuffer:64*1024*1024});
     if (secrets.some(secret => blob.includes(Buffer.from(secret)))) errors.push({file,reason:'matches a supplied credential'});
-    if (/\.(?:php|js|cjs|py|json|md|html|sql|txt)$|(?:^|\/)(?:\.htaccess|\.gitignore)$/.test(file)) {
-        const text = blob.toString('utf8');
-        if (keyPatterns.some(pattern => pattern.test(text))) errors.push({file,reason:'embedded private key/token'});
-    }
+    const text = blob.toString('utf8');
+    if (keyPatterns.some(pattern => pattern.test(text))) errors.push({file,reason:'embedded private key/token'});
 }
 console.log(JSON.stringify({stagedFiles:files.length,credentialValuesChecked:secrets.length,errors},null,2));
 if (errors.length) process.exitCode=1;
