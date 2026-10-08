@@ -13,6 +13,11 @@ return [
     'EOFFICE_CRON_TOKEN' => '',
     'EOFFICE_BACKUP_KEY' => '', // base64_encode(random_bytes(32)); preserve for recovery.
     // 'EOFFICE_BACKUP_DIRECTORY' => '/absolute/path/outside/public_html/backups',
+    'EOFFICE_DRIVE_ARCHIVE_ENABLED' => 'false',
+    'EOFFICE_DRIVE_ARCHIVE_URL' => '', // dedicated authenticated Apps Script /exec route
+    'EOFFICE_DRIVE_ARCHIVE_SECRET' => '', // 64 random lowercase hex, same Script Property
+    'EOFFICE_DRIVE_EVICT_ENABLED' => 'false', // enable after remote recovery validation
+    'EOFFICE_DRIVE_EVICT_GRACE_DAYS' => '14', // minimum 7
     'EOFFICE_MOCK_SERVICES' => 'true',
     'EOFFICE_REMOTE_FILES' => 'false',
 ];

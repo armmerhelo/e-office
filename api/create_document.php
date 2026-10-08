@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/../config/order-emails.php';
 require_once __DIR__.'/../config/amss-links.php';
+require_once __DIR__.'/../config/drive-archive.php';
 app_method('POST');$user=app_user();$pdo=app_pdo();
 $edit=($_POST['formtype']??'')==='edit_document';$id=(int)($_POST['doc_id']??0);
 $doc=null;
@@ -81,17 +82,19 @@ try{
   $pdo->prepare('DELETE FROM t_access_rights_department WHERE Doc_Id=?')->execute([$id]);$q=$pdo->prepare('INSERT INTO t_access_rights_department (Doc_Id,Department_Id) VALUES (?,?)');foreach(array_unique(array_map('intval',$_POST['send_to_group']??[])) as $dept)$q->execute([$id,$dept]);
  }
  $dir=app_storage('original',$year);if(!is_dir($dir)&&!@mkdir($dir,0755,true)&&!is_dir($dir))throw new RuntimeException('Storage unavailable');
- foreach($fileNames as $i=>$detail){$fid=(int)($fileIds[$i]??0);$path=$fid?$existing[$fid]['Doc_Upload_Path']:'';
+  foreach($fileNames as $i=>$detail){$fid=(int)($fileIds[$i]??0);$path=$fid?$existing[$fid]['Doc_Upload_Path']:'';
   if(isset($uploads[$i])){[$f,$newName]=$uploads[$i];$target=$dir.$newName;if(!move_uploaded_file($f['tmp_name'],$target))throw new RuntimeException('Upload failed');$moved[]=$target;if($fid)$oldFiles[]=$dir.$path;$path=$newName;}
   if($fid&&isset($uploads[$i]))$pdo->prepare('UPDATE t_document_upload SET Doc_Upload_Detail=?,Doc_Upload_Path=? WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$detail,$path,$fid,$link]);
   elseif($fid)$pdo->prepare('UPDATE t_document_upload SET Doc_Upload_Detail=? WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$detail,$fid,$link]);
-  else $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   else $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   if(isset($uploads[$i]))app_drive_archive_track($id,$path,'original',$dir.$path);
  }
  if($edit&&($_POST['replace_files']??'')==='1')foreach($existing as $fid=>$file)if(!in_array($fid,$keep,true)){$pdo->prepare('DELETE FROM t_document_upload WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$fid,$link]);$oldFiles[]=$dir.$file['Doc_Upload_Path'];}
  foreach($staged as [$detail,$handle]){
   $path=bin2hex(random_bytes(16)).'.pdf';$target=$dir.$path;$output=fopen($target,'xb');if($output===false)throw new RuntimeException('AMSS PDF storage unavailable');$moved[]=$target;
   try{if(stream_copy_to_stream($handle,$output)!==fstat($handle)['size']||!fflush($output))throw new RuntimeException('AMSS PDF storage failed');}finally{fclose($output);}
-  $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   app_drive_archive_track($id,$path,'original',$target);
  }
  app_order_saved($id,!$edit,$type,$orderSettings);
  $pdo->commit();

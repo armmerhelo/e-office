@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/services.php';
 require_once __DIR__.'/order-ai.php';
+require_once __DIR__.'/drive-archive.php';
 
 function app_order_audit(string $action,?int $actor=null,?int $doc=null): void {
     app_pdo()->prepare('INSERT INTO eoffice_order_audit (actor_id,doc_id,action) VALUES (?,?,?)')->execute([$actor,$doc,$action]);
@@ -46,7 +47,7 @@ function app_order_pdf_files(array $doc): array {
     foreach($q as $file){
         $name=$file['Doc_Upload_Path'];if(strtolower(pathinfo($name,PATHINFO_EXTENSION))!=='pdf')continue;
         if($name!==basename($name)||str_contains($name,'\\'))throw new AppOrderAIException('invalid_file');
-        $path=app_storage('original',$year,$name);
+        $path=app_drive_archive_resolve($doc,$name,false);
         if(!is_file($path)||filesize($path)>20*1024*1024||(new finfo(FILEINFO_MIME_TYPE))->file($path)!=='application/pdf')throw new AppOrderAIException('pdf_unavailable');
         $hash=hash_file('sha256',$path);if($hash===false)throw new AppOrderAIException('pdf_unavailable');
         $files[$name]=['name'=>$name,'caption'=>(string)($file['Doc_Upload_Detail']??''),'hash'=>$hash,'path'=>$path];

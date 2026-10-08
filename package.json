@@ -13,6 +13,7 @@
     "test:orders": "node tests/order-emails.cjs",
     "test:amss": "node tests/amss-links.cjs",
     "test:backup": "node tests/backup-ops.cjs",
+    "test:drive": "node tests/drive-archive.cjs",
     "test:google": "node tests/google-auth.cjs && node tests/google-signup.cjs",
     "build:css": "tailwindcss -i src/input.css -o assets/tailwind.css --minify",
     "serve:test": "node scripts/serve-test.cjs"

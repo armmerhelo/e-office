@@ -2,7 +2,7 @@
 require_once __DIR__.'/bootstrap.php';
 require_once __DIR__.'/backup-stream.php';
 
-function app_database_backup(): array {
+function app_database_backup(?callable $capture=null): array {
     $key=base64_decode((string)app_env('EOFFICE_BACKUP_KEY'),true);
     if($key===false||strlen($key)!==32)throw new RuntimeException('Backup encryption key required');
     $directory=(string)app_env('EOFFICE_BACKUP_DIRECTORY',dirname(app_settings()['storage']).'/backups');
@@ -21,6 +21,7 @@ function app_database_backup(): array {
             if(!preg_match('/\bENGINE=InnoDB\b/i',$schemas[$table]))throw new RuntimeException('Consistent backup requires InnoDB tables');
         }
         $pdo->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');$pdo->beginTransaction();
+        $snapshot=$capture?$capture($pdo):null;
         $writer=new AppBackupWriter($temporary,$key,'jsonl-gzip');$buffer='';
         $write=static function(array $record)use(&$buffer,$writer):void{$buffer.=json_encode($record,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE)."\n";if(strlen($buffer)>=131072){$gzip=gzencode($buffer,6);if($gzip===false)throw new RuntimeException('Backup compression failed');$writer->write($gzip);$buffer='';}};
         $write(['kind'=>'metadata','database'=>app_settings()['database'],'started_at'=>gmdate('c'),'version'=>2,'time_zone'=>'+00:00']);
@@ -37,7 +38,8 @@ function app_database_backup(): array {
         if($buffer!==''){$gzip=gzencode($buffer,6);if($gzip===false)throw new RuntimeException('Backup compression failed');$writer->write($gzip);}
         $result=$writer->finish();$pdo->commit();
         app_backup_publish($temporary,$final);
-        return ['created'=>true,'format_version'=>2,'filename'=>$name,'path'=>$final,'tables'=>$tables,'rows'=>$rows,'encrypted_bytes'=>filesize($final),'archive_sha256'=>hash_file('sha256',$final),'stream_sha256'=>$result['sha256']];
+        $result=['created'=>true,'format_version'=>2,'filename'=>$name,'path'=>$final,'tables'=>$tables,'rows'=>$rows,'encrypted_bytes'=>filesize($final),'archive_sha256'=>hash_file('sha256',$final),'stream_sha256'=>$result['sha256']];
+        if($snapshot!==null)$result['snapshot']=$snapshot;return $result;
     }catch(Throwable $e){if($statement)$statement->closeCursor();if($pdo->inTransaction())$pdo->rollBack();unset($writer);if(is_file($temporary))unlink($temporary);throw $e;}
     finally{$pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY,$buffered);$pdo->exec('SET SESSION time_zone='.$pdo->quote($timezone));$pdo->query("SELECT RELEASE_LOCK('eoffice:database-backup')");}
 }
