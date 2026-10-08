@@ -1,5 +1,18 @@
 # Production deployment — E-Office
 
+## AMSS PDF import hotfix (8 October 2026)
+
+- Source commit: `3b7a620` (`fix: restore automatic AMSS PDF imports`), pushed to `origin/main`.
+- Restored the legacy behavior found in `e-office backup/api/create_document.php`: direct AMSS PDF links become document-bound attachments on create/edit, with the link caption retained as the attachment title. Successfully imported links are removed from `Doc_Url`.
+- Review tightened public IPv4 checks and standard-port URL normalization. AMSS HTTP links download over verified HTTPS; redirects are not followed, PDF bytes are validated and each file is limited to 20 MB. Failed imports roll back document, file and notification changes.
+- The staged release was tested independently of concurrent working-tree changes. Full committed regression suite passed; AMSS validation **33 passed**, live AMSS HTTP checks **7 passed**. The checkout with order integration also passed its additional AMSS-to-AI queue check.
+- Targeted deployment verified SHA-256 for **2 files**: `config/amss-links.php` and `api/create_document.php`. The deployed document API retains its existing order-email integration. No database migration was required.
+- Production downloaded the AMSS sample successfully: **62,188 bytes**, SHA-256 `3cd5c7a41eef1b3801552229770c734479d137a359943fbdb160dc5fae1851b9`.
+- Production API smoke **5 passed**: link-only import, PDF bytes/MIME/revision, guest denial, edit without duplication, and failed-download rollback. Synthetic user/session/document/attachment were removed; no recipients or notifications were created.
+- Post-deploy checks: **0 checksum mismatches**, **0 temporary release helpers**.
+- Backup: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-amss-before-20261008-112721.tar.gz` (SHA-256 `bd0e29397ac1b1b3859bc95bd43dfae0aef37353fc444542d7a7255165cc4d61`). The release metadata and smoke cleanup record are stored privately in Temp/opencode.
+- Targeted deployment/check/rollback tooling: `python scripts/amss-release.py inspect|deploy|verify|smoke|cleanup-smoke|rollback`.
+
 ## Review hotfix (8 October 2026)
 
 Applied the authorization/attachment/public-data and notification fixes documented in `REVIEW_FIXES.md`. Local regression: 42 workflow, 7 lock-race and 17 queue tests; staging: 42 workflow and 17 queue tests. Production checksum verification covers 135 files with no mismatches, and 12 controlled smoke tests pass. Temporary smoke records and endpoints were removed; original data counts are unchanged.
