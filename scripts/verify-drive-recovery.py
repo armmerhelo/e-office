@@ -1,5 +1,5 @@
 """Real dated Drive checkpoint recovery into private local scratch, then cleanup."""
-import argparse,hashlib,importlib.util,json,os,secrets,shutil,subprocess,re,base64
+import argparse,hashlib,importlib.util,json,os,secrets,shutil,subprocess,re,base64,time,urllib.error
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('restore',Path(__file__).with_name('restore-backup.py'))
 restore=importlib.util.module_from_spec(spec);spec.loader.exec_module(restore)
@@ -7,8 +7,12 @@ ROOT=restore.ROOT
 spec=importlib.util.spec_from_file_location('production',Path(__file__).with_name('production-hosting.py'))
 production=importlib.util.module_from_spec(spec);spec.loader.exec_module(production)
 def host_call(ftp,code):
-    key=secrets.token_hex(32)
-    return production.invoke(ftp,production.php(key)+"ini_set('zend.exception_ignore_args','1');set_time_limit(180);require __DIR__.'/config/drive-archive.php';"+code,key)
+    for attempt in range(3):
+        key=secrets.token_hex(32)
+        try:return production.invoke(ftp,production.php(key)+"ini_set('zend.exception_ignore_args','1');set_time_limit(180);require __DIR__.'/config/drive-archive.php';"+code,key)
+        except urllib.error.HTTPError as error:
+            if error.code not in [500,502,503,504] or attempt==2:raise
+            time.sleep(attempt+1)
 def host_recovery(date,directory,env):
     directory.mkdir(mode=0o700);cache=directory/'objects';cache.mkdir(mode=0o700)
     account,_=production.credentials()

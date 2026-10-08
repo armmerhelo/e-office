@@ -23,3 +23,15 @@
 - No Apps Script redeployment is required for these PHP/queue fixes. The existing 1 MiB slice/encrypted object protocol is retained.
 
 Detailed setup/activation: [GOOGLE_DRIVE_ARCHIVE.md](GOOGLE_DRIVE_ARCHIVE.md).
+
+## Production verification
+
+- Reviewed runtime commit: `5947cfa` (`fix: authenticate Drive checkpoints and isolate failed upload retries`), pushed to `origin/main`.
+- Targeted runtime files and additive retry migration deployed with checksum verification. Deployment tooling now includes the committed `config/document-files.php` dependency before loading the archive module.
+- Production synthetic smoke: **8 passed** (guest rejection, authorized PDF/revision, byte ranges, HEAD, protected status, signature save and signed bytes). Temporary account/document/registry/spool files were removed.
+- Actual dated Drive checkpoint recovery passes after the fixes: **36 tables / 65,692 rows / 4 captured file versions**. The checkpoint correctly remains a partial `database_only` set with **12,024 pending variants at capture**; plaintext drill data was removed.
+- Server Cron heartbeat confirmed at **23:25:01 Asia/Bangkok**, with queued slice progress, two temporarily deferred uploads and no files marked for integrity review. Uploads are enabled, eviction is **false**, and the first full scan is still incomplete.
+- The completed queue count at that check was **21 verified versions / 15,816,091 bytes**; registered pending versions **143**. These numbers describe the registered queue, not total dataset coverage.
+- Private rollback archive: `eoffice-drive-activation-before-20261008-231347.tar.gz` in the approved temporary directory; SHA-256 `685447ae4f2d2275a50b0cc75e25b91d53acc1f08d1b4a5d8dc14e60a197fc7e`.
+
+Google response latency/retries remain the current bootstrap throughput limit. The queue now progresses independently of individual failures, but the initial dataset must not be reported as fully protected until a complete checkpoint and recovery drill pass.

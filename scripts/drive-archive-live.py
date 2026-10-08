@@ -108,7 +108,7 @@ $result=$backup;unset($result['path']);echo json_encode(['database'=>$result,'ob
     folder.joinpath(target.name+'.metadata.private.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     print(json.dumps({'cloud_database_uploaded_and_downloaded':True,'tables':metadata['tables'],'rows':metadata['rows'],'encrypted_bytes':metadata['encrypted_bytes'],'archive':str(target),'full_document_backup_completed':False}))
 def deploy_runtime(ftp):
-    root=production.hosting.ROOT;names=['config/drive-archive-schema.php','config/drive-archive-client.php','config/drive-archive.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','scripts/drive-archive.php','api/drive_archive_status.php','assets/drive-archive-status.js']
+    root=production.hosting.ROOT;names=['config/drive-archive-schema.php','config/drive-archive-client.php','config/document-files.php','config/drive-archive.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','scripts/drive-archive.php','api/drive_archive_status.php','assets/drive-archive-status.js']
     payload={name:subprocess.check_output(['git','show','HEAD:'+name],cwd=root) for name in names}
     archive=production.TEMP/('eoffice-drive-activation-before-'+time.strftime('%Y%m%d-%H%M%S')+'.tar.gz')
     with tarfile.open(archive,'w:gz') as out:
