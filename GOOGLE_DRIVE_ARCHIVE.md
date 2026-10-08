@@ -123,3 +123,28 @@ Configuration is written to production only after the actual signed private brid
 - Production synthetic smoke: 8 checks pass for guest rejection, authorized PDF/revision, Range, HEAD, protected Admin status, signature save and signed-file delivery. Temporary account/document/files were removed; no staff notifications sent.
 - Rollback archive: `eoffice-drive-before-20261008-193707.tar.gz` in the approved temporary directory; SHA-256 `f4a1f9064fd1dbc3bf8f995a4fcb2fb300b052832530c3e53d96b24431f7afa9`.
 - The original `.gs` source has now been received and merged. Actual Apps Script installation/version deployment, real cloud recovery and hosting Cron activation remain pending.
+
+## Live activation — 8 October 2026
+
+The owner updated the existing Apps Script deployment. Signed bridge health now returns protocol 1/private storage; the site's bridge settings were installed with unrelated settings preserved. Archive uploads are **enabled**; server eviction remains **disabled**, with a 14-day grace setting.
+
+Verified live:
+
+- Two synthetic encrypted parts (1,100,041 plaintext bytes total) were uploaded, downloaded and authenticated back to the exact original bytes. Temporary plaintext was removed.
+- An encrypted production database was recovered from Drive, then imported into an isolated local test database: **36 tables / 65,362 rows**, with the temporary database/plaintext removed. Archive SHA-256: `10654d6389695d03770c788c64db66b03b773b1f78030d23a0699e252acd2b7c`.
+- The first dated checkpoint (`2026-10-08`) is on Drive with **database_only** status, completed at **21:42:08 Asia/Bangkok**. Actual checkpoint recovery verified **36 tables / 65,692 rows** and the **4 file versions** captured by that snapshot. The descriptor honestly reports **12,024 pending file variants** at capture, so it is not a complete document recovery set.
+- The existing hosting Cron ran `order-cron.sh` at **21:55:01**, processed the order worker, ran Drive synchronization and recognized the already saved daily database. No extra panel schedule or open workstation is required for the recurring queue.
+- Live inventory: **14,473 active documents / 11,999 attachments**. Initially 8,800 originals were absent from current storage (3,588 in 2567, 4,670 in 2568, 542 in 2569). Read-only legacy-origin probes returned real PDFs; the worker now imports those document-bound originals and distinct signed variants safely.
+- At **21:58:38**, the queue had **9 verified versions / 9,556,688 plaintext bytes**, **155 pending registered versions**, and no evictions. This registered queue count is not the total remaining attachment count; the initial scan is still progressing.
+
+The 120-second hosting DB idle timeout required SQL keepalive between bounded Google requests, preserving advisory locks through uploads/retries. Read-only cloud fetches use the same keepalive. Regression tests cover fresh retry nonces, redirect confinement, keepalive calls, cloud corruption, initial database-only snapshots and concurrent replacements; archive behavior now has **24 passing checks**, plus HTTP/Apps Script tests.
+
+Initial synchronization is asynchronous and continues through the server Cron. Monitor `/management/drive_archive.html` for the first complete scan, upload backlog and eventual `completed` daily recovery set. Do not enable eviction until that full set has a successful recovery drill and the grace/age requirements are met. No active documents currently fall before 2567; the configured year policy therefore retains the current dataset locally even after verification.
+
+Repeat a dated private checkpoint drill from this workstation:
+
+```sh
+python scripts/verify-drive-recovery.py 2026-10-08
+```
+
+This uses the configured hosting bridge to retrieve ciphertext (avoiding transient workstation ContentService response issues), verifies/decrypts locally, reports complete-vs-partial status, and removes private drill plaintext. It does not send staff notifications or import into production.

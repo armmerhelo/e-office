@@ -41,4 +41,4 @@ try{
     $complete=$manifest['complete_recovery_set']??true;
     $result=['restored'=>true,'complete_recovery_set'=>$complete,'pending_files'=>$manifest['pending_files']??0,'date'=>$date,'files'=>$count,'database_archive'=>$root.'/database.ebak'];
     file_put_contents($root.'/'.($complete?'restore-completed.json':'database-recovery-completed.json'),json_encode($result,JSON_THROW_ON_ERROR));echo json_encode($result,JSON_THROW_ON_ERROR).PHP_EOL;
-}catch(Throwable $e){fwrite(STDERR,'Drive recovery failed ('.get_class($e).'); no completion marker published'.PHP_EOL);exit(1);}
+}catch(Throwable $e){fwrite(STDERR,'Drive recovery failed ('.get_class($e).' at '.basename($e->getFile()).':'.$e->getLine().'); no completion marker published'.PHP_EOL);exit(1);}
