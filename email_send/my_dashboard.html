@@ -188,6 +188,17 @@ async function fetchMyDocuments(page = 1) {
                     </a>
                 </td>
             `;
+            const fileCell = tr.querySelector('td:last-child');
+            fileCell.replaceChildren();
+            const files = Array.isArray(item.files) ? item.files : [fileName];
+            files.forEach((name, index) => {
+                const link = document.createElement('a');
+                link.href = `../api/view_file.php?Doc_Id=${docId}&File_Path=${encodeURIComponent(name)}&Year=${encodeURIComponent(docYear)}`;
+                link.target = '_blank'; link.rel = 'noopener'; link.className = 'btn-view';
+                link.textContent = `เปิด PDF ${index + 1}`; link.style.marginBottom = '6px';
+                fileCell.append(link, document.createElement('br'));
+            });
+            if (!files.length) fileCell.textContent = 'ไฟล์เดิมไม่พร้อมใช้งาน';
             tbody.appendChild(tr);
         });
 

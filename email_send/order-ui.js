@@ -1,0 +1,13 @@
+/* Shared safe DOM helpers: recipient/document data is never interpolated as HTML. */
+window.OrderUI = (() => {
+    const labels = {waiting_files:'รอ PDF',analyzing:'รอ/กำลังวิเคราะห์',queued:'เข้าคิวแล้ว',sending:'กำลังส่ง',pending:'รอดำเนินการ',success:'สำเร็จ',partial:'มีรายการต้องตรวจสอบ',review:'ต้องตรวจสอบงาน',cancelled:'ยกเลิก',uncertain:'ผลส่งไม่แน่ชัด',failed:'ล้มเหลว',skipped:'ข้ามรายการ'};
+    const errors = {settings_key_required:'เซิร์ฟเวอร์ยังไม่ได้ตั้ง EOFFICE_SETTINGS_KEY',settings_decryption_failed:'อ่าน key ไม่ได้ กรุณาตรวจสอบกุญแจเข้ารหัส',settings_encryption_failed:'เข้ารหัส key ไม่สำเร็จ',api_key_required:'กรุณาตั้ง API key',ai_key_or_request_rejected:'API key หรือคำขอถูกปฏิเสธ',ai_model_unavailable:'ไม่พบโมเดลหรือโมเดลไม่รองรับ',ai_connection_failed:'เชื่อมต่อ AI ไม่สำเร็จ',ai_temporary_failure:'AI จำกัดการใช้งานหรือไม่พร้อม ระบบจะลองใหม่',invalid_ai_response:'ผลจาก AI ไม่ถูกต้อง',invalid_model:'ชื่อโมเดลไม่ถูกต้อง',pdf_unavailable:'PDF ไม่พร้อมใช้งาน',files_changed:'ไฟล์เปลี่ยน กรุณาตรวจสอบและวิเคราะห์ใหม่',no_recipients:'ไม่พบผู้รับ สามารถเพิ่มผู้รับเองได้',invalid_email:'อีเมลไม่ถูกต้อง',recipient_changed:'บัญชีผู้รับหรืออีเมลเปลี่ยน',smtp_result_unknown:'ไม่แน่ใจว่า SMTP รับอีเมลแล้วหรือไม่',legacy_delivery_unconfirmed:'ประวัติเดิมยังไม่ยืนยันผลส่ง',recipient_attention:'มีผู้รับที่ต้องตรวจสอบ',document_unavailable:'คำสั่งถูกลบหรือไม่พร้อม',processing_failed:'งานขัดข้อง กรุณาตรวจสอบ',operator_cancelled:'เจ้าหน้าที่ยกเลิก',not_an_order:'เอกสารไม่ได้เป็นคำสั่ง'};
+    function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(className)el.className=className;return el;}
+    function badge(status){return node('span',labels[status]||status||'ยังไม่เข้าคิว','badge '+(status||''));}
+    function button(text,callback,danger=false){const el=node('button',text,danger?'danger':'');el.type='button';el.addEventListener('click',callback);return el;}
+    async function request(url,data){const response=await fetch(url,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok||result.status==='error')throw new Error(errors[result.code]||result.message||'ดำเนินการไม่สำเร็จ');return result;}
+    function message(id,text,error=false){const el=document.getElementById(id);el.textContent=text;el.className=error?'error':'ok';}
+    errors.smtp_configuration_required='SMTP ยังตั้งค่าไม่ครบ กรุณาตรวจสอบการตั้งค่าบนเซิร์ฟเวอร์';
+    errors.invalid_document_year='ปีของเอกสารไม่ถูกต้อง กรุณาตรวจสอบข้อมูลเดิม';
+    return {node,badge,button,request,message,error:code=>errors[code]||code||'—'};
+})();

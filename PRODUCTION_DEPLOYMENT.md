@@ -1,5 +1,19 @@
 # Production deployment — E-Office
 
+## Automatic order email release (8 October 2026)
+
+Targeted release verified **18 files**, added the order queue/settings tables, and configured the persistent Admin-secret encryption key in private `config/local.php` (`0600`). Existing Gemini key/model settings are preserved: **gemini-3.6-flash** passes real synthetic-PDF plus JSON-output testing, and the protected Admin model-list API returns 45 models.
+
+**9 production HTTP smoke checks pass**. Temporary verification account and two synthetic orders were removed, with baseline counts restored: users **69**, documents **14,494**, email logs **3,463**. Staff emails were not sent during verification. Temporary deployment helpers and incomplete upload files were cleaned up.
+
+The owner configured cron through DirectAdmin every five minutes. `scripts/order-cron.sh` recorded its first real heartbeat at **8 October 2026, 14:20:02 Asia/Bangkok**, logging `0 order jobs processed` without errors. Automatic delivery was enabled at **14:20:51 Asia/Bangkok**. Orders created before that activation boundary were not enrolled.
+
+Two post-activation production smoke checks pass: enabled settings with a real cron heartbeat, and automatic enrollment of a new offline-signed order into `waiting_files`. Its temporary job/document/account were removed; staff mail was not sent. See [ORDER_EMAILS.md](ORDER_EMAILS.md#hosting-panel-cron-entry) for scheduling and operating instructions.
+
+Confirmed the next scheduled cycle after activation at **14:25:01 Asia/Bangkok**; its log contains `0 order jobs processed`, no errors, and enabled status remains true.
+
+Private rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-orders-before-20261008-104514.tar.gz`. The encryption-key configuration backup is outside Git at `eoffice-orders-config-after.private.php` in the same approved temporary directory.
+
 ## AMSS PDF import hotfix (8 October 2026)
 
 - Source commit: `3b7a620` (`fix: restore automatic AMSS PDF imports`), pushed to `origin/main`.

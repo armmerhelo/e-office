@@ -54,6 +54,7 @@ npm.cmd run serve:test
 
 - [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
+- [ORDER_EMAILS.md](ORDER_EMAILS.md): คิวส่งอีเมลคำสั่งอัตโนมัติ, cron และตั้งค่า AI สำหรับ Admin สูงสุด
 - [TEST_REPORT.md](TEST_REPORT.md): ผลทดสอบ local
 - [STAGING_DEPLOYMENT.md](STAGING_DEPLOYMENT.md): ผล deployment และทดสอบบน staging
 - [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md): ผล deployment production

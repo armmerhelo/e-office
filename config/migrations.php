@@ -1,5 +1,7 @@
 <?php
 function app_migrate(PDO $pdo): void {
+    require_once __DIR__.'/order-email-schema.php';
+    app_order_email_migrate($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_sessions (token_hash CHAR(64) PRIMARY KEY, User_Id INT NOT NULL, expires_at DATETIME NOT NULL, KEY(User_Id), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_google_accounts (google_sub VARCHAR(255) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY, User_Id INT NOT NULL UNIQUE, FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_login_attempts (identity_hash CHAR(64) PRIMARY KEY, attempts INT NOT NULL DEFAULT 0, window_start DATETIME NOT NULL) ENGINE=InnoDB");

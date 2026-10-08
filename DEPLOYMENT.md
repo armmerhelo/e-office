@@ -20,6 +20,7 @@ Use environment variables or copy `config/local.example.php` to `config/local.ph
 | SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_FROM | Production SMTP with TLS verification |
 | ONESIGNAL_APP_ID / ONESIGNAL_REST_API_KEY | Notification worker configuration |
 | GEMINI_API_KEY / GEMINI_MODEL | Production PDF recipient matching; model default gemini-2.5-flash |
+| EOFFICE_SETTINGS_KEY | Base64-encoded 32-byte encryption key for Admin-managed Gemini credentials; same value for web and cron |
 | DRIVE_APPS_SCRIPT_URL | HTTPS Drive adapter deployment for production image upload |
 | EOFFICE_SIGN_ROUTES | JSON assistant-to-supervisor map; default preserves the existing routing |
 
@@ -41,6 +42,8 @@ Staff privileges are stored in `eoffice_permissions`. The first migration import
 When legacy remote reads are explicitly enabled, document-bound files from the fixed trusted origin are cached atomically in EOFFICE_STORAGE before signing. Revision-checked saves use those same authoritative bytes. Public orders remain public by design.
 
 ## Automated tests
+
+Automatic order delivery has a separate CLI worker, activation boundary and highest-Admin AI settings. See [ORDER_EMAILS.md](ORDER_EMAILS.md) for setup, cron and operating instructions. It remains disabled until explicitly enabled by an Admin; old orders are imported manually.
 
 Create a separate database whose name ends with `_test`, populated with a copy of the application's schema/data. Never run the test seeder on the production database.
 

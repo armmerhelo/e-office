@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/../config/services.php';
+require_once __DIR__.'/../config/order-emails.php';
 require_once __DIR__.'/../config/amss-links.php';
 app_method('POST');$user=app_user();$pdo=app_pdo();
 $edit=($_POST['formtype']??'')==='edit_document';$id=(int)($_POST['doc_id']??0);
@@ -42,6 +42,7 @@ if(isset($_FILES['doc_upload']['name'])&&count($_FILES['doc_upload']['name'])!==
 foreach(['send_to','send_to_group'] as $key){if(isset($_POST[$key])&&(!is_array($_POST[$key])||count($_POST[$key])>500))app_fail('Invalid recipients');}
 $moved=[];$oldFiles=[];if(!$edit)$pdo->beginTransaction();
 try{
+ $orderSettings=app_order_settings(!$edit);
  $values=[$number,$name,json_encode($links,JSON_UNESCAPED_UNICODE),$type,date('d/m/Y H:i'),($_POST['status']??'')==='ด่วน'?'Urgent':'Nomal',app_text($_POST,'doc_number_receive'),$date,app_text($_POST,'doc_receive_from'),app_text($_POST,'doc_action'),app_text($_POST,'doc_other'),$type==='External'?(int)($_POST['external_number']??strtok($number,'/')):0,''];
  if($edit){$q=$pdo->prepare('UPDATE t_document SET Doc_Number=?,Doc_Name=?,Doc_Url=?,Doc_Type=?,Doc_Date_Update=?,Status=?,Doc_Number_Receive=?,Doc_Date_Receive=?,Doc_Receive_From=?,Doc_Action=?,Doc_Other=?,External_Number=?,Doc_Url_Name=? WHERE Doc_Id=?');$q->execute([...$values,$id]);$link=$doc['Doc_File_Link'];}
  else{$q=$pdo->prepare('INSERT INTO t_document (Doc_Number,Doc_Name,Doc_Url,Doc_Type,Doc_Date_Update,Status,Doc_Number_Receive,Doc_Date_Receive,Doc_Receive_From,Doc_Action,Doc_Other,External_Number,Doc_Url_Name,Doc_Year,User_Id,Doc_Date,Doc_File_Link) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');$q->execute([...$values,$year,$user['User_Id'],date('d/m/Y H:i'),'']);$id=(int)$pdo->lastInsertId();$link=(string)$id;$pdo->prepare('UPDATE t_document SET Doc_File_Link=? WHERE Doc_Id=?')->execute([$link,$id]);}
@@ -51,7 +52,7 @@ try{
   $q=$pdo->prepare('SELECT * FROM t_access_rights WHERE Doc_Id=?');$q->execute([$id]);
   foreach($q->fetchAll() as $access){if(!in_array((int)$access['User_Id'],$recipients,true)){$pdo->prepare('INSERT INTO eoffice_access_history (Doc_Id,User_Id,snapshot) VALUES (?,?,?)')->execute([$id,$access['User_Id'],json_encode($access)]);$pdo->prepare('DELETE FROM t_access_rights WHERE id=?')->execute([$access['id']]);}}
   $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,'',0) ON DUPLICATE KEY UPDATE Doc_Id=VALUES(Doc_Id)");
-  foreach($recipients as $recipient){$q->execute([$recipient,$id]);if($q->rowCount()===1)app_queue(['type'=>'document_notification','user_id'=>$recipient,'doc_id'=>$id]);}
+  foreach($recipients as $recipient){$q->execute([$recipient,$id]);if($q->rowCount()===1){$payload=['type'=>'document_notification','user_id'=>$recipient,'doc_id'=>$id];if($type==='External'&&((!$edit&&$orderSettings['activated_at']!==null)||app_order_job($id)))$payload['delivery']=['mail'=>['status'=>'skipped','attempts'=>0]];app_queue($payload);}}
  }
  if(isset($_POST['send_to_group'])||($_POST['replace_recipients']??'')==='1'){
   $pdo->prepare('DELETE FROM t_access_rights_department WHERE Doc_Id=?')->execute([$id]);$q=$pdo->prepare('INSERT INTO t_access_rights_department (Doc_Id,Department_Id) VALUES (?,?)');foreach(array_unique(array_map('intval',$_POST['send_to_group']??[])) as $dept)$q->execute([$id,$dept]);
@@ -71,6 +72,7 @@ try{
   if(file_put_contents($target,$body,LOCK_EX)!==strlen($body))throw new RuntimeException('AMSS PDF storage failed');unset($body);
   $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
  }
+ app_order_saved($id,!$edit,$type,$orderSettings);
  $pdo->commit();
 }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();foreach($moved as $path)if(is_file($path))unlink($path);if($e instanceof AppAmssException)app_fail($e->getMessage(),422);if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('เลขเอกสารซ้ำหรือผู้รับไม่ถูกต้อง',409);throw $e;}
 foreach($oldFiles as $old)if(is_file($old)&&!unlink($old))error_log('Obsolete document file cleanup failed');
