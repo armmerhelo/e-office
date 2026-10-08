@@ -33,6 +33,12 @@ function eofficeArchiveHandle(e) {
       const root = DriveApp.getFolderById(rootId);
       if (root.isTrashed()) throw Error('root_unavailable');
       if (root.getSharingAccess() !== DriveApp.Access.PRIVATE) throw Error('root_not_private');
+      if (typeof CUSTOM_ROOT_FOLDER_ID !== 'undefined') {
+        if (!CUSTOM_ROOT_FOLDER_ID) throw Error('not_configured');
+        if (typeof driveObjectUnderRoot !== 'function') throw Error('not_configured');
+        const legacy = DriveApp.getFolderById(CUSTOM_ROOT_FOLDER_ID);
+        if (driveObjectUnderRoot(root, CUSTOM_ROOT_FOLDER_ID) || driveObjectUnderRoot(legacy, rootId)) throw Error('root_overlaps_legacy');
+      }
       if (input.action === 'health') return eoArchiveJSON({status:'success', protocol:1, private_storage:true});
       if (input.action === 'checkpoint' || input.action === 'run') {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date || '')) throw Error('invalid_action');
@@ -72,7 +78,7 @@ function eofficeArchiveHandle(e) {
     } finally { lock.releaseLock(); }
   } catch (error) {
     // Do not return raw Drive exception messages, IDs, credentials or filenames.
-    const allowed = ['not_configured','unauthorized','busy','replayed_request','root_unavailable','root_not_private','invalid_object','ambiguous_object','invalid_size','checksum_mismatch','invalid_action','object_missing'];
+    const allowed = ['not_configured','unauthorized','busy','replayed_request','root_unavailable','root_not_private','root_overlaps_legacy','invalid_object','ambiguous_object','invalid_size','checksum_mismatch','invalid_action','object_missing'];
     return eoArchiveJSON({status:'error', code:allowed.indexOf(error.message) >= 0 ? error.message : 'storage_failed'});
   }
 }

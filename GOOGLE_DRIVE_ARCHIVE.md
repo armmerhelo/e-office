@@ -11,15 +11,15 @@ The feature and local eviction default to **off**. Installation requires a compa
 Source: `integrations/google-drive/EOfficeArchive.gs`.
 
 1. Use the existing Google account. Create a private archive root folder with enough space. Avoid link-public sharing. Keep the encryption key outside Drive in protected recovery storage.
-2. Add the `.gs` file to the existing Apps Script project and route `eoffice-archive-v1` requests to `eofficeArchiveHandle(e)` before the legacy handler. **Review the legacy source first:** its public list/delete/update actions must not expose or modify the archive root. The original `.gs` is not present in this repository, so that merge cannot be performed from E-Office alone.
+2. The original `appscript.gs` has now been reviewed and merged. Use `UnifiedDrive.gs` plus `EOfficeArchive.gs` in the same project, replacing its existing `doGet`/`doPost` file. Do not leave duplicate entrypoints or the old unrestricted helper functions. Set `EOFFICE_LEGACY_ROOT_ID` to the previous maintenance root ID. Legacy read/create/update/delete now require an item beneath that root and cannot access the archive.
 3. If the legacy project's broad public API cannot be isolated, create a dedicated Apps Script project/deployment using the **same Google account and Drive**, with this entrypoint:
 
    ```javascript
    function doPost(e) { return eofficeArchiveHandle(e); }
    ```
 
-4. Set Script Properties `EOFFICE_ARCHIVE_ROOT_ID` and `EOFFICE_ARCHIVE_SECRET`. The latter is a newly generated 64-character lowercase hex shared authentication secret, **not** the backup encryption key.
-5. Deploy a Web App executing as the owner. Its URL can accept server requests; every archive operation is HMAC-authenticated. Put its `/exec` URL and matching authentication secret in E-Office private config.
+4. Set Script Properties `EOFFICE_LEGACY_ROOT_ID`, `EOFFICE_ARCHIVE_ROOT_ID` and `EOFFICE_ARCHIVE_SECRET`. The archive root must be a separate private sibling outside the legacy root: equal, nested or ancestor roots fail closed. The secret is a newly generated 64-character lowercase hex shared authentication secret, **not** the backup encryption key.
+5. Deploy a Web App with **Execute as: Me** and **Who has access: Anyone**, so the hosting server can call it without an interactive Google sign-in. Archive operations are HMAC-authenticated and legacy operations are limited to their existing root. If organizational policy disallows this access setting, the deployment needs a different authenticated server integration before activation. Put its `/exec` URL and matching authentication secret in E-Office private config.
 
 Requests use HMAC SHA-256 over timestamp, nonce and base64 payload. The script verifies signatures, time windows and replay nonces, confines storage to the configured root, and names immutable objects by ciphertext SHA-256. Duplicate retry returns the existing object after checksum verification. There is no cloud deletion API. Apps Script receives ciphertext, not the encryption key.
 
@@ -90,6 +90,25 @@ The tool reads the dated checkpoint, authenticates the encrypted DB/manifest arc
 
 The Apps Script owner's source/deployment access is needed to install the authenticated handler and configure Script Properties. Merely reusing the old maintenance `DRIVE_APPS_SCRIPT_URL` will not enable this protocol. Daily cloud backup/eviction must not be reported as active until a real Apps Script health, upload/download and recovery drill succeeds and the hosting Cron entries are confirmed.
 
+### Paste-ready merged script
+
+```sh
+node scripts/build-drive-appscript.cjs
+python scripts/drive-archive-configure.py prepare
+```
+
+The builder produces `integrations/google-drive/EOfficeDrive-Combined.gs`, with exactly one `doGet`/`doPost` and no embedded credentials/folder IDs. It is generated and Git-ignored. Paste it in place of the old Apps Script code, removing duplicate old entrypoints/helpers from other `.gs` files.
+
+The prepare command records the existing deployment URL, original maintenance root ID and a persistent authentication secret in `backups/keys/drive-appscript-setup.private.json`. Keep this private; do not paste the secret into chat or Git. Copy the three `script_properties` values into Apps Script Project Settings, replacing the archive-folder placeholder with the new private sibling folder ID.
+
+Save a new Apps Script version and update the existing Web App deployment to that version (same `/exec` URL). Then run:
+
+```sh
+python scripts/drive-archive-configure.py configure
+```
+
+Configuration is written to production only after the actual signed private bridge health check succeeds. It preserves other site settings and keeps upload/eviction disabled pending a real cloud recovery trial. If the owner changes the deployment URL, update the private handoff file first.
+
 ## Installation results — 8 October 2026
 
 - Server implementation commit `0bff3b0`: 15 targeted files deployed and verified against committed bytes with no checksum mismatches.
@@ -97,4 +116,4 @@ The Apps Script owner's source/deployment access is needed to install the authen
 - Local archive behavior: 19 checks pass with a mocked object store, including late upload after replacement and incomplete-snapshot rejection, plus HTTP permission/range/revision, Drive-only signing and Apps Script HMAC/idempotency/checkpoint tests. Existing full `npm test` passes.
 - Production synthetic smoke: 8 checks pass for guest rejection, authorized PDF/revision, Range, HEAD, protected Admin status, signature save and signed-file delivery. Temporary account/document/files were removed; no staff notifications sent.
 - Rollback archive: `eoffice-drive-before-20261008-193707.tar.gz` in the approved temporary directory; SHA-256 `f4a1f9064fd1dbc3bf8f995a4fcb2fb300b052832530c3e53d96b24431f7afa9`.
-- The owner selected providing the original `.gs` source for merging. Source has not yet been received; actual Google Drive connection, real cloud recovery and hosting Cron activation remain pending.
+- The original `.gs` source has now been received and merged. Actual Apps Script installation/version deployment, real cloud recovery and hosting Cron activation remain pending.

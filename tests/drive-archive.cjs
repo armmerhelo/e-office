@@ -33,5 +33,6 @@ async function test(){try{
     assert.equal((await request(route,'reader')).status,403);
     console.log('PASS signing a Drive-only PDF creates a queued immutable revision and revoked readers lose access');
     const bridge=cp.spawnSync(process.execPath,['tests/drive-appscript.cjs'],{encoding:'utf8'});process.stdout.write(bridge.stdout);assert.equal(bridge.status,0,bridge.stdout+bridge.stderr);
+    const unified=cp.spawnSync(process.execPath,['tests/drive-unified.cjs'],{encoding:'utf8'});process.stdout.write(unified.stdout);assert.equal(unified.status,0,unified.stdout+unified.stderr);
 }finally{if(server){server.kill();await new Promise(resolve=>server.once('exit',resolve));}if(created)run(`require 'config/bootstrap.php';app_pdo()->exec('DROP DATABASE ${database}');`);fs.rmSync(directory,{recursive:true,force:true});}}
 test().catch(error=>{console.error(error);process.exitCode=1;});

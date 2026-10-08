@@ -25,7 +25,7 @@
 
 ส่วนเข้ารหัส/ถอดรหัสอยู่ที่ E-Office เท่านั้น Apps Script เก็บและส่งคืน ciphertext โดยไม่ต้องถือกุญแจถอดรหัส
 
-ปัจจุบัน repository มีตัวเรียก Apps Script สำหรับ `create_folder` และ `create` ภาพแจ้งซ่อม แต่ไม่มี source `.gs` ของ endpoint จึงต้องตรวจ `doGet`/`doPost` และ helper เดิมก่อนรวม API ใหม่อย่างถูกต้อง
+ได้รับ source เดิม `appscript.gs` แล้ว และเตรียม `UnifiedDrive.gs` รวม API งานแจ้งซ่อมกับเส้นทาง archive ที่ยืนยันตัวตน โดยจำกัด API เดิมอยู่ในโฟลเดอร์งานแจ้งซ่อมเท่านั้น โฟลเดอร์ archive ต้องเป็น private sibling แยกจากต้นไม้โฟลเดอร์เดิม ขั้นที่เหลือคือเจ้าของติดตั้งโค้ด/Script Properties และอัปเดต Web App version
 
 ## โครงสร้างข้อมูล
 

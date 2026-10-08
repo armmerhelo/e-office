@@ -4,6 +4,7 @@
 /file_document/*
 !/file_document/.htaccess
 /node_modules/
+/integrations/google-drive/EOfficeDrive-Combined.gs
 /test-results/
 /backups/*
 !/backups/README.md
