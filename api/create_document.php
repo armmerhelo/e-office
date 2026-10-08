@@ -48,7 +48,7 @@ $checkAttachmentLimit=static function(array $current)use($edit,$keep,$fileNames,
  foreach($fileNames as $i=>$detail)if(!(int)($fileIds[$i]??0))$new++;
  if($retained+$new+count($amssLinks)>max(20,count($current)))app_fail('ไฟล์แนบรวม PDF จาก AMSS ต้องไม่เกิน 20 ไฟล์ (เอกสารเดิมที่เกินจำนวนนี้เพิ่มไฟล์ไม่ได้)');
 };
-$checkAttachmentLimit($existing);$moved=[];$oldFiles=[];$staged=[];
+$checkAttachmentLimit($existing);$moved=[];$oldFiles=[];$staged=[];$fileLock=null;
 try{
  // Keep slow external I/O outside document/session/settings locks. tmpfile()
  // removes staged bytes even if PHP aborts or a validation response exits.
@@ -59,6 +59,7 @@ try{
   if(fwrite($handle,$body)!==strlen($body)||!rewind($handle))throw new RuntimeException('AMSS temporary storage failed');unset($body);
  }
  if($edit){
+  $fileLock=app_document_file_lock($id);
   app_document_transaction();$doc=app_locked_document($id,$user,true);$year=(string)$doc['Doc_Year'];
   if($date!==trim((string)$doc['Doc_Date_Receive']))app_document_date($date);
   $beforeIds=array_keys($existing);$existing=[];$q=$pdo->prepare('SELECT * FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([$doc['Doc_File_Link']]);foreach($q as $file)$existing[(int)$file['Doc_Upload_Id']]=$file;
@@ -101,4 +102,5 @@ try{
 }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();foreach($moved as $path)if(is_file($path))unlink($path);if($e instanceof AppAmssException)app_fail($e->getMessage(),422);if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('เลขเอกสารซ้ำหรือผู้รับไม่ถูกต้อง',409);throw $e;}
 finally{foreach($staged as [$detail,$handle])if(is_resource($handle))fclose($handle);}
 foreach($oldFiles as $old)if(is_file($old)&&!unlink($old))error_log('Obsolete document file cleanup failed');
+$fileLock?->release();
 app_json(['status'=>'success','message'=>'บันทึกเอกสารสำเร็จ','doc_id'=>$id,'files'=>['status'=>'success']]);

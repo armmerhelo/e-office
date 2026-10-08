@@ -4,15 +4,64 @@ $id=(int)($_GET['Doc_Id']??0);$user=app_user(false);$pdo=app_pdo();
 $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$doc=$q->fetch();if(!$doc)app_fail('ไม่พบเอกสาร',404);
 if($doc['Doc_Type']!=='External'){$user=$user??app_user();app_document($id,$user);}
 $name=app_text($_GET,'File_Path',255);if($name===''){$q=$pdo->prepare('SELECT Doc_Upload_Path FROM t_document_upload WHERE Doc_File_Link=? ORDER BY Doc_Upload_Id LIMIT 1');$q->execute([$doc['Doc_File_Link']]);$name=$q->fetchColumn()?:'';}
-app_bound_file($doc,$name);$year=(string)$doc['Doc_Year'];if(isset($_GET['Year'])&&(string)$_GET['Year']!==$year)app_fail('Invalid year',403);
+app_bound_file($doc,$name);$year=trim((string)$doc['Doc_Year']);if(isset($_GET['Year'])&&trim((string)$_GET['Year'])!==$year)app_fail('Invalid year',403);
 $signed=($_GET['Type']??'')==='signed';
-try{$path=app_drive_archive_resolve($doc,$name,$signed);}catch(Throwable $e){app_fail('ไม่สามารถอ่านเอกสารจากคลัง Google Drive ได้ กรุณาลองใหม่',503);}
+$preparedPath=null;$legacyBody=null;
+// Take only a short local/registry snapshot under the file mutex. Network I/O
+// and the revision-specific cloud cache lock must never hold up other files in
+// this document. Revalidate the snapshot under a fresh mutex before opening it.
+$fileLock=app_document_file_lock($id);
+try {
+ clearstatcache();
+ $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$doc=$q->fetch();if(!$doc)app_fail('ไม่พบเอกสาร',404);
+ if($doc['Doc_Type']!=='External'){$user=app_user();app_document($id,$user);}
+ if(trim((string)$doc['Doc_Year'])!==$year)app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);app_bound_file($doc,$name);
+ $variant='original';$path=app_drive_archive_local($doc,$name,'original');$preparedVersion=null;
+ if($signed){$candidate=app_drive_archive_local($doc,$name,'signed');$remote=app_drive_archive_current($id,$name,'signed');if(is_file($candidate)||$remote){$variant='signed';$path=$candidate;$preparedVersion=$remote;}}
+ if(!is_file($path))$preparedVersion=$preparedVersion??app_drive_archive_current($id,$name,$variant);
+ if(!is_file($path)&&$preparedVersion){
+  foreach(['spool','quarantine','cache'] as $kind){$candidate=app_drive_archive_directory($kind).'/'.$preparedVersion['id'].($kind==='cache'?'.plain':'.source');
+   if(is_file($candidate)&&hash_equals($preparedVersion['revision'],hash_file('sha256',$candidate))){$preparedPath=$candidate;break;}
+  }
+ }
+ $needsDownload=!is_file($path)&&$preparedPath===null;
+}finally{$fileLock->release();}
+if($needsDownload){
+ if($preparedVersion){
+  try{$preparedPath=app_drive_archive_restore($preparedVersion);}catch(Throwable $e){app_fail('ไม่สามารถอ่านเอกสารจากคลัง Google Drive ได้ กรุณาลองใหม่',503);}
+ }else{
+  if(!app_settings()['remote_files'])app_fail('ไม่พบไฟล์ต้นฉบับในเครื่อง',404);
+  $ch=curl_init('https://eoffice.siya.ac.th/file_request.php?File_Path='.rawurlencode($year.'/'.$name).'&Type='.($signed?'signed':''));
+  curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_TIMEOUT=>20,CURLOPT_SSL_VERIFYPEER=>true]);$legacyBody=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
+  if($status!==200||!is_string($legacyBody)||strlen($legacyBody)>20*1024*1024)app_fail('ไม่สามารถโหลดไฟล์ต้นฉบับ',502);
+  if($signed&&(new finfo(FILEINFO_MIME_TYPE))->buffer($legacyBody)!=='application/pdf')app_fail('ไฟล์ต้นทางไม่ใช่ PDF',502);
+ }
+}
+$fileLock=app_document_file_lock($id);
+clearstatcache();
+// A network/file-lock wait may outlast a revocation, file edit or new signature.
+$q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$doc=$q->fetch();if(!$doc)app_fail('ไม่พบเอกสาร',404);
+if($doc['Doc_Type']!=='External'){$user=app_user();app_document($id,$user);}
+if(trim((string)$doc['Doc_Year'])!==$year)app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);app_bound_file($doc,$name);
+$variant='original';$path=app_drive_archive_local($doc,$name,'original');$currentVersion=null;
+if($signed){$candidate=app_drive_archive_local($doc,$name,'signed');$remote=app_drive_archive_current($id,$name,'signed');if(is_file($candidate)||$remote){$variant='signed';$path=$candidate;$currentVersion=$remote;}}
 if(!is_file($path)){
- // Fixed, trusted legacy host only; never accept a caller-supplied URL.
- if(!app_settings()['remote_files'])app_fail('ไม่พบไฟล์ต้นฉบับในเครื่อง',404);
- $ch=curl_init('https://eoffice.siya.ac.th/file_request.php?File_Path='.rawurlencode($year.'/'.$name).'&Type='.($signed?'signed':''));
- curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_TIMEOUT=>20,CURLOPT_SSL_VERIFYPEER=>true]);$body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
- if($status!==200||!is_string($body)||strlen($body)>20*1024*1024)app_fail('ไม่สามารถโหลดไฟล์ต้นฉบับ',502);
+ $currentVersion=$currentVersion??app_drive_archive_current($id,$name,$variant);
+ if($currentVersion){
+  // Pinned sources need no network. Never start a restore under this mutex.
+  foreach(['spool','quarantine','cache'] as $kind){$candidate=app_drive_archive_directory($kind).'/'.$currentVersion['id'].($kind==='cache'?'.plain':'.source');
+   if(is_file($candidate)&&hash_equals($currentVersion['revision'],hash_file('sha256',$candidate))){$path=$candidate;break;}
+  }
+  if(!is_file($path)){
+   if(!$preparedVersion||$preparedVersion['id']!==$currentVersion['id'])app_fail('เอกสารถูกแก้ไข กรุณาโหลดใหม่',409);
+   if(!$preparedPath||!is_file($preparedPath)||!hash_equals($currentVersion['revision'],hash_file('sha256',$preparedPath)))app_fail('ไฟล์กำลังเปลี่ยนแปลง กรุณาลองใหม่',503);
+   $path=$preparedPath;
+  }
+ }elseif($legacyBody===null)app_fail('ไฟล์กำลังเปลี่ยนแปลง กรุณาลองใหม่',503);
+}
+if(!is_file($path)){
+ // Publish already-fetched legacy bytes only after rechecking the document.
+ $body=$legacyBody;
  $mime=(new finfo(FILEINFO_MIME_TYPE))->buffer($body);$revision=hash('sha256',$body);
  if($signed&&$mime!=='application/pdf')app_fail('ไฟล์ต้นทางไม่ใช่ PDF',502);
  // Cache only document-bound bytes from the trusted legacy origin. Signing then
@@ -43,8 +92,8 @@ if(!is_file($path)){
    $pdo->commit();
  }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if(is_file($temporary))unlink($temporary);throw $e;}
 }
-// Cloud downloads may take time. Recheck permission, attachment binding and
-// the selected current revision after the fetch, before sending any plaintext.
+// A cache publication also uses the document row lock. Check its final binding
+// and current registry revision before sending any plaintext.
 if(app_drive_archive_enabled()){
  $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$latest=$q->fetch();if(!$latest)app_fail('ไม่พบเอกสาร',404);
  if($latest['Doc_Type']!=='External'){$user=app_user();app_document($id,$user);}
@@ -62,9 +111,12 @@ if(!isset($body)){
  // Hash and stream one open inode, so atomic signing replacements cannot make
  // the response bytes disagree with X-Document-Revision.
  $handle=@fopen($path,'rb');if(!$handle)app_fail('ไฟล์กำลังเปลี่ยนแปลง กรุณาลองใหม่',503);
+ if(app_drive_archive_enabled())app_drive_archive_touch_cache($path,$handle);
+ $fileLock->release(); // Stream a committed, pinned inode without holding a mutex for the client.
  $mime=(new finfo(FILEINFO_MIME_TYPE))->buffer(fread($handle,16384));rewind($handle);
  $hash=hash_init('sha256');hash_update_stream($hash,$handle);$revision=hash_final($hash);rewind($handle);
 }
+$fileLock->release();
 $inline=in_array($mime,['application/pdf','image/jpeg','image/png'],true)?'inline':'attachment';
 header('Content-Type: '.$mime);header('Content-Disposition: '.$inline.'; filename="'.rawurlencode($name).'"');header('Cache-Control: private, no-store');header('X-Document-Revision: '.$revision);header('ETag: "'.$revision.'"');header('Accept-Ranges: bytes');
 $size=isset($body)?strlen($body):(int)fstat($handle)['size'];$start=0;$end=$size-1;

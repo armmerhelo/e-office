@@ -2,6 +2,19 @@
 
 ## Auto send — เลขาฝ่าย / รองฝ่าย
 
+### แก้ concurrency หลัง deploy (local)
+
+- แก้รีวิว warm-cache TTL: การอ่าน cache ผ่าน HTTP อัปเดตเวลาใช้งานหลังเปิด inode ที่ตรวจ revision แล้ว ใช้ cache mutex แบบไม่รอ และตรวจ dev/inode ก่อน `touch()` เพื่อไม่สร้างไฟล์ว่างหลัง cache ถูกลบหรือแตะไฟล์ replacement จาก handle เก่า ตัว sweep ตรวจ mtime ซ้ำภายใน mutex ก่อนลบเพื่อไม่ใช้ snapshot เก่า ผลทดสอบครอบคลุมอ่าน → sweep → อ่านซ้ำโดยไม่ดาวน์โหลด cloud เพิ่ม, cache ถูกลบ/แทนที่, maintenance mutex ถูกถืออยู่ และการ refresh หลัง sweep อ่าน snapshot ไปแล้ว การแก้ยังอยู่ใน local
+
+- แก้รีวิว slow cloud read: ปล่อย document mutex ก่อนดาวน์โหลด Drive/legacy และก่อนรอ revision-specific cache lock จากนั้น reacquire เพื่อตรวจสิทธิ์ การผูกไฟล์ และ revision ก่อนเปิดไฟล์ คำขออ่าน local attachment อื่นไม่ถูกบล็อกตลอด cloud download; mutex timeout ตอบ `503` พร้อม `Retry-After: 2`
+- เพิ่ม HTTP regression โดยหยุด mock cloud transport ค้างไว้แล้วอ่าน local file พร้อมกัน รวมเปลี่ยนลายเซ็น/registry หรือถอนสิทธิ์ระหว่างดาวน์โหลด, timeout และอ่าน pending revision จาก spool การทดสอบใช้ API source จริงและ PHP workers แยก เฉพาะ transport ภายนอกและเวลารอ fixture ถูกแทนที่ ผล `test:drive` ผ่าน behavior 24 กรณีและ HTTP regressions ทั้งหมด; `npm.cmd test` ผ่านครบ การแก้ส่วนนี้ยังไม่ได้ deploy
+
+- ตรวจบทบาทเลขาฝ่ายก่อนติดตั้ง PDF หรือ pin ไฟล์ลง Drive spool และใช้ routing gate ร่วมกัน: การรับเอกสารถือ shared gate ก่อน document/user/routes ส่วนการแก้สมาชิก/คู่ routing ถือ exclusive gate ก่อน Admin roster
+- เพิ่ม lock ไฟล์รายเอกสารใน private `EOFFICE_STORAGE/.document-locks` ให้การลงนาม การอ่าน/cache PDF การแก้ไฟล์แนบ และการ scan/evict คลัง Drive ใช้ร่วมกัน Lock นี้ไม่หายเมื่อฐานข้อมูล rollback จึงคืน PDF ได้โดยไม่เขียนทับลายเซ็นของคำขออื่น
+- การลงนามคืนไฟล์ก่อน explicit rollback และยังรักษา file mutex หาก InnoDB rollback อัตโนมัติ กรณี SQL deadlock/timeout ตอบ `409` ให้ลองบันทึกใหม่โดยไม่ retry notification อัตโนมัติ
+- เพิ่ม `tests/sign-concurrency.cjs` / `tests/sign-concurrency-helper.php` ใช้ PHP workers หลายตัวและ FK ของ `t_access_rights` แบบ production ตรวจ 6 กรณี รวม Admin เป็นรองพร้อมแก้ routing, rollback หลังติดตั้ง PDF, failure ผ่าน HTTP และ deadlock จริงของ InnoDB หลังติดตั้ง PDF ตรวจว่า bytes/revision/audit/outbox ถูกคืนครบ
+- ผลตรวจ local: routing API **18 ผ่าน**, UI **15 ผ่าน**, concurrency **6 ผ่าน**; `npm.cmd test` ผ่านครบ และ `TEST_DATABASE=eoffice_review_test npm run test:drive` ผ่าน behavior **24 กรณี** พร้อม HTTP/cloud/Apps Script checks การแก้รอบนี้ยังไม่ได้ deploy
+
 - ฟังก์ชันเดิมยังอยู่ที่ `e-sign/upload_pdf.php` เดิมอ้างอิงคู่รหัสผู้ใช้จาก `EOFFICE_SIGN_ROUTES` และส่งทุกครั้งที่บันทึก PDF
 - เพิ่มส่วน **Auto send — เลขาฝ่าย / รองฝ่าย** ในหน้าจัดการสมาชิกและสิทธิ์ เฉพาะ Admin สูงสุด เลือกฝ่าย เลขาผู้ประทับตรา และรองผู้รับอัตโนมัติ แล้วกด **บันทึก Auto send**
 - สมาชิกมีบทบาทได้หลายฝ่าย เลขาหนึ่งคนกำหนดรองได้หนึ่งคนต่อฝ่าย และรองหนึ่งคนรับจากเลขาได้หลายคน บทบาทแสดงในช่องสิทธิ์เพิ่มเติมของสมาชิก

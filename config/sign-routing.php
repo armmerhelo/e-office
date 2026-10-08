@@ -75,15 +75,29 @@ function app_has_document_receipts(PDO $pdo, int $id): bool {
     return (bool)$q->fetchColumn();
 }
 
-// This is an explicit, audited receipt declaration by an assigned secretary,
-// not an assertion that arbitrary PDF bytes contain a visible stamp.
-function app_register_document_receipts(PDO $pdo, int $secretary, int $docId, string $file, string $revision, array $departments): array {
-    if (!$departments) return [];
-    $q=$pdo->prepare("SELECT department FROM eoffice_sign_routes WHERE secretary_id=? LOCK IN SHARE MODE");
+// All member writes take the gate exclusively BEFORE locking any users;
+// signing takes it shared BEFORE locking the document/user/routes. This prevents
+// routing -> Admin-parent FK locks from opposing the Admin -> routing order.
+function app_lock_sign_routing(PDO $pdo, bool $exclusive=false): void {
+    if (!$pdo->inTransaction()) throw new LogicException('Routing gate requires a transaction');
+    $row=$pdo->query("SELECT value FROM eoffice_counters WHERE counter_key='sign-routes-lock' ".($exclusive?'FOR UPDATE':'LOCK IN SHARE MODE'))->fetchColumn();
+    if ($row===false) throw new RuntimeException('Routing migration required');
+}
+
+function app_validate_document_receipts(PDO $pdo, int $secretary, array $departments): void {
+    if (!$departments) return;
+    $q=$pdo->prepare('SELECT department FROM eoffice_sign_routes WHERE secretary_id=? LOCK IN SHARE MODE');
     $q->execute([$secretary]);$scopes=$q->fetchAll(PDO::FETCH_COLUMN);
     foreach ($departments as $department) {
         if (!in_array('', $scopes, true) && !in_array($department, $scopes, true)) throw new DomainException('คุณไม่ได้รับมอบหมายเป็นเลขาของฝ่ายที่ยืนยันรับเอกสาร');
     }
+}
+
+// This is an explicit, audited receipt declaration by an assigned secretary,
+// not an assertion that arbitrary PDF bytes contain a visible stamp.
+function app_register_document_receipts(PDO $pdo, int $secretary, int $docId, string $file, string $revision, array $departments): array {
+    if (!$departments) return [];
+    app_validate_document_receipts($pdo,$secretary,$departments);
     $q=$pdo->prepare('INSERT INTO eoffice_document_receipts (Doc_Id,file_name,revision,secretary_id,department) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE revision=VALUES(revision)');
     foreach ($departments as $department) $q->execute([$docId,$file,$revision,$secretary,$department]);
     return app_sign_auto_send($pdo,$secretary,$docId,$departments);

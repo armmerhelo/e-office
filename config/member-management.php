@@ -2,9 +2,10 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/sign-routing.php';
 
-// All member mutations lock the Admin roster first, in the same order. This
+// All member mutations lock the routing gate, then the Admin roster. This
 // serializes demotion/deletion and prevents concurrent removal of the last Admin.
 function app_lock_member(PDO $pdo, array $actor, int $id): array {
+    app_lock_sign_routing($pdo,true);
     $admins = $pdo->query("SELECT User_Id FROM t_user WHERE User_Status='Admin' ORDER BY User_Id FOR UPDATE")->fetchAll(PDO::FETCH_COLUMN);
     $q = $pdo->prepare('SELECT * FROM t_user WHERE User_Id=? FOR UPDATE');
     $q->execute([$actor['User_Id']]);

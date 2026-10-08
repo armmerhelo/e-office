@@ -82,6 +82,7 @@ function app_drive_archive_scan(int $limit=10,?float $deadline=null): int {
                 }
             }
         }
+        $fileLock=app_document_file_lock((int)$id);
         app_document_transaction();
         try{
             $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active' FOR UPDATE");$q->execute([$id]);$doc=$q->fetch();
@@ -96,7 +97,7 @@ function app_drive_archive_scan(int $limit=10,?float $deadline=null): int {
             }
             if(!$legacyIncomplete)$pdo->prepare('UPDATE eoffice_drive_state SET scan_doc=? WHERE id=1')->execute([$id]);$pdo->commit();
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
-        finally{foreach($staged as $part)if(is_file($part[2]))unlink($part[2]);}
+        finally{foreach($staged as $part)if(is_file($part[2]))unlink($part[2]);$fileLock->release();}
         if($legacyIncomplete)break;
     }return count($ids);
 }
@@ -113,6 +114,7 @@ function app_drive_archive_evict(array $version,?array $transport=null): bool {
     $cacheRoot=app_drive_archive_directory('cache');$cache=$cacheRoot.'/'.$version['id'].'.plain';$cacheLock=fopen($cacheRoot.'/'.$version['id'].'.lock','c+b');if(!$cacheLock||!flock($cacheLock,LOCK_EX))throw new RuntimeException('Archive cache lock unavailable');
     try{if(is_file($cache))unlink($cache);}finally{flock($cacheLock,LOCK_UN);fclose($cacheLock);}
     app_drive_archive_restore($version,$transport['get']??null);
+    $fileLock=app_document_file_lock((int)$version['doc_id']);
     app_document_transaction();$quarantine=null;$local=null;
     try{
         $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active' FOR UPDATE");$q->execute([$version['doc_id']]);$doc=$q->fetch();
@@ -132,6 +134,7 @@ function app_drive_archive_evict(array $version,?array $transport=null): bool {
         if(!rename($local,$quarantine))throw new RuntimeException('Archive eviction failed');
         $pdo->prepare('UPDATE eoffice_drive_versions SET evicted_at=NOW() WHERE id=?')->execute([$version['id']]);$pdo->exec('UPDATE eoffice_drive_state SET evicted=evicted+1 WHERE id=1');$pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($quarantine&&is_file($quarantine)&&$local&&!is_file($local))rename($quarantine,$local);throw $e;}
+    finally{$fileLock->release();}
     // Preserve a one-day recoverable quarantine after commit; the sweeper only
     // removes files whose DB eviction marker exists.
     return true;

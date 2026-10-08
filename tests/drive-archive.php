@@ -9,7 +9,7 @@ $put=static function(string $bytes)use(&$objects):string{$id=hash('sha256',$byte
 $get=static function(string $id)use(&$objects):string{if(!isset($objects[$id]))throw new RuntimeException('Mock cloud missing');return $objects[$id];};
 $call=static fn(array $input):array=>['status'=>'success','descriptor'=>$input['descriptor']??null];$transport=['get'=>$get,'put'=>$put,'call'=>$call];
 $pdo->exec("INSERT INTO t_user (User_Name,User_Email,User_Password,User_Status,User_Token) VALUES ('Archive fixture','archive-fixture@example.invalid','not-a-login','User','')");$user=(int)$pdo->lastInsertId();
-$pdo->prepare("INSERT INTO t_document (Doc_Number,Doc_Name,Doc_Type,Doc_Year,User_Id,Doc_Date,Doc_File_Link,Is_Delete) VALUES ('ARCHIVE-FIXTURE','Archive fixture','Internal','2566',?,'01/01/2023 00:00','archive-fixture','active')")->execute([$user]);$id=(int)$pdo->lastInsertId();$name='archive-fixture.pdf';
+$pdo->prepare("INSERT INTO t_document (Doc_Number,Doc_Name,Doc_Type,Doc_Year,User_Id,Doc_Date,Doc_Date_Update,Doc_File_Link,Is_Delete,Doc_Url_Name,Doc_Url,Status,Doc_Number_Receive,Doc_Date_Receive,Doc_Receive_From,Doc_Action,Doc_Other,External_Number) VALUES ('ARCHIVE-FIXTURE','Archive fixture','Internal','2566',?,'01/01/2023 00:00','01/01/2023 00:00','archive-fixture','active','','[]','Nomal','','2023-01-01','','','',0)")->execute([$user]);$id=(int)$pdo->lastInsertId();$name='archive-fixture.pdf';
 $pdo->prepare("INSERT INTO t_document_upload (Doc_Upload_Path,Doc_File_Link,Doc_Upload_Detail,User_Id) VALUES (?,'archive-fixture','Fixture',?)")->execute([$name,$user]);
 $path=app_storage('original','2566',$name);if(!is_dir(dirname($path)))mkdir(dirname($path),0700,true);
 $original="%PDF-1.4\n".random_bytes(1048600);file_put_contents($path,$original);
@@ -67,8 +67,13 @@ if(getenv('EOFFICE_DRIVE_HTTP_FIXTURE')==='1'){
         $pdo->prepare('INSERT INTO t_user (User_Name,User_Email,User_Password,User_Status,User_Token) VALUES (?,?,?,?,?)')->execute(['Archive '.$label,$label.'@example.invalid','not-a-login',$label==='admin'?'Admin':'User','']);$uid=(int)$pdo->lastInsertId();$users[$label]=$uid;
         $token=bin2hex(random_bytes(32));$pdo->prepare('INSERT INTO eoffice_sessions (token_hash,User_Id,expires_at) VALUES (?,?,DATE_ADD(NOW(),INTERVAL 1 HOUR))')->execute([hash('sha256',$token),$uid]);$cookies[$label]='User_Token='.$token;
     }
-    $pdo->prepare('INSERT INTO t_access_rights (User_Id,Doc_Id,Date) VALUES (?,?,?)')->execute([$users['reader'],$id,'']);
     // Some older local schema fixtures lack the legacy alert_to column.
     if(!$pdo->query("SHOW COLUMNS FROM t_access_rights LIKE 'alert_to'")->fetch())$pdo->exec('ALTER TABLE t_access_rights ADD COLUMN alert_to INT NOT NULL DEFAULT 0');
-    echo json_encode(['doc'=>$id,'name'=>$name,'cookies'=>$cookies,'users'=>$users,'signed_revision'=>$signedVersion['revision'],'signed_cache'=>$signedCache],JSON_THROW_ON_ERROR).PHP_EOL;
+    $pdo->prepare('INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,?,0)')->execute([$users['reader'],$id,'']);
+    $cloud=dirname(app_settings()['storage']).'/mock-cloud';if(!is_dir($cloud))mkdir($cloud,0700,true);
+    foreach($objects as $object=>$bytes)file_put_contents($cloud.'/'.$object.'.ebak',$bytes);
+    $localName='local-attachment.pdf';$localBytes="%PDF-1.4\n% independent local attachment\n%%EOF\n";
+    file_put_contents(app_storage('original','2566',$localName),$localBytes);
+    $pdo->prepare("INSERT INTO t_document_upload (Doc_Upload_Path,Doc_File_Link,Doc_Upload_Detail,User_Id) VALUES (?,'archive-fixture','Independent local file',?)")->execute([$localName,$user]);
+    echo json_encode(['doc'=>$id,'name'=>$name,'cookies'=>$cookies,'users'=>$users,'signed_revision'=>$signedVersion['revision'],'signed_cache'=>$signedCache,'local_name'=>$localName,'local_revision'=>hash('sha256',$localBytes)],JSON_THROW_ON_ERROR).PHP_EOL;
 }

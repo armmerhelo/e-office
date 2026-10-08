@@ -19,7 +19,7 @@ $pdo=app_pdo();$pdo->beginTransaction();
 try {
     $locked=app_lock_member($pdo,$actor,(int)$actor['User_Id']);
     if ($locked['actor']['User_Status']!=='Admin') { $pdo->rollBack();app_fail('เฉพาะ Admin สูงสุดเท่านั้นที่กำหนด Auto send ได้',403); }
-    $pdo->query("SELECT value FROM eoffice_counters WHERE counter_key='sign-routes-lock' FOR UPDATE")->fetchColumn();
+    // app_lock_member already holds the routing gate before its user locks.
     $current=app_sign_routes($pdo,true);
     if (!hash_equals(app_sign_routes_version($current),$version)) { $pdo->rollBack();app_fail('การกำหนด Auto send เปลี่ยนแล้ว กรุณาโหลดข้อมูลใหม่',409); }
     // The member roster lock serializes this validation with user deletion.

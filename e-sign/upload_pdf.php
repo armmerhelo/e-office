@@ -18,11 +18,17 @@ $dir=app_storage('e-sign',$year);if(!is_dir($dir)&&!@mkdir($dir,0755,true)&&!is_
 $target=$dir.'signed_'.$id.'_'.$name;$original=app_storage('original',$year,$name);$legacy=$dir.'signed_'.$name;
 $remoteCurrent=null;
 if(app_drive_archive_enabled())$remoteCurrent=app_drive_archive_resolve($doc,$name,true);
+$fileLock=app_document_file_lock($id);
 $pdo=app_document_transaction();$backup=null;$installed=false;$temp=$dir.bin2hex(random_bytes(16)).'.tmp';
 try{
+ if($receiptDepartments)app_lock_sign_routing($pdo);
  $doc=app_locked_document($id,$user);
  if((string)$doc['Doc_Year']!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง กรุณาโหลดใหม่',409);}
  app_bound_file($doc,$name);
+ // Reject an unauthorized receipt before installing any bytes or pinning a
+ // Drive source. The gate keeps this validation stable until commit.
+ app_validate_document_receipts($pdo,(int)$user['User_Id'],$receiptDepartments);
+ clearstatcache();
  $preferCloudSigned=app_drive_archive_enabled()&&app_drive_archive_current($id,$name,'signed')!==null;
  $current=is_file($target)?$target:(is_file($legacy)?$legacy:($preferCloudSigned?($remoteCurrent??$original):(is_file($original)?$original:($remoteCurrent??$original))));
  if($current===$remoteCurrent&&!is_file($target)&&!is_file($legacy)&&($preferCloudSigned||!is_file($original))&&app_drive_archive_enabled()){
@@ -31,7 +37,7 @@ try{
  }
  if(!is_file($current)||!hash_equals(hash_file('sha256',$current),$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
  if(!move_uploaded_file($file['tmp_name'],$temp))throw new RuntimeException('Upload failed');
- if(is_file($target)){$backup=$target.'.'.bin2hex(random_bytes(8)).'.bak';if(!rename($target,$backup))throw new RuntimeException('Backup failed');}
+ if(is_file($target)){$candidate=$target.'.'.bin2hex(random_bytes(8)).'.bak';if(!rename($target,$candidate))throw new RuntimeException('Backup failed');$backup=$candidate;}
  if(!rename($temp,$target))throw new RuntimeException('File save failed');
  $installed=true;
  $revision=hash_file('sha256',$target);
@@ -40,6 +46,17 @@ try{
  app_drive_archive_track($id,$name,'signed',$target);
   $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);
  $pdo->commit();
-}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if(is_file($temp))unlink($temp);if($backup&&is_file($backup)){if(is_file($target))unlink($target);rename($backup,$target);}elseif(is_file($target)&&$installed)unlink($target);if($e instanceof DomainException)app_fail($e->getMessage(),403);throw $e;}
+}catch(Throwable $e){
+ try {
+  // Restore bytes before an explicit rollback releases the document row lock.
+  // The file mutex still protects recovery if InnoDB rolled back implicitly.
+  app_restore_signed_file($target,$backup,$installed);
+  if(is_file($temp)&&!unlink($temp))throw new RuntimeException('Upload temporary file cleanup failed');
+ }finally{if($pdo->inTransaction())$pdo->rollBack();$fileLock->release();}
+ if($e instanceof DomainException)app_fail($e->getMessage(),403);
+ if($e instanceof PDOException && in_array((int)($e->errorInfo[1]??0),[1205,1213],true))app_fail('เอกสารถูกใช้งานพร้อมกัน กรุณาลองบันทึกอีกครั้ง',409);
+ throw $e;
+}
 if($backup&&is_file($backup)&&!unlink($backup))error_log('Signed file backup cleanup failed');
+$fileLock->release();
 app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ','revision'=>$revision,'auto_sent_user_ids'=>$autoSent,'registered_receipt_departments'=>$receiptDepartments]);

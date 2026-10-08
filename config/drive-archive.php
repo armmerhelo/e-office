@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/drive-archive-client.php';
 require_once __DIR__.'/backup-stream.php';
+require_once __DIR__.'/document-files.php';
 
 function app_drive_archive_enabled(): bool {return filter_var(app_env('EOFFICE_DRIVE_ARCHIVE_ENABLED','false'),FILTER_VALIDATE_BOOLEAN);}
 function app_drive_archive_key(?string $id=null): string {
@@ -109,10 +110,32 @@ function app_drive_archive_resolve(array $doc,string $name,bool $signed=false): 
 function app_drive_archive_old_year(int $year,?int $current=null): bool {
     $current=$current??(int)date('Y')+543;return $year>=2400&&$year<$current-2;
 }
+// Refresh cache activity only for the already-open, authenticated inode. Use
+// the cache sweeper/restorer's mutex without waiting under a document mutex.
+// In particular, touch() must not recreate an empty file after a sweep.
+function app_drive_archive_touch_cache(string $path, $handle): void {
+    if (!is_resource($handle) || !preg_match('/^[a-f0-9]{64}\.plain$/D',basename($path))) return;
+    $cache=app_drive_archive_directory('cache');
+    if ($path!==$cache.'/'.basename($path)) return;
+    $lock=@fopen(substr($path,0,-6).'.lock','c+b');
+    if (!$lock) { error_log('Archive cache activity lock unavailable'); return; }
+    try {
+        if (!flock($lock,LOCK_EX|LOCK_NB)) return;
+        clearstatcache(true,$path);
+        if (!is_file($path)) return;
+        $current=@stat($path);$opened=fstat($handle);
+        if (!$current || !$opened || $current['dev']!==$opened['dev'] || $current['ino']!==$opened['ino']) return;
+        if (!@touch($path)) error_log('Archive cache activity timestamp update failed');
+    } finally { flock($lock,LOCK_UN);fclose($lock); }
+}
 function app_drive_archive_cache_sweep(): int {
     $cache=app_drive_archive_directory('cache');$removed=0;$files=[];$bytes=0;$ttl=max(60,(int)app_env('EOFFICE_DRIVE_CACHE_TTL','3600'));$limit=max(20971520,(int)app_env('EOFFICE_DRIVE_CACHE_BYTES','268435456'));
     foreach(glob($cache.'/*.plain')?:[] as $path){$files[$path]=filemtime($path);$bytes+=filesize($path);}asort($files);
     foreach($files as $path=>$mtime){if($mtime>=time()-$ttl&&$bytes<=$limit)continue;$lock=fopen(substr($path,0,-6).'.lock','c+b');if(!$lock)continue;
-        try{if(flock($lock,LOCK_EX|LOCK_NB)){clearstatcache(true,$path);if(is_file($path)){ $size=filesize($path);if(@unlink($path)){$bytes-=$size;$removed++;}}}}finally{fclose($lock);}
+        try{if(flock($lock,LOCK_EX|LOCK_NB)){clearstatcache(true,$path);if(is_file($path)){
+            // A reader may have refreshed this file since the sorted snapshot.
+            if(filemtime($path)>=time()-$ttl&&$bytes<=$limit)continue;
+            $size=filesize($path);if(@unlink($path)){$bytes-=$size;$removed++;}
+        }}}finally{fclose($lock);}
     }return $removed;
 }
