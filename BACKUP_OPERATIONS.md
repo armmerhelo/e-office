@@ -9,7 +9,9 @@
 - Recovery drill: the actual downloaded database archive was authenticated, decompressed and imported into an empty isolated local `_test` database. All table/row counts matched. The temporary database and decrypted personnel data were removed.
 - Full local `npm test` passed, including encryption, database recovery, protected scheduler dispatch and synthetic multi-part document recovery.
 
-The document transfer covers the immutable **7 October deployment rollback snapshot**, **5,431 files / 7,128,788,382 bytes**. It is complete only when its private progress file says `completed` and `manifest.ebak` is authenticated. Progress and archive/key locations are under local `backups/`; do not treat a partial transfer as a complete recovery set. This snapshot predates subsequent production changes.
+The document transfer covers the immutable **7 October deployment rollback snapshot**, **5,431 files / 7,128,788,382 bytes**. It **completed on 8 October 2026 at 15:53:52 workstation time**. A full recovery drill authenticated the manifest and every part, reconstructed all 5,431 files with the exact original byte count, and authenticated the supporting database/application archives. Decrypted drill files were removed after verification.
+
+Completed set: `backups/snapshot-20261008-113251-900ad6f2`; private progress and recovery-drill records are in that directory. Its key vault is `backups/keys/snapshot-snapshot-20261008-113251-900ad6f2.key.private.json`. This snapshot predates subsequent production changes. Future transfers are complete only when private progress says `completed` and `manifest.ebak` is authenticated.
 
 ## Private settings and storage
 
@@ -82,6 +84,14 @@ python scripts/offsite-snapshot.py resume
 
 `stop` checks the recorded Windows worker identity before stopping it. Resume verifies saved archive checksums and replaces an uncommitted slice. Active job coordination lives in the approved temporary directory; durable, key-free progress is mirrored into the snapshot folder. Keep that coordination directory until the active transfer finishes. Recovery from a completed set uses the encrypted manifest and key vault, without temporary job state.
 
+For supervised runs in terminals that clean up detached processes, use bounded foreground runs:
+
+```powershell
+python scripts/offsite-snapshot.py resume --foreground --seconds 600
+```
+
+The worker stops between committed slices with status `paused` when that budget expires; repeat the command until `completed`. An exclusive per-snapshot file lock prevents two workers from writing the same backup.
+
 ## Recovery
 
 Recover into a new private local directory. These commands create decrypted sensitive data; remove it after the drill or completed recovery.
@@ -111,6 +121,14 @@ python scripts/restore-snapshot.py "backups/<snapshot-folder>" --key-file "backu
 ```
 
 The tool authenticates `manifest.ebak`, verifies each encrypted/plaintext checksum and contiguous offset, rejects unsafe paths, and reconstructs files into `file_document`. Only successful full recovery publishes `restore-completed.json`. Existing destinations are refused.
+
+To repeat the full drill and remove reconstructed plaintext automatically (requires at least the snapshot size plus 128 MiB free disk space):
+
+```powershell
+python scripts/verify-offsite-snapshot.py "backups/<snapshot-folder>" --key-file "backups/keys/<snapshot-key-vault>.private.json"
+```
+
+Successful drills save a key-free private verification record in the completed snapshot folder.
 
 The snapshot also includes `database.ebak` and `application.ebak`: these wrap the original deployment rollback database/application archives, rather than the newer JSONL database backup. Decrypt each using `scripts/encrypted-file.php decrypt` and the snapshot key supplied through `EOFFICE_BACKUP_KEY`, then inspect/import the original archive format on an isolated recovery system. Restore a consistent DB/application/document point in time and reconcile later changes before a production cutover.
 

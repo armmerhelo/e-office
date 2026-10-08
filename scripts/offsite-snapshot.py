@@ -66,7 +66,19 @@ def encrypt_part(ftp,entry,offset,length,path,state):
         raise
     finally:
         if connection:connection.close()
-def run():
+def run(seconds=None):
+    state=json.loads(STATE.read_text());folder=Path(state['directory'])
+    with open(folder/'.worker.lock','a+b') as lock:
+        if lock.tell()==0:lock.write(b'0');lock.flush()
+        lock.seek(0)
+        if os.name=='nt':
+            import msvcrt
+            msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
+        else:
+            import fcntl
+            fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        _run(time.monotonic()+seconds if seconds else None)
+def _run(deadline=None):
     state=json.loads(STATE.read_text());folder=Path(state['directory']);manifest_path=folder/'snapshot-manifest.private.json';account,_=production.credentials()
     state.update(status='running',pid=os.getpid(),error_class=None);write_json(STATE,state)
     for orphan in folder.glob('*.partial'):orphan.unlink()
@@ -84,6 +96,8 @@ def run():
                 if digest(folder/part['archive'])!=part['archive_sha256']:raise RuntimeError('Saved part integrity mismatch')
             if offset==entry['size'] and entry['parts']:continue
             while offset<entry['size'] or (entry['size']==0 and not entry['parts']):
+                if deadline and time.monotonic()>=deadline:
+                    state.update(status='paused',active_part_bytes=0);write_json(STATE,state);return
                 length=min(CHUNK,entry['size']-offset);path=folder/(f'{index:06d}-{offset:012d}.ebak');state['active_part_bytes']=0;state['active_file_index']=index;write_json(STATE,state)
                 if path.exists():path.unlink()  # A complete-but-uncommitted part from a stopped worker.
                 success=False
@@ -117,12 +131,15 @@ def run():
     finally:
         if ftp:ftp.close()
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('action',choices=['start','run','status','resume','relocate','stop']);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('action',choices=['start','run','status','resume','relocate','stop']);parser.add_argument('--foreground',action='store_true');parser.add_argument('--seconds',type=int);args=parser.parse_args()
+    if args.seconds is not None and args.seconds<1:raise RuntimeError('Positive run budget required')
     if args.action=='status':print(json.dumps({k:v for k,v in json.loads(STATE.read_text()).items() if k!='key_b64'},indent=2));return
-    if args.action=='run':run();return
+    if args.action=='run':run(args.seconds);return
     if args.action=='stop':
         if os.name!='nt':raise RuntimeError('Managed stop currently supports this Windows workstation only')
         state=json.loads(STATE.read_text());pid=int(state.get('pid',0))
+        if state['status'] in ['completed','failed','paused']:
+            print(json.dumps({'stopped':True,'already_stopped':True,'status':state['status']}));return
         if pid<=0:raise RuntimeError('Worker PID unavailable')
         command=f"$worker=Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}'; if ($worker) {{ if ($worker.CommandLine -notmatch 'offsite-snapshot.py.*run') {{ throw 'Worker identity mismatch' }}; $children=Get-CimInstance Win32_Process -Filter 'ParentProcessId = {pid}'; Stop-Process -Id {pid} -ErrorAction Stop; foreach ($child in $children) {{ Stop-Process -Id $child.ProcessId -ErrorAction SilentlyContinue }} }}"
         subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',command],capture_output=True,check=True)
@@ -130,7 +147,7 @@ def main():
         print(json.dumps({'stopped':True,'verified_parts_retained':True}));return
     if args.action=='relocate':
         state=json.loads(STATE.read_text())
-        if state['status'] not in ['failed','completed']:raise RuntimeError('Stop the worker before relocating')
+        if state['status'] not in ['failed','paused','completed']:raise RuntimeError('Stop the worker before relocating')
         destination=production.hosting.ROOT/'backups'/Path(state['directory']).name
         if destination.exists():raise RuntimeError('Backup destination already exists')
         shutil.move(state['directory'],destination);state['directory']=str(destination)
@@ -148,8 +165,10 @@ def main():
         Path(state['key_vault']).write_text(json.dumps({'key_b64':state['key_b64'],'directory':str(folder)},indent=2),encoding='utf-8')
     else:
         state=json.loads(STATE.read_text())
-        if state['status'] not in ['failed']:raise RuntimeError('Only a stopped backup may resume')
+        if state['status'] not in ['failed','paused']:raise RuntimeError('Only a stopped backup may resume')
         state['status']='starting';write_json(STATE,state)
+    if args.foreground:
+        run(args.seconds);print(json.dumps({k:v for k,v in json.loads(STATE.read_text()).items() if k!='key_b64'}));return
     log=open(TEMP/'eoffice-offsite-resumable.log','ab');kwargs={'stdin':subprocess.DEVNULL,'stdout':log,'stderr':log,'close_fds':True}
     if os.name=='nt':kwargs['creationflags']=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP
     else:kwargs['start_new_session']=True
