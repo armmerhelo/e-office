@@ -76,12 +76,6 @@ def atomic(name, content):
                 pass
 
 
-def section(source, start, end):
-    if source.count(start) != 1 or source.count(end) != 1:
-        raise RuntimeError('Unknown document API layout')
-    return source[source.index(start):source.index(end)]
-
-
 def without_order_feature(source):
     # Preserve the deployed order integration, but verify all other API bytes
     # against the committed base before merging this narrowly scoped patch.
@@ -98,23 +92,29 @@ def merged_api(remote):
     remote = remote.decode().replace('\r\n', '\n')
     if 'config/amss-links.php' not in local:
         raise RuntimeError('AMSS API must be committed before deployment')
-    if 'config/amss-links.php' not in remote:
-        pos = remote.index('\n', remote.index('require_once ')) + 1
-        remote = remote[:pos] + "require_once __DIR__.'/../config/amss-links.php';\n" + remote[pos:]
-        old = section(remote, '$links=[];', '$fileNames=')
-        remote = remote.replace(old, section(local, '$links=[];', '$fileNames='), 1)
-        download = section(local, ' $deadline=microtime(true)+60;', ' $pdo->commit();')
-        if ' app_order_saved(' in download:
-            raise RuntimeError('Commit includes unrelated order changes')
-        marker = ' app_order_saved($id,!$edit,$type,$orderSettings);' if ' app_order_saved(' in remote else ' $pdo->commit();'
-        remote = remote.replace(marker, download + marker, 1)
-        marker = "if($e instanceof PDOException&&$e->getCode()==='23000')"
-        if remote.count(marker) != 1:
-            raise RuntimeError('Unknown document rollback handler')
-        remote = remote.replace(marker, 'if($e instanceof AppAmssException)app_fail($e->getMessage(),422);' + marker, 1)
-    if without_order_feature(remote) != without_order_feature(local):
+    base = without_order_feature(local)
+    # Permit follow-up AMSS hotfixes only over an exact, known committed API.
+    # The initial tool only handled first installation and rejected updates to
+    # an API that already imported AMSS. Unknown production changes still stop.
+    known = {base}
+    revisions = subprocess.check_output(['git','log','-20','--format=%H','--','api/create_document.php'],cwd=ROOT,text=True).splitlines()
+    for revision in revisions:
+        previous = subprocess.check_output(['git','show',revision+':api/create_document.php'],cwd=ROOT).decode().replace('\r\n','\n')
+        known.add(without_order_feature(previous))
+    if without_order_feature(remote) not in known:
         raise RuntimeError('Production document API differs beyond known order integration')
-    return remote.encode()
+    merged = base
+    if 'config/order-emails.php' in remote:
+        merged = merged.replace("require_once __DIR__.'/../config/services.php';", "require_once __DIR__.'/../config/order-emails.php';", 1)
+        if merged.count(' $values=') != 1 or merged.count(' $pdo->commit();') != 1:
+            raise RuntimeError('Unknown document save layout')
+        merged = merged.replace(' $values=', ' $orderSettings=app_order_settings(!$edit);\n $values=', 1)
+        merged = merged.replace(' $pdo->commit();', ' app_order_saved($id,!$edit,$type,$orderSettings);\n $pdo->commit();', 1)
+        merged = merged.replace("  foreach($recipients as $recipient){$q->execute([$recipient,$id]);if($q->rowCount()===1)app_queue(['type'=>'document_notification','user_id'=>$recipient,'doc_id'=>$id]);}",
+            "  foreach($recipients as $recipient){$q->execute([$recipient,$id]);if($q->rowCount()===1){$payload=['type'=>'document_notification','user_id'=>$recipient,'doc_id'=>$id];if($type==='External'&&((!$edit&&$orderSettings['activated_at']!==null)||app_order_job($id)))$payload['delivery']=['mail'=>['status'=>'skipped','attempts'=>0]];app_queue($payload);}}", 1)
+    if without_order_feature(merged) != base:
+        raise RuntimeError('Order integration merge failed')
+    return merged.encode()
 
 
 def inspect(ftp):
