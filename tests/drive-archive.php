@@ -40,6 +40,14 @@ unlink($signedCache);$parts=app_drive_archive_parts($signedVersion);$object=$par
 drive_reject(static fn()=>app_drive_archive_restore($signedVersion,$get),'corrupted cloud ciphertext is rejected before plaintext publication');$objects[$object]=$saved;
 drive_check(!is_file($signedCache),'corruption never publishes an incomplete plaintext cache');
 $pending=$signedVersion;$pending['status']='pending';drive_reject(static fn()=>app_drive_archive_restore($pending,$get),'unverified versions cannot be restored as trusted files');
+// A slow upload of a pinned revision must not undo a concurrent replacement.
+$replacement=$original."\n% replacement one\n";file_put_contents($path.'.new',$replacement);rename($path.'.new',$path);
+app_document_transaction();app_drive_archive_track($id,$name,'original',$path);$pdo->commit();$olderPending=app_drive_archive_current($id,$name,'original');
+$newer=$original."\n% replacement two\n";file_put_contents($path.'.new',$newer);rename($path.'.new',$path);
+app_document_transaction();app_drive_archive_track($id,$name,'original',$path);$pdo->commit();$newerVersion=app_drive_archive_current($id,$name,'original');
+app_drive_archive_upload_version($olderPending,microtime(true)+30,$transport);
+drive_check(app_drive_archive_current($id,$name,'original')['id']===$newerVersion['id'],'late upload verification never overwrites a newer file-version pointer');
+$pdo->beginTransaction();try{drive_reject(static fn()=>app_drive_archive_snapshot($pdo),'consistent snapshot refuses current files still pending upload');}finally{$pdo->rollBack();}
 echo 'Drive archive behavior: '.$passed.' passed'.PHP_EOL;
 if(getenv('EOFFICE_DRIVE_HTTP_FIXTURE')==='1'){
     app_drive_archive_restore($signedVersion,$get);

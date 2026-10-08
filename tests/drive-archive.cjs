@@ -25,7 +25,6 @@ async function test(){try{
     console.log('PASS private cloud-only HTTP reads, revision headers, PDF ranges and Admin-only archive status');
     // Original may still be local even though the current signed version is
     // Drive-only: signing must compare against signed cloud bytes, not original.
-    fs.writeFileSync(path.join(directory,'file_document','original','2566',fixture.name),'%PDF-1.4\n% old original\n');
     const form=new FormData();form.append('Doc_Id',String(fixture.doc));form.append('year','2566');form.append('revision',fixture.signed_revision);form.append('file',new Blob(['%PDF-1.4\n% HTTP signed fixture\n'],{type:'application/pdf'}),fixture.name);
     const saved=await fetch(url+'/e-sign/upload_pdf.php',{method:'POST',headers:{Cookie:fixture.cookies.reader},body:form});assert.equal(saved.status,200,await saved.text());
     const fresh=await request(route,'reader');assert.equal(fresh.status,200);assert.notEqual(fresh.headers.get('X-Document-Revision'),fixture.signed_revision);await fresh.arrayBuffer();

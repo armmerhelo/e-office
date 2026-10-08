@@ -89,3 +89,12 @@ The tool reads the dated checkpoint, authenticates the encrypted DB/manifest arc
 ## Remaining activation dependency
 
 The Apps Script owner's source/deployment access is needed to install the authenticated handler and configure Script Properties. Merely reusing the old maintenance `DRIVE_APPS_SCRIPT_URL` will not enable this protocol. Daily cloud backup/eviction must not be reported as active until a real Apps Script health, upload/download and recovery drill succeeds and the hosting Cron entries are confirmed.
+
+## Installation results — 8 October 2026
+
+- Server implementation commit `0bff3b0`: 15 targeted files deployed and verified against committed bytes with no checksum mismatches.
+- Four additive registry/run/state tables installed in production; activation and local eviction remain **false**, no Drive objects uploaded or production files archived.
+- Local archive behavior: 19 checks pass with a mocked object store, including late upload after replacement and incomplete-snapshot rejection, plus HTTP permission/range/revision, Drive-only signing and Apps Script HMAC/idempotency/checkpoint tests. Existing full `npm test` passes.
+- Production synthetic smoke: 8 checks pass for guest rejection, authorized PDF/revision, Range, HEAD, protected Admin status, signature save and signed-file delivery. Temporary account/document/files were removed; no staff notifications sent.
+- Rollback archive: `eoffice-drive-before-20261008-193707.tar.gz` in the approved temporary directory; SHA-256 `f4a1f9064fd1dbc3bf8f995a4fcb2fb300b052832530c3e53d96b24431f7afa9`.
+- The owner selected providing the original `.gs` source for merging. Source has not yet been received; actual Google Drive connection, real cloud recovery and hosting Cron activation remain pending.
