@@ -6,6 +6,7 @@ const port=Number(process.env.DRIVE_TEST_PORT||8108),url=`http://localhost:${por
 const env={...process.env,DB_DATABASE:database,APP_URL:url,EOFFICE_MOCK_SERVICES:'true',EOFFICE_DRIVE_ARCHIVE_ENABLED:'true',EOFFICE_DRIVE_HTTP_FIXTURE:'1',EOFFICE_BACKUP_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(directory,'file_document')};let created=false,server;
 function run(code,db=base){const result=cp.spawnSync(php,['-r',code],{env:{...env,DB_DATABASE:db},encoding:'utf8'});assert.equal(result.status,0,result.stdout+result.stderr);return result.stdout;}
 async function test(){try{
+    const client=cp.spawnSync(php,['tests/drive-client.php'],{env,encoding:'utf8'});process.stdout.write(client.stdout);assert.equal(client.status,0,client.stdout+client.stderr);
     run(`require 'config/bootstrap.php';$pdo=app_pdo();$pdo->exec('CREATE DATABASE ${database} CHARACTER SET utf8mb4');`);created=true;
     // Clone schema only; no personnel/document data is copied into this fixture.
     const setup=`require 'config/bootstrap.php';$pdo=app_pdo();$pdo->exec('SET FOREIGN_KEY_CHECKS=0');$tables=$pdo->query('SHOW FULL TABLES')->fetchAll(PDO::FETCH_NUM);foreach($tables as [$table,$type]){if($type!=='BASE TABLE'||str_starts_with($table,'eoffice_drive_'))continue;$quote=chr(96);$sql=$pdo->query('SHOW CREATE TABLE '.$quote.$table.$quote)->fetch(PDO::FETCH_NUM)[1];$pdo->exec('USE ${database}');$pdo->exec($sql);$pdo->exec('USE ${base}');}`;
@@ -32,6 +33,9 @@ async function test(){try{
     run(`require 'config/bootstrap.php';app_pdo()->exec('DELETE FROM t_access_rights WHERE User_Id=${fixture.users.reader} AND Doc_Id=${fixture.doc}');`,database);
     assert.equal((await request(route,'reader')).status,403);
     console.log('PASS signing a Drive-only PDF creates a queued immutable revision and revoked readers lose access');
+    run("require 'config/order-ai.php';require 'config/order-email-schema.php';app_order_email_migrate(app_pdo());",database);
+    const scheduled=cp.spawnSync(php,['scripts/scheduled-jobs.php'],{env:{...env,EOFFICE_DRIVE_ARCHIVE_ENABLED:'false'},encoding:'utf8'});assert.equal(scheduled.status,0,scheduled.stdout+scheduled.stderr);assert.match(scheduled.stdout,/0 order jobs processed/);assert.ok(!scheduled.stdout.includes('drive_worker'));
+    console.log('PASS existing order scheduler remains operational while cloud feature is disabled');
     const bridge=cp.spawnSync(process.execPath,['tests/drive-appscript.cjs'],{encoding:'utf8'});process.stdout.write(bridge.stdout);assert.equal(bridge.status,0,bridge.stdout+bridge.stderr);
     const unified=cp.spawnSync(process.execPath,['tests/drive-unified.cjs'],{encoding:'utf8'});process.stdout.write(unified.stdout);assert.equal(unified.status,0,unified.stdout+unified.stderr);
 }finally{if(server){server.kill();await new Promise(resolve=>server.once('exit',resolve));}if(created)run(`require 'config/bootstrap.php';app_pdo()->exec('DROP DATABASE ${database}');`);fs.rmSync(directory,{recursive:true,force:true});}}

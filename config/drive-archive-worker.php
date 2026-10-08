@@ -8,7 +8,8 @@ function app_drive_archive_upload_version(array $version,float $deadline,?array 
     $spool=app_drive_archive_directory('spool');$source=$spool.'/'.$version['id'].'.source';$key=app_drive_archive_key($version['key_id']);
     if(!is_file($source)||filesize($source)!==(int)$version['bytes']||!hash_equals($version['revision'],hash_file('sha256',$source)))throw new RuntimeException('Archive upload source unavailable');
     $parts=json_decode($version['parts']??'[]',true,32,JSON_THROW_ON_ERROR)??[];$offset=0;
-    foreach($parts as $part){if(($part['offset']??null)!==$offset)throw new RuntimeException('Upload offset mismatch');$offset+=$part['bytes'];}
+    foreach($parts as $part){if(($part['offset']??null)!==$offset||!is_int($part['bytes']??null)||$part['bytes']<0||$part['bytes']>1048576||!preg_match('/^[a-f0-9]{64}$/',$part['object']??'')||!preg_match('/^[a-f0-9]{64}$/',$part['sha256']??''))throw new RuntimeException('Upload offset mismatch');$offset+=$part['bytes'];}
+    if($offset>(int)$version['bytes'])throw new RuntimeException('Upload manifest exceeds source');
     $in=fopen($source,'rb');if(!$in)throw new RuntimeException('Archive upload source unavailable');
     try{
         if(fseek($in,$offset)!==0)throw new RuntimeException('Archive source seek failed');
@@ -38,21 +39,60 @@ function app_drive_archive_upload_version(array $version,float $deadline,?array 
     foreach(glob($spool.'/'.$version['id'].'.*.ebak')?:[] as $part)unlink($part);
     return true;
 }
+function app_drive_archive_legacy_fetch(array $doc,string $name,bool $signed,float $deadline): ?string {
+    if($name!==basename($name)||str_contains($name,'\\')||!preg_match('/^\d{4}$/D',(string)$doc['Doc_Year']))throw new RuntimeException('Invalid legacy archive identity');
+    $remaining=(int)floor($deadline-microtime(true));if($remaining<2)return null;
+    $body='';$ch=curl_init('https://eoffice.siya.ac.th/file_request.php?File_Path='.rawurlencode($doc['Doc_Year'].'/'.$name).'&Type='.($signed?'signed':''));
+    curl_setopt_array($ch,[CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>min(10,$remaining),CURLOPT_TIMEOUT=>min(20,$remaining),CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,
+        CURLOPT_WRITEFUNCTION=>static function($ch,$bytes)use(&$body){if(strlen($body)+strlen($bytes)>20*1024*1024)return 0;$body.=$bytes;return strlen($bytes);}]);
+    $ok=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
+    if($ok===false||$status!==200||$body==='')return null;
+    $mime=(new finfo(FILEINFO_MIME_TYPE))->buffer($body);
+    if($signed&&$mime!=='application/pdf')return null;
+    if(!in_array($mime,['application/pdf','image/jpeg','image/png','application/zip','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],true))return null;
+    $path=app_drive_archive_directory('spool').'/legacy-'.bin2hex(random_bytes(16)).'.tmp';
+    if(file_put_contents($path,$body)!==strlen($body)){if(is_file($path))unlink($path);throw new RuntimeException('Legacy staging failed');}chmod($path,0600);return $path;
+}
 function app_drive_archive_scan(int $limit=10,?float $deadline=null): int {
     $pdo=app_pdo();$cursor=(int)$pdo->query('SELECT scan_doc FROM eoffice_drive_state WHERE id=1')->fetchColumn();
     $query=$pdo->prepare("SELECT Doc_Id FROM t_document WHERE Is_Delete='active' AND Doc_Id>? ORDER BY Doc_Id LIMIT ".max(1,min(100,$limit)));$query->execute([$cursor]);$ids=$query->fetchAll(PDO::FETCH_COLUMN);
     if(!$ids){$pdo->exec('UPDATE eoffice_drive_state SET scan_doc=0,full_scan_at=NOW() WHERE id=1');return 0;}
     foreach($ids as $id){
         if($deadline!==null&&microtime(true)>=$deadline)break;
+        $staged=[];
+        // Old attachments are still served by the trusted legacy origin. Fetch
+        // outside document locks, then install only still-bound absent paths.
+        if(app_settings()['remote_files']){
+            $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$candidate=$q->fetch();
+            if($candidate){$q=$pdo->prepare('SELECT Doc_Upload_Path FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([$candidate['Doc_File_Link']]);
+                foreach($q->fetchAll(PDO::FETCH_COLUMN) as $name){
+                    $original=app_drive_archive_local($candidate,$name,'original');
+                    if(is_file($original)||app_drive_archive_current((int)$id,$name,'original'))continue;
+                    $plain=app_drive_archive_legacy_fetch($candidate,$name,false,$deadline??microtime(true)+60);if(!$plain)continue;
+                    $staged[]=[$name,'original',$plain,(string)$candidate['Doc_Year']];
+                    if((new finfo(FILEINFO_MIME_TYPE))->file($plain)==='application/pdf'&&!is_file(app_drive_archive_local($candidate,$name,'signed'))&&!app_drive_archive_current((int)$id,$name,'signed')){
+                        $signed=app_drive_archive_legacy_fetch($candidate,$name,true,$deadline??microtime(true)+60);
+                        if($signed){if(hash_file('sha256',$signed)!==hash_file('sha256',$plain))$staged[]=[$name,'signed',$signed,(string)$candidate['Doc_Year']];else unlink($signed);}
+                    }
+                    if($deadline!==null&&microtime(true)>=$deadline)break;
+                }
+            }
+        }
         app_document_transaction();
         try{
             $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active' FOR UPDATE");$q->execute([$id]);$doc=$q->fetch();
             if($doc){
+                foreach($staged as [$name,$variant,$temporary,$year]){
+                    if((string)$doc['Doc_Year']!==$year)continue;$bound=$pdo->prepare('SELECT 1 FROM t_document_upload WHERE Doc_File_Link=? AND Doc_Upload_Path=?');$bound->execute([$doc['Doc_File_Link'],$name]);if(!$bound->fetchColumn())continue;
+                    $path=app_drive_archive_local($doc,$name,$variant);if(is_file($path)||app_drive_archive_current((int)$id,$name,$variant))continue;
+                    if(!is_dir(dirname($path))&&!mkdir(dirname($path),0750,true))throw new RuntimeException('Legacy archive directory unavailable');app_backup_publish($temporary,$path);
+                }
                 $q=$pdo->prepare('SELECT Doc_Upload_Path FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([$doc['Doc_File_Link']]);
                 foreach($q->fetchAll(PDO::FETCH_COLUMN) as $name)foreach(['original','signed'] as $variant){$path=app_drive_archive_local($doc,$name,$variant);if(is_file($path))app_drive_archive_track((int)$id,$name,$variant,$path);}
             }
             $pdo->prepare('UPDATE eoffice_drive_state SET scan_doc=? WHERE id=1')->execute([$id]);$pdo->commit();
         }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+        finally{foreach($staged as $part)if(is_file($part[2]))unlink($part[2]);}
     }return count($ids);
 }
 function app_drive_archive_evict(array $version,?array $transport=null): bool {
@@ -99,7 +139,11 @@ function app_drive_archive_worker(int $seconds=90,?array $transport=null): array
     try{
         $pdo->exec('UPDATE eoffice_drive_state SET worker_at=NOW(),error_code=NULL WHERE id=1');
         if($transport===null)app_drive_archive_call(['action'=>'health']);
-        app_drive_archive_scan(10,$deadline);
+        $backlog=(int)$pdo->query("SELECT COUNT(*) FROM eoffice_drive_versions WHERE status='pending'")->fetchColumn();
+        if($backlog<100){
+            $scanDeadline=min($deadline,microtime(true)+max(2,$seconds*0.35));
+            app_drive_archive_scan(max(1,min(100,(int)app_env('EOFFICE_DRIVE_SCAN_BATCH','100'))),$scanDeadline);
+        }
         $versions=$pdo->query("SELECT * FROM eoffice_drive_versions WHERE status='pending' ORDER BY created_at,id LIMIT 20")->fetchAll();
         foreach($versions as $version){if(microtime(true)>=$deadline)break;if(app_drive_archive_upload_version($version,$deadline,$transport)){$uploaded++;$pdo->exec('UPDATE eoffice_drive_state SET uploaded=uploaded+1 WHERE id=1');}}
         $q=$pdo->prepare("SELECT v.* FROM eoffice_drive_files f JOIN eoffice_drive_versions v ON v.id=f.version_id JOIN t_document d ON d.Doc_Id=f.doc_id WHERE v.status='verified' AND v.evicted_at IS NULL AND d.Is_Delete='active' AND CAST(d.Doc_Year AS UNSIGNED)<? AND v.verified_at<DATE_SUB(NOW(),INTERVAL ".max(7,(int)app_env('EOFFICE_DRIVE_EVICT_GRACE_DAYS','14'))." DAY) ORDER BY v.verified_at LIMIT 20");$q->execute([(int)date('Y')+543-2]);$versions=$q->fetchAll();

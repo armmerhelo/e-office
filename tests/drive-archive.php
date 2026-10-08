@@ -48,6 +48,9 @@ app_document_transaction();app_drive_archive_track($id,$name,'original',$path);$
 app_drive_archive_upload_version($olderPending,microtime(true)+30,$transport);
 drive_check(app_drive_archive_current($id,$name,'original')['id']===$newerVersion['id'],'late upload verification never overwrites a newer file-version pointer');
 $pdo->beginTransaction();try{drive_reject(static fn()=>app_drive_archive_snapshot($pdo),'consistent snapshot refuses current files still pending upload');}finally{$pdo->rollBack();}
+$badGet=static fn(string $id):string=>'changed bytes';
+drive_reject(static fn()=>app_drive_archive_upload_version($newerVersion,microtime(true)+30,['put'=>$put,'get'=>$badGet]),'upload never verifies a version whose cloud read-back differs');
+drive_check(app_drive_archive_current($id,$name,'original')['status']==='pending','failed remote verification keeps the version pending and local source intact');
 echo 'Drive archive behavior: '.$passed.' passed'.PHP_EOL;
 if(getenv('EOFFICE_DRIVE_HTTP_FIXTURE')==='1'){
     app_drive_archive_restore($signedVersion,$get);
