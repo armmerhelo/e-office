@@ -1,5 +1,27 @@
 # Production deployment — E-Office
 
+## Member pre-commit review (8 October 2026)
+
+Added permission-snapshot validation so a stale work-permission form cannot restore revoked grants. The full local regression suite passes, including **20 member API** and **6 UI** checks. No unresolved blocking findings remain in the member changes after this fix.
+
+`scripts/member-release.py` accepts `--commit <hash>` for backup/deploy/verification using Git blobs, and records `member_release_commit` in the production manifest. The release verification includes 18 application files and the production smoke suite now covers 14 scenarios, including stale permission submissions. Runtime smoke credentials and rollback archives remain outside Git.
+
+## Member review hotfix (8 October 2026)
+
+Published and verified **18 member-release files**, including the separate Admin-only role endpoint. Profile updates never change roles and both profile/role writes require a current snapshot version. Member mutations revalidate and hold the session after the roster lock. The member UI blocks group edits until the initial snapshot completes and ignores responses belonging to older dialog openings.
+
+Full local regression suite passes; member API checks **19 passed** and UI regression checks **5 passed**. Production HTTP checks **13 passed**, including rejection of stale profile/role submissions after Admin revocation. Temporary accounts/groups were removed; users **69** and documents **14,502** match the test baseline, with unchanged original permission/role hashes. No schema migration was required.
+
+Backup: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-members-before-20261008-151919.tar.gz` (SHA-256 `525a740335e3078d3aec6982a22ceb31ac46e3bddf8e68253fa73dbbecc7b02b`). Details: [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md).
+
+## Member permissions release (8 October 2026)
+
+Published and verified **17 targeted files** for per-member permission management on `https://e-office.siya.ac.th/`. Admin can grant/revoke the six work permissions from the member page. No schema migration was needed; the existing `eoffice_permissions` table is used.
+
+Production HTTP smoke: **11 passed**. Three temporary accounts and the synthetic group were removed. Baseline users **69** and documents **14,500** were restored, and hashes of existing roles and per-member permissions match the pre-test baseline. Local member authorization regression: **12 passed**, including last-Admin protection and concurrent cross-demotion. Syntax checks pass.
+
+Rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-members-before-20261008-142319.tar.gz` (SHA-256 `ea815b74a906ec495c0ec9f663af3378ef4528211d0ed48b001022e905616709`). Targeted tooling: `scripts/member-release.py`; usage and results: [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md).
+
 ## Automatic order email release (8 October 2026)
 
 Targeted release verified **18 files**, added the order queue/settings tables, and configured the persistent Admin-secret encryption key in private `config/local.php` (`0600`). Existing Gemini key/model settings are preserved: **gemini-3.6-flash** passes real synthetic-PDF plus JSON-output testing, and the protected Admin model-list API returns 45 models.

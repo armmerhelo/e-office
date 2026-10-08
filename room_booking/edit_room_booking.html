@@ -195,6 +195,7 @@
         }
 
         let bookings = [];
+        let canManageBookings = false;
 
         function renderTable(data = bookings) {
             const tbody = document.getElementById('tableBody');
@@ -320,10 +321,20 @@
                     </td>
                 `;
                 tbody.appendChild(tr);
+                if (!canManageBookings) {
+                    const statusButton = tr.querySelector('button[onclick^="changeStatus"]');
+                    if (statusButton) {
+                        statusButton.disabled = true;
+                        statusButton.removeAttribute('onclick');
+                        statusButton.classList.remove('cursor-pointer');
+                    }
+                }
             });
         }
 
         async function changeStatus(id, currentStatus) {
+            await window.sessionReady;
+            if (!canManageBookings) return;
             let nextStatus = 'pending';
             if (currentStatus === 'pending') {
                 nextStatus = 'confirmed';
@@ -625,6 +636,7 @@
         });
 
         async function fetchBookings() {
+            await window.sessionReady;
             const currentUserId = getCookie('User_Id')|| '';
             const currentUserDisplay = escapeHTML(getCookie('User_DisplayName') || 'ผู้ใช้งานระบบ');
 
@@ -638,6 +650,8 @@
                 const result = await response.json();
 
                 if (result.status === 'success' && Array.isArray(result.data)) {
+                    canManageBookings = !!result.is_admin;
+                    document.querySelector('h1').lastChild.textContent = result.is_admin ? ' จัดการรายการจองห้องประชุม' : ' รายการจองห้องประชุมของฉัน';
                     bookings = result.data;
                 } else {
                     bookings = [];

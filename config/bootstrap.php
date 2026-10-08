@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/permissions.php';
 date_default_timezone_set('Asia/Bangkok');
 function app_env(string $key, $default = '') {
     $value = getenv($key);
@@ -86,6 +87,7 @@ function app_admin(): array {
     return $user;
 }
 function app_can(array $user, string $permission): bool {
+    if (!isset(app_permission_catalog()[$permission])) return false;
     if($user['User_Status']==='Admin')return true;
     $q=app_pdo()->prepare('SELECT 1 FROM eoffice_permissions WHERE User_Id=? AND permission=?');
     $q->execute([$user['User_Id'],$permission]);return (bool)$q->fetchColumn();

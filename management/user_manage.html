@@ -1,518 +1,161 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <script src="../assets/security.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการบุคลากร</title>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&family=Inter:wght@400;600;700&family=Noto+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
-
+    <title>จัดการสมาชิกและสิทธิ์</title>
+    <script src="../assets/security.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root { font-family: 'Noto Sans Thai', 'Prompt', sans-serif; }
-        body { background-color: transparent; padding: 15px; }
-        .management-data-table { min-width: 560px; }
-        .management-modal-actions { flex-wrap: wrap; }
-        /* ซ่อน Scrollbar บางส่วนแต่ยัง Scroll ได้ */
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        :root { font-family: 'Noto Sans Thai', sans-serif; color: #1f2937; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 16px; background: transparent; }
+        button, input, select { font: inherit; }
+        button { cursor: pointer; }
+        button:disabled { cursor: not-allowed; opacity: .55; }
+        button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+        .card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 3px 12px #11182708; margin-bottom: 16px; }
+        .toolbar { padding: 22px; display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
+        h1 { margin: 0; font-size: 24px; }
+        h2 { margin: 0; font-size: 20px; }
+        .muted { color: #6b7280; font-size: 13px; }
+        p { margin: 6px 0; }
+        .filters, .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input:not([type=checkbox]), select { border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; min-height: 44px; background: white; max-width: 100%; }
+        .btn { border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 8px; padding: 10px 16px; min-height: 44px; font-weight: 500; }
+        .btn:hover:not(:disabled) { background: #f3f4f6; }
+        .primary { background: #4f46e5; color: white; border-color: #4f46e5; }
+        .primary:hover:not(:disabled) { background: #4338ca; }
+        .danger { color: #b91c1c; border-color: #fecaca; }
+        .small { padding: 6px 10px; min-height: 36px; font-size: 13px; }
+        .table-scroll { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 840px; font-size: 14px; }
+        th { background: #f9fafb; text-align: left; color: #4b5563; font-weight: 600; }
+        th, td { padding: 15px 18px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+        tbody tr:hover { background: #fafaff; }
+        .name { font-weight: 600; }
+        .badges { display: flex; gap: 5px; flex-wrap: wrap; max-width: 380px; }
+        .badge { background: #eef2ff; color: #4338ca; padding: 3px 8px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+        .badge-admin { background: #fef2f2; color: #b91c1c; }
+        .pagination { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .message { padding: 12px 16px; background: #eef2ff; color: #3730a3; border-radius: 8px; margin-bottom: 16px; }
+        .error { background: #fef2f2; color: #b91c1c; }
+        [hidden] { display: none !important; }
+        .overlay { position: fixed; inset: 0; z-index: 50; background: #11182780; display: flex; align-items: center; justify-content: center; padding: 16px; }
+        .dialog { background: white; width: 100%; max-width: 680px; max-height: 92vh; border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 20px 60px #0003; }
+        .dialog-head { padding: 18px 22px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .dialog-body { padding: 22px; overflow-y: auto; }
+        .dialog-foot { padding: 16px 22px; border-top: 1px solid #e5e7eb; justify-content: flex-end; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+        .full { grid-column: 1 / -1; }
+        .field label { font-weight: 500; }
+        .section { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e5e7eb; }
+        .section h3 { margin: 0 0 8px; font-size: 16px; }
+        .department-results { padding: 0; margin: 6px 0; list-style: none; border: 1px solid #e5e7eb; border-radius: 8px; max-height: 160px; overflow-y: auto; }
+        .department-results button { width: 100%; border: 0; background: white; text-align: left; padding: 10px 12px; }
+        .department-results button:hover { background: #eef2ff; }
+        .department-chip { display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; background: #f3f4f6; }
+        .department-chip button { border: 0; background: none; color: #b91c1c; min-width: 32px; min-height: 32px; }
+        .permission-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+        .permission-option { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #e5e7eb; padding: 14px; border-radius: 10px; cursor: pointer; }
+        .permission-option:has(input:checked) { border-color: #818cf8; background: #eef2ff; }
+        .permission-option input { width: 18px; height: 18px; margin-top: 3px; accent-color: #4f46e5; flex-shrink: 0; }
+        .permission-option strong { display: block; font-size: 14px; }
+        @media (max-width: 600px) { body { padding: 8px; } .toolbar { padding: 16px; } .filters, .filters input, .filters select { width: 100%; } .form-grid, .permission-grid { grid-template-columns: 1fr; } .dialog-body { padding: 16px; } .dialog-foot .btn { flex: 1; } }
     </style>
+    <script src="../assets/member-management.js?v=20261008-review2" defer></script>
 </head>
-<body class="text-gray-800">
-
-<div class="w-full" id="main-content">
-
-    <div class="bg-white shadow-lg rounded-xl p-4 sm:p-6 mb-6 border border-gray-100">
-        <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">จัดการบุคลากร</h1>
-                <p class="text-sm text-gray-500 mt-1">เพิ่ม ลบ และแก้ไขข้อมูลสมาชิกในระบบ</p>
+<body>
+    <main>
+        <header class="card toolbar">
+            <div><h1>จัดการสมาชิกและสิทธิ์</h1><p class="muted">กำหนดสิทธิ์รายบุคคล สมาชิกหนึ่งคนดูแลงานได้หลายอย่าง</p></div>
+            <button id="add-member" class="btn primary" type="button" disabled>+ เพิ่มสมาชิก</button>
+        </header>
+        <div id="page-message" class="message" role="status" hidden></div>
+        <section class="card" aria-label="รายการสมาชิก">
+            <div class="toolbar filters">
+                <input id="search_txt" type="search" placeholder="ค้นหาชื่อสมาชิก..." aria-label="ค้นหาชื่อสมาชิก">
+                <select id="permission-filter" aria-label="กรองตามสิทธิ์"><option value="">สิทธิ์ทั้งหมด</option></select>
+                <span id="member-count" class="muted"></span>
             </div>
-
-            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                <div class="relative w-full sm:w-64">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                    </div>
-                    <input id="search_txt" type="text" onkeyup="searchUsers(this.value)" class="h-11 block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors" placeholder="ค้นหาชื่อบุคลากร...">
-                </div>
-
-                <button onclick="openModal('modal_user_manage', 'add')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition duration-200 flex items-center justify-center whitespace-nowrap">
-                    <svg class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                    </svg>
-                    เพิ่มบุคลากร
-                </button>
+            <div class="table-scroll">
+                <table>
+                    <thead><tr><th>ลำดับ</th><th>ชื่อ – สกุล / อีเมล</th><th>ระดับผู้ใช้</th><th>สิทธิ์เพิ่มเติม</th><th>จัดการ</th></tr></thead>
+                    <tbody id="userTableBody"><tr><td colspan="5">กำลังตรวจสอบสิทธิ์และโหลดข้อมูล...</td></tr></tbody>
+                </table>
             </div>
-        </div>
-    </div>
+            <div id="usersPagination" class="pagination"></div>
+        </section>
+        <p class="muted">บุคลากรทั่วไปมีสิทธิ์พื้นฐานในการใช้งานระบบ การเพิ่ม–ถอนสิทธิ์และการเปลี่ยนระดับผู้ใช้ทำได้โดย Admin สูงสุดเท่านั้น</p>
+    </main>
 
-    <div class="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
-        <div class="overflow-x-auto hide-scrollbar">
-            <table class="management-data-table w-full whitespace-nowrap text-left text-sm text-gray-600">
-                <thead class="bg-gray-50 text-gray-700 uppercase font-semibold border-b border-gray-200">
-                    <tr>
-                        <th class="px-6 py-4 text-center w-16">ลำดับ</th>
-                        <th class="px-6 py-4">ชื่อ - สกุล</th>
-                        <th class="px-6 py-4">อีเมล</th>
-                        <th class="px-6 py-4 text-center">สถานะ</th>
-                        <th class="px-6 py-4 text-center w-24">จัดการ</th>
-                    </tr>
-                </thead>
-                <tbody id="userTableBody" class="divide-y divide-gray-200">
-                    <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">กำลังตรวจสอบสิทธิ์และโหลดข้อมูล...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="usersPagination" class="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-gray-200"></div>
-    </div>
-
-</div>
-
-<div id="modal_user_manage" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 hidden flex items-center justify-center transition-opacity opacity-0 backdrop-blur-sm">
-    <div class="bg-white rounded-xl shadow-2xl w-11/12 md:w-3/4 lg:w-1/2 max-h-[90vh] flex flex-col transform scale-95 transition-transform duration-300 relative">
-
-        <div class="bg-indigo-50 px-6 py-4 border-b border-indigo-100 flex justify-between items-center rounded-t-xl shrink-0">
-            <h3 id="modal_title" class="text-xl font-bold text-indigo-800">จัดการข้อมูลบุคลากร</h3>
-            <button onclick="closeModal('modal_user_manage')" class="text-gray-400 hover:text-gray-600 focus:outline-none">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-
-        <div class="overflow-y-auto hide-scrollbar p-6 grow">
-            <form id="form_user_data" autocomplete="off" class="space-y-4">
-                <input id="edit_id" type="hidden" name="User_Id" value="">
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center" id="User_Status_Group">
-                    <label class="font-medium text-gray-700">สถานะ</label>
-                    <div class="md:col-span-2">
-                        <select id="User_Status" name="User_Status" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-                            <option value="User">บุคลากรทั่วไป</option>
-                            <option value="Editor">ผู้แก้ไข</option>
-                            <option value="Admin">ผู้ดูแลระบบ</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label class="font-medium text-gray-700">ชื่อ - สกุล</label>
-                    <div class="md:col-span-2">
-                        <input id="edit_name" type="text" name="User_name" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="ระบุชื่อ - สกุล">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label class="font-medium text-gray-700">อีเมล</label>
-                    <div class="md:col-span-2">
-                        <input id="edit_email" type="email" name="User_Email" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="ระบุอีเมล">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label class="font-medium text-gray-700">รหัสผ่าน</label>
-                    <div class="md:col-span-2">
-                        <input id="password_1" oninput="check_password()" type="password" name="User_password1" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="ระบุรหัสผ่าน (ปล่อยว่างหากไม่เปลี่ยน)">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                    <label class="font-medium text-gray-700">ยืนยันรหัสผ่าน</label>
-                    <div class="md:col-span-2">
-                        <input id="password_2" oninput="check_password()" type="password" name="User_password2" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="ยืนยันรหัสผ่านอีกครั้ง">
-                    </div>
-                </div>
-
-                <p id="check_password" class="text-sm text-center font-semibold h-4"></p>
-
-                <hr class="my-5 border-gray-200">
-
-                <div id="department_section">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start md:items-center mb-2">
-                        <label class="font-medium text-gray-700 mt-2 md:mt-0">เพิ่มกลุ่มงาน</label>
-                        <div class="md:col-span-2 relative">
-                            <input type="text" onkeyup="showHint_department(this.value)" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="พิมพ์เพื่อค้นหากลุ่มงาน...">
-                            <ul id="txtHint_department" class="absolute w-full bg-white shadow-xl rounded-b-lg z-20 max-h-48 overflow-y-auto mt-1 border border-gray-200 hidden divide-y divide-gray-100 text-sm"></ul>
+    <div id="modal_user_manage" class="overlay" hidden>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal_title">
+            <header class="dialog-head"><h2 id="modal_title">เพิ่มสมาชิก</h2><button class="btn small" type="button" data-close="modal_user_manage" aria-label="ปิดหน้าต่าง">✕</button></header>
+            <div class="dialog-body">
+                <div id="member-error" class="message error" role="alert" hidden></div>
+                <form id="form_user_data" autocomplete="off">
+                    <input id="edit_id" type="hidden" name="User_Id">
+                    <div class="form-grid">
+                        <div id="User_Status_Group" class="field full">
+                            <label for="User_Status">ระดับผู้ใช้</label>
+                            <select id="User_Status" name="User_Status"><option value="User">บุคลากรทั่วไป</option><option value="Admin">Admin สูงสุด — ทุกสิทธิ์</option></select>
+                            <p class="muted">หลังสร้างสมาชิก เปลี่ยนระดับจากปุ่ม “ระดับ” และเลือกสิทธิ์ดูแลงานจากปุ่ม “สิทธิ์”</p>
                         </div>
+                        <div class="field full"><label for="edit_name">ชื่อ – สกุล</label><input id="edit_name" name="User_name" maxlength="255" required></div>
+                        <div class="field full"><label for="edit_email">อีเมล</label><input id="edit_email" name="User_Email" type="email" maxlength="255" required></div>
+                        <div class="field"><label for="password_1">รหัสผ่าน</label><input id="password_1" name="User_password1" type="password" minlength="8" autocomplete="new-password"><span class="muted">อย่างน้อย 8 ตัวอักษร / เว้นว่างหากไม่เปลี่ยน</span></div>
+                        <div class="field"><label for="password_2">ยืนยันรหัสผ่าน</label><input id="password_2" name="User_password2" type="password" minlength="8" autocomplete="new-password"></div>
                     </div>
-
-                    <div class="mt-5 bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <p class="font-semibold text-gray-700 mb-3 text-sm">กลุ่มงานที่ได้รับมอบหมาย</p>
-                        <div class="bg-white border border-gray-200 rounded-md overflow-hidden">
-                            <table class="w-full text-sm text-left">
-                                <tbody id="Department_Name_edit" class="divide-y divide-gray-100">
-                                    </tbody>
-                            </table>
-                        </div>
-                        <div id="Department_input_edit" class="hidden"></div>
-                    </div>
-                </div>
-            </form>
-        </div>
-
-        <div class="management-modal-actions bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3 rounded-b-xl shrink-0">
-            <button type="button" id="btn_delete_user" onclick="submit_delete()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm hidden w-full sm:w-auto">ลบผู้ใช้งาน</button>
-            <button type="button" onclick="closeModal('modal_user_manage')" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm w-full sm:w-auto">ยกเลิก</button>
-            <button type="button" onclick="submit_update_api()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition duration-150 shadow-sm w-full sm:w-auto">บันทึกข้อมูล</button>
-        </div>
-
+                    <section id="department_section" class="section" hidden>
+                        <h3>กลุ่มงานที่ได้รับมอบหมาย</h3>
+                        <p id="department-loading" class="muted" role="status" hidden>กำลังโหลดข้อมูลกลุ่มงาน กรุณารอสักครู่...</p>
+                        <div class="field"><label for="department-search" class="muted">ค้นหาเพื่อเพิ่มกลุ่มงาน</label><input id="department-search" type="search" placeholder="พิมพ์ชื่อกลุ่มงาน..."></div>
+                        <ul id="txtHint_department" class="department-results" hidden></ul>
+                        <div id="selected-departments" class="actions" style="margin-top:12px"></div>
+                    </section>
+                </form>
+            </div>
+            <footer class="dialog-foot actions">
+                <button id="btn_delete_user" type="button" class="btn danger" hidden>ลบสมาชิก</button>
+                <button class="btn" type="button" data-close="modal_user_manage">ยกเลิก</button>
+                <button id="save-member" class="btn primary" type="submit" form="form_user_data">บันทึกข้อมูล</button>
+            </footer>
+        </section>
     </div>
-</div>
 
-<script>
-// ================= 1. ฟังก์ชันพื้นฐาน =================
-function getCookie(name) {
-    if (name === 'User_Token') return document.cookie.includes('User_Id=') ? 'session' : null;
-    let match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    if (match) return match[2];
-    return null;
-}
-
-function escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-    }[tag] || tag));
-}
-
-// ================= 2. ดึงข้อมูลตารางผู้ใช้ (รองรับ pagination) =================
-let currentPage = 1;
-const perPage = 20;
-let totalUsers = 0;
-
-function loadUsers(searchQuery = '') {
-    const tbody = document.getElementById('userTableBody');
-    const token = getCookie("User_Token");
-
-    if (!token) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500 font-medium">ไม่พบ Token กรุณาเข้าสู่ระบบ</td></tr>`;
-        return;
-    }
-
-    fetch(`get_users_api.php?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&limit=${perPage}`, {
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.status === 'error') {
-            tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500 font-medium">${res.message}</td></tr>`;
-            renderPagination();
-            return;
-        }
-        totalUsers = res.total || 0;
-        if (res.page) currentPage = res.page; // sync กลับ (API ตัดหน้าเกินให้เอง เช่น หลังลบแถวสุดท้าย)
-        if (res.data.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">ไม่พบข้อมูลบุคลากร</td></tr>`;
-            renderPagination();
-            return;
-        }
-
-        let html = '';
-        const rowOffset = (currentPage - 1) * perPage;
-        res.data.forEach((user, index) => {
-            let badgeClass = "bg-gray-100 text-gray-800";
-            let badgeText = "บุคลากรทั่วไป";
-            if (user.User_Status === 'Admin') { badgeClass = "bg-red-100 text-red-800"; badgeText = "ผู้ดูแลระบบ"; }
-            else if (user.User_Status === 'Editor') { badgeClass = "bg-blue-100 text-blue-800"; badgeText = "ผู้แก้ไข"; }
-
-            html += `
-            <tr class="hover:bg-indigo-50/50 transition-colors">
-                <td class="px-6 py-4 text-center font-medium text-gray-900">
-                    ${rowOffset + index + 1}
-                    <input type="hidden" id="User_Id_${user.User_Id}" value="${user.User_Id}">
-                    <input type="hidden" id="User_Status_${user.User_Id}" value="${user.User_Status}">
-                </td>
-                <td class="px-6 py-4 font-semibold text-gray-800" id="User_Name_${user.User_Id}">${escapeHTML(user.User_Name)}</td>
-                <td class="px-6 py-4 text-gray-600" id="User_Email_${user.User_Id}">${escapeHTML(user.User_Email)}</td>
-                <td class="px-6 py-4 text-center">
-                    <span class="px-2.5 py-1 rounded-md text-xs font-semibold ${badgeClass}">${badgeText}</span>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    <button onclick="openModal('modal_user_manage', 'edit', ${user.User_Id})" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-1.5 rounded shadow-sm text-sm font-medium transition-colors flex items-center justify-center mx-auto">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                        แก้ไข
-                    </button>
-                </td>
-            </tr>`;
-        });
-        tbody.innerHTML = html;
-        renderPagination();
-    }).catch(() => {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-red-500 font-medium">เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์</td></tr>`;
-        renderPagination();
-    });
-}
-
-// ค้นหา: รีเซ็ตกลับหน้าแรกทุกครั้ง
-function searchUsers(q) {
-    currentPage = 1;
-    loadUsers(q);
-}
-
-// วาดแถบ pagination ใต้ตาราง
-function renderPagination() {
-    const el = document.getElementById('usersPagination');
-    if (!el) return;
-    const totalPages = Math.max(1, Math.ceil(totalUsers / perPage));
-    const startItem = totalUsers === 0 ? 0 : ((currentPage - 1) * perPage) + 1;
-    const endItem = Math.min(totalUsers, currentPage * perPage);
-    const searchVal = document.getElementById('search_txt').value;
-
-    el.innerHTML = '';
-    const info = document.createElement('div');
-    info.className = 'text-sm text-gray-500';
-    info.innerText = totalUsers === 0 ? 'ไม่พบข้อมูล' : `แสดง ${startItem}–${endItem} จาก ${totalUsers} รายการ (หน้า ${currentPage}/${totalPages})`;
-    el.appendChild(info);
-
-    const btns = document.createElement('div');
-    btns.className = 'flex items-center gap-1.5';
-    const mkBtn = (label, page, disabled, isActive) => {
-        const b = document.createElement('button');
-        b.innerText = label;
-        b.disabled = !!disabled;
-        b.className = 'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ' +
-            (isActive ? 'bg-indigo-600 text-white' :
-             disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' :
-             'bg-white border border-gray-300 text-gray-700 hover:bg-indigo-50');
-        if (!disabled && !isActive) b.onclick = () => { currentPage = page; loadUsers(searchVal); };
-        btns.appendChild(b);
-        return b;
-    };
-    mkBtn('‹ ก่อนหน้า', currentPage - 1, currentPage === 1, false);
-    let start = Math.max(1, currentPage - 2);
-    let end = Math.min(totalPages, start + 4);
-    if (end - start < 4) start = Math.max(1, end - 4);
-    for (let i = start; i <= end; i++) mkBtn(String(i), i, false, i === currentPage);
-    mkBtn('ถัดไป ›', currentPage + 1, currentPage === totalPages, false);
-    el.appendChild(btns);
-}
-
-// ================= 3. จัดการ Modal (Tailwind) =================
-let isEditMode = false;
-
-function openModal(modalId, mode, id = null) {
-    const modal = document.getElementById(modalId);
-    const content = modal.querySelector('div');
-
-    modal.classList.remove('hidden');
-    setTimeout(() => {
-        modal.classList.remove('opacity-0');
-        content.classList.remove('scale-95');
-        content.classList.add('scale-100');
-    }, 10);
-
-    // เคลียร์ค่า Form
-    document.getElementById('form_user_data').reset();
-    document.getElementById('check_password').innerHTML = "";
-    document.getElementById("txtHint_department").innerHTML = "";
-    document.getElementById("txtHint_department").classList.add('hidden');
-    selectedDepartments = [];
-    renderDepartments();
-
-    if (mode === 'add') {
-        isEditMode = false;
-        document.getElementById('modal_title').innerText = "เพิ่มข้อมูลบุคลากรใหม่";
-        document.getElementById('edit_id').value = "";
-        document.getElementById('btn_delete_user').classList.add('hidden');
-        document.getElementById('department_section').classList.add('hidden'); // ซ่อนส่วนแผนกตอนเพิ่ม (ถ้าต้องการ)
-        document.getElementById('User_Status_Group').style.display = 'grid';
-    } else if (mode === 'edit') {
-        isEditMode = true;
-        document.getElementById('modal_title').innerText = "แก้ไขข้อมูลบุคลากร";
-        document.getElementById('btn_delete_user').classList.remove('hidden');
-        document.getElementById('department_section').classList.remove('hidden');
-
-        document.getElementById('edit_id').value = id;
-        document.getElementById('edit_name').value = document.getElementById('User_Name_' + id).innerText;
-        document.getElementById('edit_email').value = document.getElementById('User_Email_' + id).innerText;
-
-        let currentStatus = document.getElementById('User_Status_' + id).value;
-        if (currentStatus === 'Admin' && String(id) === String(getCookie('User_Id'))) {
-            document.getElementById('User_Status_Group').style.display = 'none';
-            document.getElementById('User_Status').value = 'Admin';
-        } else {
-            document.getElementById('User_Status_Group').style.display = 'grid';
-            document.getElementById('User_Status').value = currentStatus;
-        }
-
-        // โหลดข้อมูลกลุ่มงานจาก API
-        loadUserDepartments(id);
-    }
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    const content = modal.querySelector('div');
-
-    modal.classList.add('opacity-0');
-    content.classList.remove('scale-100');
-    content.classList.add('scale-95');
-
-    setTimeout(() => { modal.classList.add('hidden'); }, 300);
-}
-
-function check_password() {
-    let p1 = document.getElementById('password_1').value;
-    let p2 = document.getElementById('password_2').value;
-    let msg = document.getElementById('check_password');
-    if (p1 !== p2) {
-        msg.innerHTML = 'รหัสผ่านไม่ตรงกัน!';
-        msg.className = 'text-sm text-center font-semibold h-4 text-red-500';
-    } else {
-        msg.innerHTML = p1 ? 'รหัสผ่านตรงกัน' : '';
-        msg.className = 'text-sm text-center font-semibold h-4 text-green-600';
-    }
-}
-
-// ================= 4. ระบบจัดการกลุ่มงาน (Department) =================
-let selectedDepartments = [];
-
-function loadUserDepartments(userId) {
-    const token = getCookie("User_Token");
-    fetch(`get_user_departments_api.php?User_Id=${userId}`, {
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.status === 'success') {
-            selectedDepartments = res.data.map(dept => ({
-                id: dept.Department_Id,
-                name: dept.Department_Name
-            }));
-            renderDepartments();
-        }
-    });
-}
-
-function showHint_department(str) {
-    let box = document.getElementById("txtHint_department");
-    if (str.length === 0) { box.classList.add('hidden'); box.innerHTML = ""; return; }
-
-    fetch(`search_departments_api.php?search=${encodeURIComponent(str)}`, {
-        headers: { 'Authorization': 'Bearer ' + getCookie("User_Token") }
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.status === 'success' && res.data.length > 0) {
-            let html = '';
-            res.data.forEach(dept => {
-                html += `<li onclick="add_department_edit('${dept.Department_Id}', '${escapeHTML(dept.Department_Name)}')" class="px-4 py-2.5 hover:bg-indigo-50 cursor-pointer text-gray-700 font-medium transition-colors">${escapeHTML(dept.Department_Name)}</li>`;
-            });
-            box.innerHTML = html;
-            box.querySelectorAll('li').forEach(li => {
-                li.removeAttribute('onclick');
-                const dept = res.data.find(d => d.Department_Name === li.textContent);
-                if (dept) li.addEventListener('click', () => add_department_edit(dept.Department_Id, dept.Department_Name));
-            });
-            box.classList.remove('hidden');
-        } else {
-            box.innerHTML = `<li class="px-4 py-2.5 text-gray-500 italic">ไม่พบกลุ่มงานที่ค้นหา</li>`;
-            box.classList.remove('hidden');
-        }
-    });
-}
-
-function add_department_edit(id, name) {
-    let exists = selectedDepartments.some(d => d.id == id);
-    if (!exists) {
-        selectedDepartments.push({ id: id, name: name });
-        renderDepartments();
-    }
-    document.getElementById("txtHint_department").classList.add('hidden');
-}
-
-function delete_department_edit(id) {
-    selectedDepartments = selectedDepartments.filter(d => d.id != id);
-    renderDepartments();
-}
-
-function renderDepartments() {
-    let tbody = document.getElementById("Department_Name_edit");
-    let inputDiv = document.getElementById("Department_input_edit");
-
-    let trHtml = '';
-    let inputHtml = '';
-
-    if(selectedDepartments.length === 0) {
-        trHtml = `<tr><td class="p-4 text-center text-gray-400 italic">ยังไม่มีกลุ่มงานที่ได้รับมอบหมาย</td></tr>`;
-    } else {
-        selectedDepartments.forEach(raw => {
-            const dept = {id: Number(raw.id), name: escapeHTML(raw.name)};
-            trHtml += `
-            <tr class="hover:bg-gray-50 transition-colors">
-                <td class="p-3 pl-4 font-medium text-gray-700">${dept.name}</td>
-                <td class="p-3 w-16 text-center">
-                    <button type="button" onclick="delete_department_edit('${dept.id}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-md transition-colors" title="ลบกลุ่มงาน">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                </td>
-            </tr>`;
-            inputHtml += `<input type="hidden" name="Department_Id_Acc[]" value="${dept.id}">`;
-        });
-    }
-
-    tbody.innerHTML = trHtml;
-    inputDiv.innerHTML = inputHtml;
-}
-
-// ================= 5. บันทึก & ลบ ข้อมูล (API) =================
-function submit_update_api() {
-    let p1 = document.getElementById('password_1').value;
-    let p2 = document.getElementById('password_2').value;
-    if (p1 !== p2) { alert("รหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง!"); return; }
-
-    let formData = new FormData(document.getElementById("form_user_data"));
-    let apiEndpoint = isEditMode ? "update_user_api.php" : "new_user_api.php";
-    // หมายเหตุ: กรณี Add คุณต้องมีไฟล์ new_user_api.php มารับค่าด้วย
-
-    fetch(apiEndpoint, {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + getCookie("User_Token") },
-        body: formData
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.status === "success") {
-            closeModal('modal_user_manage');
-            loadUsers(); // รีเฟรชตาราง
-        } else {
-            alert("ข้อผิดพลาด: " + res.message);
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
-    });
-}
-
-function submit_delete() {
-    if (confirm("ต้องการลบผู้ใช้งานนี้อย่างถาวรใช่หรือไม่?\n\n** การกระทำนี้ไม่สามารถย้อนกลับได้ **")) {
-        let id = document.getElementById('edit_id').value;
-        let formData = new FormData();
-        formData.append('User_Id', id);
-
-        fetch("delete_user_api.php", {
-            method: "POST",
-            headers: { "Authorization": "Bearer " + getCookie("User_Token") },
-            body: formData
-        })
-        .then(res => res.json())
-        .then(res => {
-            if(res.status === "success") {
-                closeModal('modal_user_manage');
-                loadUsers();
-            } else { alert("ลบไม่สำเร็จ: " + res.message); }
-        });
-    }
-}
-
-// เริ่มทำงานทันทีที่โหลดหน้าเสร็จ
-document.addEventListener('DOMContentLoaded', () => loadUsers());
-</script>
-
+    <div id="modal_permissions" class="overlay" hidden>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="permissions-title">
+            <header class="dialog-head"><h2 id="permissions-title">สิทธิ์การใช้งาน</h2><button class="btn small" type="button" data-close="modal_permissions" aria-label="ปิดหน้าต่าง">✕</button></header>
+            <div class="dialog-body">
+                <p id="permissions-member" class="name"></p>
+                <p class="muted">เลือกได้หลายสิทธิ์ หรือถอนทุกสิทธิ์เพื่อให้เหลือเฉพาะการใช้งานพื้นฐาน</p>
+                <div id="permissions-error" class="message error" role="alert" hidden></div>
+                <div id="permissions-loading" class="message" role="status" hidden></div>
+                <form id="form_permissions"><div id="permission-options" class="permission-grid"></div></form>
+                <p class="muted" style="margin-top:16px">การเปลี่ยนแปลงมีผลกับคำขอถัดไป โดยสมาชิกไม่ต้องออกจากระบบ</p>
+            </div>
+            <footer class="dialog-foot actions">
+                <button class="btn" type="button" data-close="modal_permissions">ยกเลิก</button>
+                <button id="save-permissions" class="btn primary" type="submit" form="form_permissions">บันทึกสิทธิ์</button>
+            </footer>
+        </section>
+    </div>
+    <div id="modal_status" class="overlay" hidden>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="status-title">
+            <header class="dialog-head"><h2 id="status-title">เปลี่ยนระดับผู้ใช้</h2><button class="btn small" type="button" data-close="modal_status" aria-label="ปิดหน้าต่าง">✕</button></header>
+            <div class="dialog-body">
+                <p id="status-member" class="name"></p>
+                <div id="status-error" class="message error" role="alert" hidden></div>
+                <form id="form_status" class="field">
+                    <label for="status-select">ระดับผู้ใช้</label>
+                    <select id="status-select" disabled><option value="User">บุคลากรทั่วไป</option><option value="Admin">Admin สูงสุด — ทุกสิทธิ์</option></select>
+                </form>
+                <p class="muted">การเปลี่ยนระดับแยกจากการแก้ข้อมูลทั่วไป และต้องเหลือ Admin สูงสุดอย่างน้อยหนึ่งคน</p>
+            </div>
+            <footer class="dialog-foot actions"><button class="btn" type="button" data-close="modal_status">ยกเลิก</button><button id="save-status" class="btn primary" type="submit" form="form_status" disabled>บันทึกระดับผู้ใช้</button></footer>
+        </section>
+    </div>
 </body>
 </html>

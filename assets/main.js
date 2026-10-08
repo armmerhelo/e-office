@@ -1,4 +1,45 @@
 
+function eofficeCan(permission) {
+    return !!window.eofficeUser?.permissions?.includes(permission);
+}
+
+function applyPermissionMenus() {
+    for (const [permission, ids] of Object.entries({
+        members: ['menu-members', 'group_menu_members'],
+        departments: ['menu-groups', 'group_menu_groups'],
+        email: ['send_email', 'group_send_email'],
+        maintenance: ['menu-maintenance-admin', 'group_maintenance_admin']
+    })) {
+        for (const id of ids) {
+            const node = document.getElementById(id);
+            if (node) node.style.display = eofficeCan(permission) ? (node.tagName === 'A' ? 'flex' : 'block') : 'none';
+        }
+    }
+    display_style('system_management', eofficeCan('members') || eofficeCan('departments') ? 'block' : 'none');
+}
+
+async function refreshPermissionMenus() {
+    try {
+        const response = await fetch('api/me.php');
+        if (!response.ok) return;
+        window.eofficeUser = (await response.json()).user;
+        applyPermissionMenus();
+        const current = localStorage.getItem('currentPage');
+        if (restrictedViewPermission(current) && !eofficeCan(restrictedViewPermission(current))) showView(window.eofficeUser ? 'received' : 'public', 'load');
+    } catch (error) { console.error(error); }
+}
+
+function restrictedViewPermission(view) {
+    return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance'}[view];
+}
+
+window.addEventListener('message', event => {
+    if (event.origin !== location.origin || event.data?.type !== 'eoffice-permissions-changed') return;
+    if (![...document.querySelectorAll('iframe')].some(frame => frame.contentWindow === event.source)) return;
+    refreshPermissionMenus();
+});
+window.addEventListener('focus', () => { if (window.eofficeUser) refreshPermissionMenus(); });
+
 var Page_number = 1;
 var data_save = [];
 var data_report_arr = [];
@@ -105,7 +146,7 @@ window.onload = async () => {
     let User_Status = getCookie("User_Status");
     let User_DisplayName = getCookie("User_DisplayName");
     document.getElementById('user_nameDisplay').textContent = User_DisplayName ? decodeURI(User_DisplayName) : '';
-    if (User_Status != 'Admin') {
+    if (!window.eofficeUser) {
       menu_members.style.display = 'none';
       menu_groups.style.display = 'none';
       document.getElementById('system_management').style.display = 'none';
@@ -118,10 +159,8 @@ window.onload = async () => {
       display_style('group_send_email','none');
     }
 
-    // เมนู "แจ้งซ่อม (ฝ่ายงาน)" แสดงเฉพาะผู้ดูแลงานซ่อม (User_Id 1 หรือ 14 - ตรงกับเงื่อนไขฝั่ง API)
+    // เมนูฝ่ายงานตรวจจากสิทธิ์ที่เซิร์ฟเวอร์ส่งกลับ
     // (หลัง login สำเร็จจะมี cookie User_Id; ผู้ใช้เก่าที่ยังไม่มี cookie จะถูกซ่อนจนกว่าจะ login ใหม่)
-    const maintenanceStaffIds = [1, 14];
-    const loggedInUserId = parseInt(getCookie("User_Id"), 10);
     if (!window.eofficeUser?.permissions?.includes('maintenance')) {
       display_style('group_maintenance_admin','none');
       display_style('menu-maintenance-admin','none');
@@ -143,6 +182,7 @@ window.onload = async () => {
 
 
     var currentPage = localStorage.getItem("currentPage");
+    applyPermissionMenus();
     if (id && getCookie("User_Token")) {
         showView('received', "load", '1');
     } else if (currentPage) {
@@ -447,6 +487,8 @@ window.addEventListener('message', function(event) {
 
 
 function showView(showViews, page , page_number) {
+    const permission = restrictedViewPermission(showViews);
+    if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
 
 document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
 components_pagination.style.display = 'block';
@@ -523,7 +565,7 @@ if (! page_number) {
         const management_user = document.getElementById("management_user");
         if (!management_user.querySelector('iframe')) {
             management_user.innerHTML = `
-                <iframe src="management/user_manage.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+                <iframe src="management/user_manage.html?v=20261008-review2" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
             `;
         }
         load_data.style.display = "none";

@@ -14,6 +14,9 @@ cli('scripts/migrate.php');const seed=JSON.parse(cli('tests/seed.php'));env.EOFF
 const servers=remote?[]:[0,1,2].map(i=>cp.spawn(php,['-S',`localhost:${port+i}`,'scripts/router.php'],{env:{...env,APP_URL:`http://localhost:${port+i}`},stdio:['ignore','ignore','pipe']}));let serverErrors='';servers.forEach(server=>server.stderr.on('data',s=>serverErrors+=s));
 const pdf=Buffer.from(seed.pdf,'base64');let passed=0;const stamp=Date.now();
 async function request(route,{cookie='',data,form,method=data||form?'POST':'GET',status=200,headers={},worker=0}={}){
+ if(route==='/management/update_user_api.php'&&form&&!form.has('member_version')){
+  const snapshot=await request('/management/get_user_departments_api.php?User_Id='+form.get('User_Id'),{cookie,worker});form.set('member_version',snapshot.body.member_version);
+ }
  if(remote)await new Promise(resolve=>setTimeout(resolve,Number(process.env.EOFFICE_REMOTE_DELAY_MS||2000)));
  const r=await fetch((remote?base:`http://localhost:${port+worker}`)+route,{method,redirect:remote?'manual':'follow',headers:{...headers,...(cookie?{Cookie:cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:form||(data?JSON.stringify(data):undefined)});
  const text=await r.text();if(remote&&text.includes('One moment, please...'))throw Error(`Hosting bot verification blocked ${route}; no application test result was accepted`);if(Array.isArray(status))assert.ok(status.includes(r.status),`${route}: ${text}`);else assert.equal(r.status,status,`${route}: ${text}`);let body;try{body=JSON.parse(text);}catch{body=text;}return {body,r,text};

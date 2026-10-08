@@ -1,26 +1,13 @@
 <?php
-require_once __DIR__.'/../config/config.php'; app_method('GET'); app_admin();
-header('Content-Type: application/json; charset=utf-8');
-
-$User_Id = isset($_GET['User_Id']) ? $_GET['User_Id'] : '';
-$data = [];
-
-if ($User_Id !== '') {
-    $stmt = $conn->prepare("
-        SELECT d.Department_Id, d.Department_Name
-        FROM t_user_department ud
-        JOIN t_department d ON ud.Department_Id = d.Department_Id
-        WHERE ud.User_Id = ?
-    ");
-    $stmt->bind_param("s", $User_Id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    while ($row = $result->fetch_assoc()) {
-        $data[] = $row;
-    }
-    $stmt->close();
-}
-
-echo json_encode(["status" => "success", "data" => $data]);
-?>
+require_once __DIR__.'/../config/member-management.php';app_method('GET');$actor=app_permission('members');
+$id=(int)($_GET['User_Id']??0);if($id<=0)app_fail('ผู้ใช้ไม่ถูกต้อง');
+$pdo=app_pdo();$pdo->beginTransaction();
+try {
+    $locked=app_lock_member($pdo,$actor,$id);$user=$locked['target'];
+    $departments=app_member_departments($pdo,$id);
+    $version=app_member_version($user,$departments);
+    $permissions=app_user_permissions($user);$permissionVersion=app_member_permission_version($user,$permissions);
+    $pdo->commit();
+} catch (Throwable $e) { if($pdo->inTransaction())$pdo->rollBack();throw $e; }
+app_json(['status'=>'success','data'=>$departments,'member_version'=>$version,'permissions'=>$permissions,'permission_version'=>$permissionVersion,
+    'user'=>['User_Id'=>(int)$user['User_Id'],'User_Name'=>$user['User_Name'],'User_Email'=>$user['User_Email'],'User_Status'=>$user['User_Status']]]);

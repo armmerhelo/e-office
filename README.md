@@ -52,6 +52,8 @@ npm.cmd run serve:test
 
 ## เอกสาร
 
+- [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md): การให้สิทธิ์รายบุคคลและการจัดการสมาชิกโดย Admin สูงสุด
+
 - [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
 - [ORDER_EMAILS.md](ORDER_EMAILS.md): คิวส่งอีเมลคำสั่งอัตโนมัติ, cron และตั้งค่า AI สำหรับ Admin สูงสุด
