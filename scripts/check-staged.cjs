@@ -8,7 +8,7 @@ const secrets = fs.existsSync(credentialFile)
     ? [...fs.readFileSync(credentialFile,'utf8').matchAll(/password\s*:\s*(\S+)/gi)].map(match => match[1]).filter(value => value.length >= 6)
     : [];
 const errors = [];
-const forbidden = /^(?:config\/local\.php|email_send\/(?:User_Data.*\.json|backup\/)|e-sign\/uploads\/|e-sign\/generated_images\/(?!\.htaccess$)|file_document\/(?!\.htaccess$)|node_modules\/|test-results\/)|(?:^|\/)\.env(?:\.|$)|\.private\./i;
+const forbidden = /^(?:config\/local\.php|email_send\/(?:User_Data.*\.json|backup\/)|e-sign\/uploads\/|e-sign\/generated_images\/(?!\.htaccess$)|file_document\/(?!\.htaccess$)|node_modules\/|test-results\/|backups\/(?!README\.md$))|(?:^|\/)\.env(?:\.|$)|\.private\./i;
 const keyPatterns = [
     /\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}/,
     /\bAIza[A-Za-z0-9_-]{30,}/,

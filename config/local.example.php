@@ -9,6 +9,10 @@ return [
     'GEMINI_MODEL' => 'gemini-2.5-flash',
     // Generate once on the server: base64_encode(random_bytes(32)). Keep private.
     'EOFFICE_SETTINGS_KEY' => '',
+    // Private scheduler token (64 lowercase hex characters) and backup master key.
+    'EOFFICE_CRON_TOKEN' => '',
+    'EOFFICE_BACKUP_KEY' => '', // base64_encode(random_bytes(32)); preserve for recovery.
+    // 'EOFFICE_BACKUP_DIRECTORY' => '/absolute/path/outside/public_html/backups',
     'EOFFICE_MOCK_SERVICES' => 'true',
     'EOFFICE_REMOTE_FILES' => 'false',
 ];

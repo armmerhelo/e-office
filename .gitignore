@@ -5,6 +5,8 @@
 !/file_document/.htaccess
 /node_modules/
 /test-results/
+/backups/*
+!/backups/README.md
 /email_send/User_Data*.json
 /email_send/backup/
 /e-office ftp and db.*

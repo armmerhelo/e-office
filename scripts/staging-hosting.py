@@ -151,7 +151,7 @@ def ensure_dir(ftp, directory):
 
 
 def deployment_files():
-    excluded={'node_modules','tests','test-results','.git','__pycache__','file_document','Boardcast'}
+    excluded={'node_modules','tests','test-results','.git','__pycache__','file_document','Boardcast','backups'}
     for path in ROOT.rglob('*'):
         if not path.is_file():continue
         relative=path.relative_to(ROOT)

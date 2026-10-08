@@ -7,7 +7,7 @@ let phpCount = 0, jsCount = 0, inlineCount = 0, failures = [];
 function walk(dir) {
     for (const entry of fs.readdirSync(dir, {withFileTypes:true})) {
         const file = path.join(dir,entry.name);
-        if (entry.isDirectory()) { if (!['node_modules','test-results','file_document'].includes(entry.name)) walk(file); continue; }
+        if (entry.isDirectory()) { if (!['node_modules','test-results','file_document','backups','.git'].includes(entry.name)) walk(file); continue; }
         if (file.endsWith('.php')) {
             phpCount++;
             const r=cp.spawnSync(php,['-l',file],{encoding:'utf8'});
