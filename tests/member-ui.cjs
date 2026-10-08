@@ -27,7 +27,7 @@ class MockFormData {
     get(key){return this.data.get(key)?.[0]??null;} getAll(key){return this.data.get(key)??[];}
     set(key,value){this.data.set(key,[value]);} append(key,value){this.data.set(key,[...(this.data.get(key)??[]),value]);} delete(key){this.data.delete(key);}
 }
-vm.runInNewContext(source,{document,fetch,window:{sessionReady:Promise.resolve(),eofficeUser:{id:1},parent:{postMessage(){}}},location:{origin:'http://localhost'},URLSearchParams,FormData:MockFormData,confirm:()=>true,Option:class{constructor(text,value){this.text=text;this.value=value;}},escapeHTML:String,setTimeout,clearTimeout,console});
+vm.runInNewContext(source,{document,fetch,window:{sessionReady:Promise.resolve(),eofficeUser:{id:1},parent:{postMessage(){}},addEventListener(){}},location:{origin:'http://localhost'},URLSearchParams,FormData:MockFormData,confirm:()=>true,Option:class{constructor(text,value){this.text=text;this.value=value;}},escapeHTML:String,setTimeout,clearTimeout,console});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,10));
 const selected=()=>el('selected-departments').children.map(chip=>chip.children[0]?.textContent);
 const snapshot=dept=>response({status:'success',data:[{Department_Id:dept==='Alpha'?1:3,Department_Name:dept}],user,member_version:'a'.repeat(64),permissions:[],permission_version:'b'.repeat(64)});

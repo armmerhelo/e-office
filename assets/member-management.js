@@ -51,7 +51,9 @@
         state.users.forEach((user, index) => {
             const row = document.createElement('tr');
             const status = user.User_Status === 'Admin' ? 'Admin สูงสุด' : user.User_Status === 'Editor' ? 'ผู้แก้ไข (เดิม)' : 'บุคลากรทั่วไป';
-            const badges = user.User_Status === 'Admin' ? '<span class="badge badge-admin">ทุกสิทธิ์</span>' : user.permissions.map(key => `<span class="badge">${escapeHTML(state.catalog[key]?.label || key)}</span>`).join('') || '<span class="muted">สิทธิ์พื้นฐาน</span>';
+            const permissionBadges = user.User_Status === 'Admin' ? '<span class="badge badge-admin">ทุกสิทธิ์</span>' : user.permissions.map(key => `<span class="badge">${escapeHTML(state.catalog[key]?.label || key)}</span>`).join('');
+            const roleBadges = (user.sign_roles || []).map(role => `<span class="badge">${escapeHTML(role)}</span>`).join('');
+            const badges = permissionBadges + roleBadges || '<span class="muted">สิทธิ์พื้นฐาน</span>';
             row.innerHTML = `<td>${(state.page - 1) * state.limit + index + 1}</td><td><div class="name">${escapeHTML(user.User_Name)}</div><div class="muted">${escapeHTML(user.User_Email)}</div></td><td><span class="badge ${user.User_Status === 'Admin' ? 'badge-admin' : ''}">${status}</span></td><td><div class="badges">${badges}</div></td><td><div class="actions"></div></td>`;
             const actions = row.querySelector('.actions');
             if (user.can_edit) actions.append(button('แก้ไข', () => editMember(user)));
@@ -286,4 +288,5 @@
         }
     });
     window.sessionReady.then(loadUsers);
+    window.addEventListener('eoffice-sign-routes-changed', loadUsers);
 })();

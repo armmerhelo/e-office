@@ -64,7 +64,8 @@
         .permission-option strong { display: block; font-size: 14px; }
         @media (max-width: 600px) { body { padding: 8px; } .toolbar { padding: 16px; } .filters, .filters input, .filters select { width: 100%; } .form-grid, .permission-grid { grid-template-columns: 1fr; } .dialog-body { padding: 16px; } .dialog-foot .btn { flex: 1; } }
     </style>
-    <script src="../assets/member-management.js?v=20261008-review2" defer></script>
+    <script src="../assets/member-management.js?v=20261008-routing1" defer></script>
+    <script src="../assets/sign-routing-management.js?v=20261008-1" defer></script>
 </head>
 <body>
     <main>
@@ -73,6 +74,21 @@
             <button id="add-member" class="btn primary" type="button" disabled>+ เพิ่มสมาชิก</button>
         </header>
         <div id="page-message" class="message" role="status" hidden></div>
+        <section id="sign-routing-section" class="card" aria-labelledby="sign-routing-title" hidden>
+            <header class="toolbar">
+                <div><h2 id="sign-routing-title">Auto send — เลขาฝ่าย / รองฝ่าย</h2><p class="muted">เมื่อเลขาฝ่ายประทับตรา ยืนยันลงทะเบียนรับเอกสาร และบันทึกสำเร็จ ระบบจะเพิ่มรองฝ่ายเป็นผู้รับและแจ้งเตือนอัตโนมัติ พร้อมบันทึกประวัติการรับ</p></div>
+                <button id="reload-sign-routes" type="button" class="btn">โหลดข้อมูลใหม่</button>
+            </header>
+            <div style="padding:0 22px 22px">
+                <div id="sign-routing-message" class="message" role="status" hidden></div>
+                <form id="form_sign_routes">
+                    <div class="table-scroll"><table><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
+                    <p id="sign-route-empty" class="muted" hidden>ยังไม่มี Auto send กดเพิ่มคู่เลขา / รองฝ่ายเพื่อเริ่มตั้งค่า</p>
+                    <p class="muted" style="margin:14px 0">คู่เดิมใช้ “ทุกฝ่าย (คู่เดิม)” ให้เลือกฝ่ายให้ตรงกับตราประทับเพื่อส่งเฉพาะฝ่ายนั้น การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
+                    <div class="actions"><button id="add-sign-route" class="btn" type="button" disabled>+ เพิ่มคู่เลขา / รองฝ่าย</button><button id="save-sign-routes" class="btn primary" type="submit" disabled>บันทึก Auto send</button></div>
+                </form>
+            </div>
+        </section>
         <section class="card" aria-label="รายการสมาชิก">
             <div class="toolbar filters">
                 <input id="search_txt" type="search" placeholder="ค้นหาชื่อสมาชิก..." aria-label="ค้นหาชื่อสมาชิก">

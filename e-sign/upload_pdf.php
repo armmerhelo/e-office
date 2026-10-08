@@ -1,6 +1,16 @@
 <?php
 require_once __DIR__.'/../config/services.php';app_method('POST');$user=app_user();
+require_once __DIR__.'/../config/sign-routing.php';
 require_once __DIR__.'/../config/drive-archive.php';
+// Legacy client metadata is never authority to grant recipients.
+$legacyStamp=app_text($_POST,'stamp_departments',2000);
+if ($legacyStamp!=='' && $legacyStamp!=='[]') app_fail('กรุณาโหลดหน้าใหม่และยืนยันลงทะเบียนรับเอกสารก่อน Auto send');
+$receiptJson=app_text($_POST,'receipt_departments',2000);
+$receiptDepartments=$receiptJson===''?[]:json_decode($receiptJson);
+if (!is_array($receiptDepartments) || !array_is_list($receiptDepartments) || count($receiptDepartments)>count(app_sign_departments())) app_fail('ข้อมูลฝ่ายที่รับเอกสารไม่ถูกต้อง');
+foreach ($receiptDepartments as $department) if (!is_string($department) || !in_array($department,app_sign_departments(),true)) app_fail('ข้อมูลฝ่ายที่รับเอกสารไม่ถูกต้อง');
+$receiptDepartments=array_values(array_unique($receiptDepartments));
+if ($receiptDepartments && ($_POST['confirm_receipt']??'')!=='1') app_fail('ต้องยืนยันลงทะเบียนรับเอกสารก่อน Auto send');
 $id=(int)($_POST['Doc_Id']??0);$doc=app_document($id,$user);$file=$_FILES['file']??[];app_uploaded($file,['pdf']);
 $name=basename($file['name']);app_bound_file($doc,$name);$year=(string)$doc['Doc_Year'];if((string)($_POST['year']??'')!==$year)app_fail('Invalid year');
 $expected=app_text($_POST,'revision',64,true);if(!preg_match('/^[a-f0-9]{64}$/',$expected))app_fail('Invalid revision');
@@ -28,10 +38,8 @@ try{
  $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Status,Is_Signed) VALUES (?,?,?,0,'Readed','true') ON DUPLICATE KEY UPDATE Date=VALUES(Date),Status='Readed',Is_Signed='true'")->execute([$user['User_Id'],$id,date('d/m/Y H:i')]);
  $pdo->prepare('INSERT INTO eoffice_signed_files VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE revision=VALUES(revision),signed_at=NOW()')->execute([$id,$name,$revision]);
  app_drive_archive_track($id,$name,'signed',$target);
- // Preserve the existing assistant -> supervisor routing as configurable business data.
- $routes=json_decode(app_env('EOFFICE_SIGN_ROUTES','{"8":13,"11":15,"14":58,"10":61}'),true);
- if(isset($routes[$user['User_Id']])){$supervisor=(int)$routes[$user['User_Id']];$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,'',0) ON DUPLICATE KEY UPDATE Doc_Id=VALUES(Doc_Id)")->execute([$supervisor,$id]);app_queue(['type'=>'document_notification','user_id'=>$supervisor,'doc_id'=>$id]);}
+  $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);
  $pdo->commit();
-}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if(is_file($temp))unlink($temp);if($backup&&is_file($backup)){if(is_file($target))unlink($target);rename($backup,$target);}elseif(is_file($target)&&$installed)unlink($target);throw $e;}
+}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if(is_file($temp))unlink($temp);if($backup&&is_file($backup)){if(is_file($target))unlink($target);rename($backup,$target);}elseif(is_file($target)&&$installed)unlink($target);if($e instanceof DomainException)app_fail($e->getMessage(),403);throw $e;}
 if($backup&&is_file($backup)&&!unlink($backup))error_log('Signed file backup cleanup failed');
-app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ','revision'=>$revision]);
+app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ','revision'=>$revision,'auto_sent_user_ids'=>$autoSent,'registered_receipt_departments'=>$receiptDepartments]);

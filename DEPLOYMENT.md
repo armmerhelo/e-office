@@ -22,7 +22,7 @@ Use environment variables or copy `config/local.example.php` to `config/local.ph
 | GEMINI_API_KEY / GEMINI_MODEL | Production PDF recipient matching; model default gemini-2.5-flash |
 | EOFFICE_SETTINGS_KEY | Base64-encoded 32-byte encryption key for Admin-managed Gemini credentials; same value for web and cron |
 | DRIVE_APPS_SCRIPT_URL | HTTPS Drive adapter deployment for production image upload |
-| EOFFICE_SIGN_ROUTES | JSON assistant-to-supervisor map; default preserves the existing routing |
+| EOFFICE_SIGN_ROUTES | Initial JSON secretary-to-deputy map, imported once by migration into `eoffice_sign_routes`; Admin manages later changes in member rights. The assigned secretary explicitly confirms registering receipt before saving; receipt audit, deputy access and notifications commit together. |
 
 All exposed database, mail, AI and push credentials from the previous source must be rotated by their owner. Setting new environment variables does not revoke the old credentials.
 

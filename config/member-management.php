@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/sign-routing.php';
 
 // All member mutations lock the Admin roster first, in the same order. This
 // serializes demotion/deletion and prevents concurrent removal of the last Admin.
@@ -31,7 +32,7 @@ function app_lock_member(PDO $pdo, array $actor, int $id): array {
     }
     // Resetting another staff account's email/password would also transfer its
     // permissions. Delegated member managers may only manage basic accounts.
-    if ($currentActor['User_Status'] !== 'Admin' && (int)$id !== (int)$currentActor['User_Id'] && app_user_permissions($target)) {
+    if ($currentActor['User_Status'] !== 'Admin' && (int)$id !== (int)$currentActor['User_Id'] && (app_user_permissions($target) || app_has_sign_role($pdo,$id))) {
         $pdo->rollBack();
         app_fail('เฉพาะ Admin สูงสุดเท่านั้นที่จัดการบัญชีผู้ดูแลงานได้', 403);
     }

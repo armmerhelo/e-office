@@ -3,6 +3,7 @@
 <html lang="th">
 <head>
 <?php
+require_once __DIR__.'/../config/sign-routing.php';
 
 
  $Doc_Id = $_GET['Doc_Id'] ?? '';
@@ -50,6 +51,7 @@ $doc_id_int         = (int)$Doc_Id;
         window.dispatchEvent(new Event('pdfjsready'));
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="../assets/stamp-render-queue.js?v=20261008-1"></script>
 
 
     <!-- Icons (Lucide) -->
@@ -256,12 +258,9 @@ $doc_id_int         = (int)$Doc_Id;
                   <label class="block text-sm font-medium text-gray-700 mb-1">ฝ่ายงาน</label>
                   <select id="stamp-text-1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                       <option value="">-- เลือกฝ่ายงาน --</option>
-                       <option value="โรงเรียนศรียานุสรณ์">โรงเรียนศรียานุสรณ์</option>
-                       <option value="ฝ่ายงานผู้อำนวยการ">ฝ่ายงานผู้อำนวยการ</option>
-                      <option value="กลุ่มบริหารทั่วไป">กลุ่มบริหารทั่วไป</option>
-                      <option value="กลุ่มบริหารวิชาการ">กลุ่มบริหารวิชาการ</option>
-                      <option value="กลุ่มบริหารงานบุคคล">กลุ่มบริหารงานบุคคล</option>
-                      <option value="กลุ่มบริหารงบประมาณ">กลุ่มบริหารงบประมาณ</option>
+                      <?php foreach (app_sign_departments() as $department): ?>
+                      <option value="<?= htmlspecialchars($department, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($department, ENT_QUOTES, 'UTF-8') ?></option>
+                      <?php endforeach; ?>
                   </select>
               </div>
                 <div id="stamp-receipt-fields" class="space-y-4">
@@ -325,6 +324,15 @@ const CONFIG = {
         let lastX = 0;
         let lastY = 0;
         let documentHistory = {};
+        let currentStampDepartment = '';
+        let savingDocument = false;
+        const stampRenderQueue = new StampRenderQueue();
+        async function loadReceiptScopes() {
+            const response = await fetch(`receipt_scopes.php?Doc_Id=<?= $doc_id_int ?>`, {cache:'no-store'});
+            const result = await response.json();
+            if (!response.ok || result.status !== 'success' || !Array.isArray(result.departments)) throw new Error(result.message || 'โหลดบทบาทเลขาไม่สำเร็จ กรุณาลองบันทึกอีกครั้ง');
+            return result.departments;
+        }
 
         // --- 2. INITIALIZATION ---
 
@@ -350,6 +358,7 @@ const CONFIG = {
                 }
 
                 async function loadServerDocument() {
+                    if (savingDocument) return;
                     showLoading(true, "กำลังดึงไฟล์จาก Server หลัก...");
 
                     try {
@@ -504,22 +513,24 @@ const CONFIG = {
             };
 
             const startDraw = (e) => {
-                if (currentTool === 'hand') return;
+                if (currentTool === 'hand' || savingDocument || stampRenderQueue.pending.size) return;
 
                 const { x, y } = getPos(e);
 
                 // --- STAMP LOGIC (Requested #3) ---
                 if (currentTool === 'stamp') {
-                    const img = new Image();
-                    img.crossOrigin = "Anonymous";
-                    img.src = CONFIG.STAMP_URL;
-
-                    const drawStamp = (imageSrc) => {
+                    const stampSource = CONFIG.STAMP_URL;
+                    const stampDepartment = currentStampDepartment;
+                    const pageHistory = documentHistory;
+                    stampRenderQueue.add(() => new Promise((resolve, reject) => {
                         const stampToDraw = new Image();
+                        const timeout = setTimeout(() => { stampToDraw.onload = null; stampToDraw.onerror = null; reject(new Error('โหลดรูปตราเกินเวลา กรุณาวางตราใหม่')); }, 15000);
                         stampToDraw.crossOrigin = "Anonymous"; // Ensure crossOrigin is set for the draw instance too
-                        stampToDraw.src = imageSrc;
-
+                        stampToDraw.onerror = () => { clearTimeout(timeout); reject(new Error('โหลดรูปตราไม่สำเร็จ กรุณาวางตราใหม่ก่อนบันทึก')); };
                         stampToDraw.onload = () => {
+                            clearTimeout(timeout);
+                            try {
+                            if (pageHistory !== documentHistory) { resolve(); return; }
                             // --- AUTO SIZE LOGIC (แก้ไขตรงนี้) ---
                             // 1. กำหนดความกว้างฐานที่ต้องการ (เช่น 120px) แล้วคูณด้วย scale ของ PDF เพื่อให้คมชัด
                             const baseWidth = 270;
@@ -547,16 +558,16 @@ const CONFIG = {
                             documentHistory[pageNum].push({
                                 tool: 'stamp',
                                 x: drawX, y: drawY, w: stampW, h: stampH,
-                                src: imageSrc
+                                src: stampSource,
+                                department: stampDepartment,
+                                saved: false,
+                                receiptRegistered: false
                             });
+                            resolve();
+                            } catch (error) { reject(error); }
                         }
-                    };
-
-                    img.onload = () => drawStamp(CONFIG.STAMP_URL);
-                    img.onerror = () => {
-                        console.warn("Stamp CORS error, using fallback.");
-                        drawStamp(FALLBACK.STAMP);
-                    };
+                        stampToDraw.src = stampSource;
+                    })).catch(error => showToast(error.message, 'error'));
                     return;
                 }
 
@@ -582,7 +593,7 @@ const CONFIG = {
             };
 
             const draw = (e) => {
-                if (!isDrawing || currentTool === 'hand' || currentTool === 'stamp') return;
+                if (!isDrawing || savingDocument || currentTool === 'hand' || currentTool === 'stamp') return;
                 if (e.cancelable) e.preventDefault();
 
                 const { x, y } = getPos(e);
@@ -620,6 +631,7 @@ const CONFIG = {
         }
 
         function undoLastAction() {
+            if (savingDocument || isDrawing || stampRenderQueue.pending.size) return;
             // Find last active page
             let lastPageNum = -1;
             const pages = Object.keys(documentHistory);
@@ -634,27 +646,35 @@ const CONFIG = {
             }
 
             if (lastPageNum !== -1) {
-                documentHistory[lastPageNum].pop();
-                redrawCanvas(lastPageNum);
-                showToast("ย้อนกลับการกระทำล่าสุด", "info");
+                const actions = documentHistory[lastPageNum].slice(0, -1);
+                redrawCanvas(lastPageNum, actions)
+                    .then(applied => { if (applied) showToast("ย้อนกลับการกระทำล่าสุด", "info"); })
+                    .catch(error => showToast(error.message, 'error'));
             } else {
                 showToast("ไม่มีการกระทำที่สามารถย้อนกลับได้", "info");
             }
         }
 
-        function redrawCanvas(pageNum) {
+        function redrawCanvas(pageNum, actions = (documentHistory[pageNum] || []).slice()) {
             const canvas = document.getElementById(`draw-layer-${pageNum}`);
-            const ctx = canvas.getContext('2d');
-            const actions = documentHistory[pageNum] || [];
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            actions.forEach(action => {
+            const history = documentHistory;
+            return stampRenderQueue.add(async () => {
+            if (!canvas) throw new Error('ไม่พบหน้าที่ต้องวาดใหม่');
+            // Build a complete layer offscreen. Failure leaves both the visible
+            // canvas and action history untouched, so retry cannot lose a stamp.
+            const layer = document.createElement('canvas');
+            layer.width = canvas.width; layer.height = canvas.height;
+            const ctx = layer.getContext('2d');
+            for (const action of actions) {
                 if (action.tool === 'stamp') {
-                    const img = new Image();
-                    img.src = action.src;
+                    const img = await new Promise((resolve, reject) => {
+                        const image = new Image();
+                        const timeout = setTimeout(() => { image.onload = null; image.onerror = null; reject(new Error('โหลดรูปตราเกินเวลา ย้อนกลับไม่สำเร็จ')); }, 15000);
+                        image.onload = () => { clearTimeout(timeout); resolve(image); };
+                        image.onerror = () => { clearTimeout(timeout); reject(new Error('โหลดรูปตราไม่สำเร็จ ย้อนกลับไม่สำเร็จ')); };
+                        image.src = action.src;
+                    });
                     ctx.globalCompositeOperation = 'source-over';
-                    // Draw immediately if cached, otherwise wait (rare in redraw)
                     ctx.drawImage(img, action.x, action.y, action.w, action.h);
                 } else {
                     ctx.beginPath();
@@ -683,8 +703,15 @@ const CONFIG = {
                     }
                     ctx.closePath();
                 }
+            }
+            if (history !== documentHistory || canvas !== document.getElementById(`draw-layer-${pageNum}`)) return false;
+            const visible = canvas.getContext('2d');
+            visible.globalCompositeOperation = 'source-over';
+            visible.clearRect(0, 0, canvas.width, canvas.height);
+            visible.drawImage(layer, 0, 0);
+            documentHistory[pageNum] = actions;
+            return true;
             });
-            ctx.globalCompositeOperation = 'source-over';
         }
 
         // --- 5. SAVE & DOWNLOAD ---
@@ -696,12 +723,20 @@ const CONFIG = {
 
         // UPDATE: Function to Save to Server (Real Implementation Logic Added)
         async function saveToServer() {
-            if (!currentPDF) return;
+            if (!currentPDF || savingDocument || isDrawing) return;
+            savingDocument = true;
             showLoading(true, "กำลังส่งข้อมูลไปยัง Server...");
 
             try {
-
-
+                await stampRenderQueue.wait();
+                const stamps = Object.values(documentHistory).flat().filter(action => action.tool === 'stamp' && action.department);
+                const pendingReceipts = stamps.filter(action => !action.receiptRegistered);
+                let registeredDepartments = [];
+                if (pendingReceipts.length) {
+                    const scopes = await loadReceiptScopes();
+                    registeredDepartments = [...new Set(pendingReceipts.map(action => action.department))].filter(department => scopes.includes(department));
+                    if (registeredDepartments.length && !confirm(`ยืนยันลงทะเบียนรับเอกสารในนามเลขาฝ่าย:\n${registeredDepartments.join('\n')}\nระบบจะบันทึกประวัติการรับและเพิ่มรองฝ่ายอัตโนมัติเมื่อบันทึกสำเร็จ`)) return;
+                }
                 // 1. สร้างไฟล์ PDF (Blob)
                 const blob = await generatePDFBlob();
                 var year = <?= $year_json ?>;
@@ -712,6 +747,8 @@ const CONFIG = {
                 formData.append('year', year);
                 formData.append('Doc_Id', <?= $doc_id_int ?>);
                 formData.append('revision', documentRevision || '');
+                formData.append('receipt_departments', JSON.stringify(registeredDepartments));
+                if (registeredDepartments.length) formData.append('confirm_receipt', '1');
 
                 // --- ส่วนการส่งไฟล์จริง (Real Upload) ---
                 // วิธีใช้: แก้ไข URL ด้านล่างให้เป็น API ของคุณ
@@ -728,10 +765,16 @@ const CONFIG = {
                         const result = await response.json(); // อ่านค่าตอบกลับจาก Server
                         if (result.status !== 'success') throw new Error(result.message);
                         documentRevision = result.revision;
+                        const confirmedReceipts = result.registered_receipt_departments || [];
+                        stamps.forEach(action => {
+                            action.saved = true;
+                            if (registeredDepartments.includes(action.department) && confirmedReceipts.includes(action.department)) action.receiptRegistered = true;
+                        });
                         console.log("Server response:", result);
-                        showToast("บันทึกข้อมูลเรียบร้อย!", "success");
+                        showToast(result.auto_sent_user_ids?.length ? `บันทึกเรียบร้อย และเพิ่มรองฝ่ายอัตโนมัติ ${result.auto_sent_user_ids.length} คน` : "บันทึกข้อมูลเรียบร้อย!", "success");
                     } else {
-                        throw new Error("Server Error: " + response.status);
+                        const result = await response.json().catch(() => ({}));
+                        throw new Error(result.message || "Server Error: " + response.status);
                     }
                 } else {
                     // --- จำลองการทำงาน (Simulation) เมื่อยังไม่มี URL ---
@@ -743,8 +786,9 @@ const CONFIG = {
 
             } catch (err) {
                 console.error(err);
-                showToast("การเชื่อมต่อ Server ล้มเหลว", "error");
+                showToast(err.message || "การเชื่อมต่อ Server ล้มเหลว", "error");
             } finally {
+                savingDocument = false;
                 showLoading(false);
             }
         }
@@ -789,6 +833,7 @@ const CONFIG = {
         // Helper to generate Blob (for Upload)
         // Helper to generate Blob (for Upload)
                 async function generatePDFBlob() {
+                    await stampRenderQueue.wait();
                     const pdf = await PDFLib.PDFDocument.load(sourceBytes);
                     const pages = pdf.getPages();
                     for (let i = 0; i < pages.length; i++) {
@@ -1004,6 +1049,7 @@ const CONFIG = {
 
                 // เปลี่ยน URL ของแสตมป์ใน CONFIG ให้เป็นรูปที่เราเพิ่งสร้าง
                 CONFIG.STAMP_URL = currentStampDataUrl;
+                currentStampDepartment = document.getElementById('stamp-text-1').value;
 
                 // ปิด Modal และเลือกเครื่องมือ Stamp
                 closeStampModal();
