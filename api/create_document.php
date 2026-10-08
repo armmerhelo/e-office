@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../config/services.php';
+require_once __DIR__.'/../config/amss-links.php';
 app_method('POST');$user=app_user();$pdo=app_pdo();
 $edit=($_POST['formtype']??'')==='edit_document';$id=(int)($_POST['doc_id']??0);
 $doc=null;
@@ -18,7 +19,12 @@ $date=app_text($_POST,'doc_date_receive',255,true);
 if(!$edit||$date!==trim((string)$doc['Doc_Date_Receive']))app_document_date($date);
 $urls=$_POST['doc_url']??[];$urlNames=$_POST['doc_url_name']??[];
 if(!is_array($urls)||!is_array($urlNames)||count($urls)!==count($urlNames)||count($urls)>20)app_fail('Invalid links');
-$links=[];foreach($urls as $i=>$url){if(!is_string($url)||strlen($url)>2000||!filter_var($url,FILTER_VALIDATE_URL)||!in_array(parse_url($url,PHP_URL_SCHEME),['http','https'],true)||!is_string($urlNames[$i]))app_fail('Invalid link');$links[]=[$urlNames[$i]=>$url];}
+$links=[];$amssLinks=[];foreach($urls as $i=>$url){
+ if(!is_string($url)||strlen($url)>2000||!filter_var($url,FILTER_VALIDATE_URL)||!in_array(parse_url($url,PHP_URL_SCHEME),['http','https'],true)||!is_string($urlNames[$i]))app_fail('Invalid link');
+ $amssUrl=app_amss_pdf_url($url);
+ if($amssUrl!==null){$detail=trim($urlNames[$i]);if($detail==='')$detail=rawurldecode(basename(parse_url($amssUrl,PHP_URL_PATH)));if(mb_strlen($detail)>1000)app_fail('Invalid filename');$amssLinks[]=[$detail,$amssUrl];}
+ else $links[]=[$urlNames[$i]=>$url];
+}
 $fileNames=$_POST['doc_file_name']??[];$fileIds=$_POST['file_id']??[];$versions=$_POST['file_version']??null;
 if(!is_array($fileNames)||!is_array($fileIds)||count($fileNames)>20)app_fail('Invalid files');
 if($versions!==null&&(!is_array($versions)||count($versions)!==count($fileNames)))app_fail('Invalid file versions');
@@ -58,7 +64,14 @@ try{
   else $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
  }
  if($edit&&($_POST['replace_files']??'')==='1')foreach($existing as $fid=>$file)if(!in_array($fid,$keep,true)){$pdo->prepare('DELETE FROM t_document_upload WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$fid,$link]);$oldFiles[]=$dir.$file['Doc_Upload_Path'];}
+ $deadline=microtime(true)+60;
+ foreach($amssLinks as [$detail,$url]){
+  $remaining=(int)ceil($deadline-microtime(true));if($remaining<=0)throw new AppAmssException('ดาวน์โหลด PDF จาก AMSS ใช้เวลานานเกินไป กรุณาลองใหม่');
+  $body=app_amss_download_pdf($url,min(30,$remaining));$path=bin2hex(random_bytes(16)).'.pdf';$target=$dir.$path;$moved[]=$target;
+  if(file_put_contents($target,$body,LOCK_EX)!==strlen($body))throw new RuntimeException('AMSS PDF storage failed');unset($body);
+  $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+ }
  $pdo->commit();
-}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();foreach($moved as $path)if(is_file($path))unlink($path);if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('เลขเอกสารซ้ำหรือผู้รับไม่ถูกต้อง',409);throw $e;}
+}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();foreach($moved as $path)if(is_file($path))unlink($path);if($e instanceof AppAmssException)app_fail($e->getMessage(),422);if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('เลขเอกสารซ้ำหรือผู้รับไม่ถูกต้อง',409);throw $e;}
 foreach($oldFiles as $old)if(is_file($old)&&!unlink($old))error_log('Obsolete document file cleanup failed');
 app_json(['status'=>'success','message'=>'บันทึกเอกสารสำเร็จ','doc_id'=>$id,'files'=>['status'=>'success']]);
