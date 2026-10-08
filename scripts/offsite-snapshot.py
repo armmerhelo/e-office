@@ -1,5 +1,6 @@
 """Resumable encrypted, off-host copy of the deployment's immutable snapshot."""
 import argparse,base64,hashlib,importlib.util,json,os,secrets,subprocess,time,ftplib,shutil,traceback
+from contextlib import contextmanager
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('production',Path(__file__).with_name('production-hosting.py'))
 production=importlib.util.module_from_spec(spec);spec.loader.exec_module(production)
@@ -31,6 +32,19 @@ def env(state):return {**os.environ,'EOFFICE_BACKUP_KEY':state['key_b64'],'EOFFI
 def verify(path,state):
     result=subprocess.run([PHP,str(production.hosting.ROOT/'scripts/encrypted-file.php'),'verify',str(path)],env=env(state),capture_output=True,check=True)
     return json.loads(result.stdout)
+def saved_offset(entry,index,folder,state):
+    size=entry['size'];offset=0
+    if type(size) is not int or size<0:raise RuntimeError('Invalid saved file size')
+    for part in entry['parts']:
+        length=part['length']
+        if type(length) is not int or type(part['offset']) is not int or part['offset']!=offset or length<0 or (length==0 and (size!=0 or len(entry['parts'])!=1)) or offset+length>size:raise RuntimeError('Invalid saved part offsets')
+        if part['archive']!=f'{index:06d}-{offset:012d}.ebak':raise RuntimeError('Invalid saved part filename')
+        path=folder/part['archive']
+        if digest(path)!=part['archive_sha256']:raise RuntimeError('Saved part integrity mismatch')
+        result=verify(path,state)
+        if result['bytes']!=length or result['sha256']!=part['plaintext_sha256']:raise RuntimeError('Saved part authentication mismatch')
+        offset+=length
+    return offset
 def encrypt_part(ftp,entry,offset,length,path,state):
     partial=Path(str(path)+'.partial')
     if partial.exists():partial.unlink()
@@ -66,9 +80,9 @@ def encrypt_part(ftp,entry,offset,length,path,state):
         raise
     finally:
         if connection:connection.close()
-def run(seconds=None):
-    state=json.loads(STATE.read_text());folder=Path(state['directory'])
-    with open(folder/'.worker.lock','a+b') as lock:
+@contextmanager
+def exclusive_lock(path):
+    with open(path,'a+b') as lock:
         if lock.tell()==0:lock.write(b'0');lock.flush()
         lock.seek(0)
         if os.name=='nt':
@@ -77,13 +91,19 @@ def run(seconds=None):
         else:
             import fcntl
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        _run(time.monotonic()+seconds if seconds else None)
-def _run(deadline=None):
-    state=json.loads(STATE.read_text());folder=Path(state['directory']);manifest_path=folder/'snapshot-manifest.private.json';account,_=production.credentials()
+        yield
+def run(seconds=None):
+    with exclusive_lock(STATE.with_suffix('.lock')):
+        state=json.loads(STATE.read_text());folder=Path(state['directory'])
+        with exclusive_lock(folder/'.worker.lock'):
+            _run(time.monotonic()+seconds if seconds else None,state)
+def _run(deadline=None,state=None):
+    state=state if state is not None else json.loads(STATE.read_text());folder=Path(state['directory']);manifest_path=folder/'snapshot-manifest.private.json'
     state.update(status='running',pid=os.getpid(),error_class=None);write_json(STATE,state)
-    for orphan in folder.glob('*.partial'):orphan.unlink()
     ftp=None
     try:
+        account,_=production.credentials()
+        for orphan in folder.glob('*.partial'):orphan.unlink()
         if manifest_path.exists():manifest=json.loads(manifest_path.read_text())
         else:
             with production.hosting.connect(account,'ftp.siya.ac.th') as listing:
@@ -91,9 +111,7 @@ def _run(deadline=None):
             write_json(manifest_path,manifest)
         state['files_total']=len(manifest['entries']);state['bytes_total']=sum(e['size'] for e in manifest['entries']);write_json(STATE,state)
         for index,entry in enumerate(manifest['entries']):
-            offset=sum(p['length'] for p in entry['parts'])
-            for part in entry['parts']:
-                if digest(folder/part['archive'])!=part['archive_sha256']:raise RuntimeError('Saved part integrity mismatch')
+            offset=saved_offset(entry,index,folder,state)
             if offset==entry['size'] and entry['parts']:continue
             while offset<entry['size'] or (entry['size']==0 and not entry['parts']):
                 if deadline and time.monotonic()>=deadline:
@@ -141,36 +159,44 @@ def main():
         if state['status'] in ['completed','failed','paused']:
             print(json.dumps({'stopped':True,'already_stopped':True,'status':state['status']}));return
         if pid<=0:raise RuntimeError('Worker PID unavailable')
-        command=f"$worker=Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}'; if ($worker) {{ if ($worker.CommandLine -notmatch 'offsite-snapshot.py.*run') {{ throw 'Worker identity mismatch' }}; $children=Get-CimInstance Win32_Process -Filter 'ParentProcessId = {pid}'; Stop-Process -Id {pid} -ErrorAction Stop; foreach ($child in $children) {{ Stop-Process -Id $child.ProcessId -ErrorAction SilentlyContinue }} }}"
+        command=f"$worker=Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}'; if ($worker) {{ if ($worker.CommandLine -notmatch 'offsite-snapshot.py.*(?:run|(?:start|resume).*--foreground)') {{ throw 'Worker identity mismatch' }}; $children=Get-CimInstance Win32_Process -Filter 'ParentProcessId = {pid}'; Stop-Process -Id {pid} -ErrorAction Stop; foreach ($child in $children) {{ Stop-Process -Id $child.ProcessId -ErrorAction SilentlyContinue }} }}"
         subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',command],capture_output=True,check=True)
         state=json.loads(STATE.read_text());state.update(status='failed',error_class='StoppedByOwner');write_json(STATE,state)
         print(json.dumps({'stopped':True,'verified_parts_retained':True}));return
     if args.action=='relocate':
-        state=json.loads(STATE.read_text())
-        if state['status'] not in ['failed','paused','completed']:raise RuntimeError('Stop the worker before relocating')
-        destination=production.hosting.ROOT/'backups'/Path(state['directory']).name
-        if destination.exists():raise RuntimeError('Backup destination already exists')
-        shutil.move(state['directory'],destination);state['directory']=str(destination)
-        vault=production.hosting.ROOT/'backups'/'keys'/Path(state['key_vault']).name;vault.parent.mkdir(exist_ok=True)
-        shutil.move(state['key_vault'],vault);state['key_vault']=str(vault)
-        vault.write_text(json.dumps({'key_b64':state['key_b64'],'directory':str(destination)},indent=2),encoding='utf-8');write_json(STATE,state)
-        print(json.dumps({'relocated':True,'directory':str(destination),'key_vault':str(vault)}));return
-    if args.action=='start':
+        with exclusive_lock(STATE.with_suffix('.lock')):
+            state=json.loads(STATE.read_text())
+            if state['status'] not in ['failed','paused','completed']:raise RuntimeError('Stop the worker before relocating')
+            destination=production.hosting.ROOT/'backups'/Path(state['directory']).name
+            if destination.exists():raise RuntimeError('Backup destination already exists')
+            shutil.move(state['directory'],destination);state['directory']=str(destination)
+            vault=production.hosting.ROOT/'backups'/'keys'/Path(state['key_vault']).name;vault.parent.mkdir(exist_ok=True)
+            shutil.move(state['key_vault'],vault);state['key_vault']=str(vault)
+            vault.write_text(json.dumps({'key_b64':state['key_b64'],'directory':str(destination)},indent=2),encoding='utf-8');write_json(STATE,state)
+            print(json.dumps({'relocated':True,'directory':str(destination),'key_vault':str(vault)}));return
+    with exclusive_lock(STATE.with_suffix('.lock')):
+        prepare_job(args.action)
+    if args.foreground:
+        run(args.seconds);print(json.dumps({k:v for k,v in json.loads(STATE.read_text()).items() if k!='key_b64'}));return
+    command=[os.sys.executable,str(Path(__file__).resolve()),'run']
+    if args.seconds is not None:command.extend(['--seconds',str(args.seconds)])
+    state=json.loads(STATE.read_text())
+    log=open(TEMP/'eoffice-offsite-resumable.log','ab');kwargs={'stdin':subprocess.DEVNULL,'stdout':log,'stderr':log,'close_fds':True}
+    if os.name=='nt':kwargs['creationflags']=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP
+    else:kwargs['start_new_session']=True
+    process=subprocess.Popen(command,**kwargs);log.close();print(json.dumps({'started':True,'pid':process.pid,'directory':state['directory']}))
+def prepare_job(action):
+    if action=='start':
         if STATE.exists() and json.loads(STATE.read_text())['status'] in ['starting','running']:raise RuntimeError('Backup already running')
         snapshot=json.loads((TEMP/'eoffice-production-storage-snapshot.private.json').read_text())['snapshot'];prefix='/home/siyaacth/domains/e-office.siya.ac.th/'
         if not snapshot.startswith(prefix):raise RuntimeError('Unexpected snapshot root')
         folder=production.hosting.ROOT/'backups'/('snapshot-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(4));folder.mkdir(parents=True)
         vault=production.hosting.ROOT/'backups'/'keys';vault.mkdir(exist_ok=True)
-        state={'status':'starting','snapshot':snapshot,'ftp_snapshot':'/'+snapshot[len(prefix):],'directory':str(folder),'key_b64':base64.b64encode(secrets.token_bytes(32)).decode(),'key_vault':str(vault/(folder.name+'.key.private.json')),'verified_bytes':0,'files_copied':0};write_json(STATE,state)
+        state={'status':'starting','snapshot':snapshot,'ftp_snapshot':'/'+snapshot[len(prefix):],'directory':str(folder),'key_b64':base64.b64encode(secrets.token_bytes(32)).decode(),'key_vault':str(vault/(folder.name+'.key.private.json')),'verified_bytes':0,'files_copied':0}
         Path(state['key_vault']).write_text(json.dumps({'key_b64':state['key_b64'],'directory':str(folder)},indent=2),encoding='utf-8')
+        write_json(STATE,state)
     else:
         state=json.loads(STATE.read_text())
         if state['status'] not in ['failed','paused']:raise RuntimeError('Only a stopped backup may resume')
         state['status']='starting';write_json(STATE,state)
-    if args.foreground:
-        run(args.seconds);print(json.dumps({k:v for k,v in json.loads(STATE.read_text()).items() if k!='key_b64'}));return
-    log=open(TEMP/'eoffice-offsite-resumable.log','ab');kwargs={'stdin':subprocess.DEVNULL,'stdout':log,'stderr':log,'close_fds':True}
-    if os.name=='nt':kwargs['creationflags']=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP
-    else:kwargs['start_new_session']=True
-    process=subprocess.Popen([os.sys.executable,str(Path(__file__).resolve()),'run'],**kwargs);log.close();print(json.dumps({'started':True,'pid':process.pid,'directory':state['directory']}))
 if __name__=='__main__':main()

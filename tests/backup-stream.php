@@ -25,5 +25,8 @@ try{
     file_put_contents($prefix.'.reserved.partial','other worker');
     check_backup($cli(['encrypt',$prefix.'.empty',$prefix.'.reserved'])!==0&&file_get_contents($prefix.'.reserved.partial')==='other worker','encryption preserves another worker partial');
     check_backup($cli(['decrypt',$prefix,$prefix.'.restored'])!==0&&file_get_contents($prefix.'.restored')===$data,'restore refuses existing destination');
+    file_put_contents($prefix.'.publish.partial','encrypted fixture');file_put_contents($prefix.'.publish','concurrent owner');
+    rejects_backup(static fn()=>app_backup_publish($prefix.'.publish.partial',$prefix.'.publish'),'atomic publication rejects concurrent destination');
+    check_backup(file_get_contents($prefix.'.publish')==='concurrent owner'&&file_get_contents($prefix.'.publish.partial')==='encrypted fixture','publication never replaces the competing file');
     echo "Encrypted backup: $passed passed\n";
-}finally{foreach([$prefix,$prefix.'.bad',$prefix.'.empty',$prefix.'.restored',$prefix.'.reserved.partial'] as $file)if(is_file($file))unlink($file);}
+}finally{foreach([$prefix,$prefix.'.bad',$prefix.'.empty',$prefix.'.restored',$prefix.'.reserved.partial',$prefix.'.publish.partial',$prefix.'.publish'] as $file)if(is_file($file))unlink($file);}

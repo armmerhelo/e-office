@@ -27,6 +27,10 @@ Existing production settings were preserved when the operations keys were added.
 
 Database snapshots require InnoDB tables and reject non-transactional engines. Keep schema migrations/DDL paused during capture. This format covers base-table schemas and rows; views, stored routines, triggers and DB grants must be inventoried/exported separately if introduced.
 
+The reviewed database format now writes JSONL **version 2**: non-UTF-8 cell bytes are explicitly base64-tagged, and `TIMESTAMP` values are captured/restored in UTC. The recovery tools still accept version-1 archives; those older archives do not record a DB session timezone, so use the original session timezone for recovery. Restoration preserves zero auto-increment IDs and ordinary `DEFAULT_GENERATED` timestamp columns while excluding actual computed columns. Archive encryption remains the same authenticated version-1 envelope.
+
+Archive/plaintext publication uses exclusive same-directory hard links so a concurrently created destination cannot be replaced. Filesystems used for backup and restore must support hard links; unsupported publication fails rather than falling back to an overwrite-prone rename.
+
 Local encrypted archives are stored in `backups/`. Private key vaults are in `backups/keys/`. Git ignores all contents except `backups/README.md`; staging/deployment scanners also exclude backup payloads, and HTTP access to `/backups` is denied. Preserve a protected copy of the keys on a separate device. Filesystem permissions on Windows should be restricted to the owner's account using Windows ACLs; POSIX mode bits alone do not provide that restriction.
 
 ## Hosting-panel Cron entries
@@ -90,7 +94,7 @@ For supervised runs in terminals that clean up detached processes, use bounded f
 python scripts/offsite-snapshot.py resume --foreground --seconds 600
 ```
 
-The worker stops between committed slices with status `paused` when that budget expires; repeat the command until `completed`. An exclusive per-snapshot file lock prevents two workers from writing the same backup.
+The worker stops between committed slices with status `paused` when that budget expires; repeat the command until `completed`. Exclusive job-coordination and per-snapshot file locks prevent concurrent writers from switching shared job state. Resume validates canonical slice filenames, contiguous offsets, declared lengths, archive checksums and authenticated plaintext before trusting previously saved parts.
 
 ## Recovery
 

@@ -37,7 +37,7 @@ def unpack_database(archive, key_file, destination, database=None):
                 if ended:
                     raise RuntimeError('Data after end record')
                 if not started:
-                    if kind != 'metadata' or record.get('version') != 1:
+                    if kind != 'metadata' or record.get('version') not in (1, 2):
                         raise RuntimeError('Invalid snapshot metadata')
                     started = True
                 elif kind == 'schema':

@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='offsite-transfer-',dir=temporary) as di
     print('PASS empty file authenticated and short transfer never publishes a part')
     offsite.STATE.write_text(json.dumps(state),encoding='utf-8')
     real=offsite._run
-    def competing_worker(deadline):
+    def competing_worker(deadline,state):
         try:offsite.run(1)
         except OSError:return
         raise AssertionError('Concurrent worker acquired the same backup')
@@ -69,3 +69,15 @@ with tempfile.TemporaryDirectory(prefix='offsite-transfer-',dir=temporary) as di
     try:offsite.run(1)
     finally:offsite._run=real
     print('PASS exclusive worker lock prevents concurrent writers for one snapshot')
+    canonical=folder/'000000-000000000000.ebak'
+    canonical.write_bytes((folder/'full.ebak').read_bytes())
+    saved={'size':len(source),'parts':[{'archive':canonical.name,'offset':0,'length':len(source),'archive_sha256':offsite.digest(canonical),'plaintext_sha256':part['plaintext_sha256']}]}
+    saved['parts'][0]['plaintext_sha256']=hashlib.sha256(source).hexdigest()
+    assert offsite.saved_offset(saved,0,folder,state)==len(source)
+    for field,value in [('offset',1),('length',len(source)+1),('archive','../escape.ebak'),('plaintext_sha256','0'*64)]:
+        original=saved['parts'][0][field];saved['parts'][0][field]=value
+        try:offsite.saved_offset(saved,0,folder,state)
+        except RuntimeError:pass
+        else:raise AssertionError('Invalid saved manifest accepted: '+field)
+        saved['parts'][0][field]=original
+    print('PASS resume authenticates saved bytes and rejects invalid offsets, lengths and paths')

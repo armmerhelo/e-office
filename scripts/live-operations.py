@@ -205,7 +205,7 @@ def store_backups():
 
 def verify_operations(ftp):
     import hashlib
-    names=['.htaccess','api/cron.php','config/backup-stream.php','config/database-backup.php','scripts/encrypted-file.php','scripts/backup.php','scripts/cron-health.php']
+    names=['.htaccess','api/cron.php','config/backup-stream.php','config/database-backup.php','scripts/encrypted-file.php','scripts/backup.php','scripts/cron-health.php','scripts/restore-database.php']
     mismatches=[]
     for name in names:
         if hashlib.sha256(production.hosting.retrieve(ftp,name)).digest()!=hashlib.sha256((production.hosting.ROOT/name).read_bytes()).digest():mismatches.append(name)

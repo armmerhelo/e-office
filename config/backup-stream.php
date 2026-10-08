@@ -47,6 +47,12 @@ final class AppBackupWriter {
 function app_backup_read_exact($handle,int $bytes): string {
     $result='';while(strlen($result)<$bytes){$part=fread($handle,$bytes-strlen($result));if($part===false||$part==='')throw new RuntimeException('Incomplete encrypted backup');$result.=$part;}return $result;
 }
+function app_backup_publish(string $temporary,string $output): void {
+    // Same-directory hard-link creation is atomic and never replaces a path
+    // another worker created after our initial existence check.
+    if(!@link($temporary,$output))throw new RuntimeException('Backup output exists or cannot be published');
+    if(!unlink($temporary))throw new RuntimeException('Backup temporary output cleanup failed');
+}
 function app_backup_verify(string $path,string $masterKey,?callable $emit=null): array {
     if(strlen($masterKey)!==32)throw new RuntimeException('Backup key must contain 32 bytes');
     $handle=fopen($path,'rb');if(!$handle)throw new RuntimeException('Backup input unavailable');
