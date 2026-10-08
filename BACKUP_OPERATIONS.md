@@ -116,6 +116,8 @@ python scripts/verify-offsite-database.py
 
 It uses loopback port 3307 by default (`LOCAL_TEST_DB_PORT` overrides it), creates a uniquely named test database, verifies the actual saved snapshot, then deletes the test database and plaintext. `--cleanup-stale` removes only this tool's uniquely named stale drill databases/directories after an interrupted run.
 
+The default drill selects the newest saved database archive. Use `--archive <database-archive>.ebak` to select a specific saved set. The reviewed v2 production release and its actual recovery result are recorded in [BACKUP_REVIEW.md](BACKUP_REVIEW.md#production-release-verification).
+
 ### Document snapshot
 
 After its status is `completed`:

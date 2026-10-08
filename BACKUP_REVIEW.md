@@ -19,3 +19,13 @@
 - Project PHP/JavaScript syntax and changed Python compilation checks pass.
 
 Production deployment uses a targeted rollback archive and checksum verification for server-side files. Python transfer/recovery tools are workstation utilities. Operational instructions: [BACKUP_OPERATIONS.md](BACKUP_OPERATIONS.md).
+
+## Production release verification
+
+- Runtime source commit: `0ee1544` (`fix: preserve backup data and harden recovery publication`), pushed to `origin/main`.
+- Targeted deployment: `config/backup-stream.php`, `config/database-backup.php`, `scripts/encrypted-file.php`, `scripts/restore-database.php`. Checksum verification of **8 operations files** passes with no mismatches.
+- Private rollback archive: `eoffice-production-patch-before-20261008-162352.tar.gz`, in the approved temporary directory. It contains the three previously deployed files; the fourth CLI restore tool was newly installed. SHA-256: `29fd13e7d611793d83e4133ea0241987e581ea89b892dd264a002d0ef23eb075`.
+- Production scheduler health: PHP **8.3.33 / LiteSpeed**, database reachable and backup key valid.
+- Actual production **JSONL v2** capture, verified download and isolated SQL recovery: **30 tables / 65,349 rows**, encrypted archive **2,212,098 bytes**. Temporary restored data/database were removed.
+- Saved local archive: `backups/database-20261008-092359-b166ea508c54340e.ebak`; SHA-256 `5f4b8e2bed013ffc8fb3058543145fb117e26773583ed8ddc79ae4860da0bf60`.
+- Database-drill selection now defaults to the newest saved archive and supports `--archive <filename>` so operators can verify a specific version instead of accidentally repeating the oldest backup.

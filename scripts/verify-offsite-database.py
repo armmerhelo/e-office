@@ -11,8 +11,14 @@ from pathlib import Path
 spec=importlib.util.spec_from_file_location('restore',Path(__file__).with_name('restore-backup.py'))
 restore=importlib.util.module_from_spec(spec);spec.loader.exec_module(restore)
 root=restore.ROOT/'backups'
-parser=argparse.ArgumentParser();parser.add_argument('--cleanup-stale',action='store_true');args=parser.parse_args()
-metadata=next(root.glob('database-*.metadata.private.json'))
+parser=argparse.ArgumentParser();parser.add_argument('--cleanup-stale',action='store_true');parser.add_argument('--archive',help='Optional saved database archive filename');args=parser.parse_args()
+if args.archive:
+    if Path(args.archive).name!=args.archive or not args.archive.endswith('.ebak'):raise RuntimeError('Saved archive filename required')
+    metadata=root/(args.archive+'.metadata.private.json')
+else:
+    candidates=sorted(root.glob('database-*.metadata.private.json'),reverse=True)
+    if not candidates:raise RuntimeError('No saved database archives available')
+    metadata=candidates[0]
 info=json.loads(metadata.read_text(encoding='utf-8'))
 database='eoffice_offsite_restore_'+secrets.token_hex(6)+'_test'
 directory=root/('recovery-drill-'+secrets.token_hex(6))
