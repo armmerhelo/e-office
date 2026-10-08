@@ -46,7 +46,7 @@ echo json_encode(['enabled'=>true,'eviction_enabled'=>false,'grace_days'=>14]);
 def status(ftp):
     data=invoke(ftp,"""
 require __DIR__.'/config/drive-archive.php';$pdo=app_pdo();
-$counts=$pdo->query('SELECT status,COUNT(*) versions,COALESCE(SUM(bytes),0) bytes FROM eoffice_drive_versions GROUP BY status')->fetchAll();
+$counts=$pdo->query('SELECT status,COUNT(*) versions,COALESCE(SUM(bytes),0) bytes,COALESCE(SUM(JSON_LENGTH(parts)),0) uploaded_parts FROM eoffice_drive_versions GROUP BY status')->fetchAll();
 $totals=$pdo->query("SELECT COUNT(DISTINCT d.Doc_Id) docs,COUNT(u.Doc_Upload_Id) attachments FROM t_document d LEFT JOIN t_document_upload u ON u.Doc_File_Link=d.Doc_File_Link WHERE d.Is_Delete='active'")->fetch();
 echo json_encode(['enabled'=>app_drive_archive_enabled(),'configured'=>app_drive_archive_configured(),'eviction_enabled'=>filter_var(app_env('EOFFICE_DRIVE_EVICT_ENABLED','false'),FILTER_VALIDATE_BOOLEAN),'state'=>$pdo->query('SELECT * FROM eoffice_drive_state WHERE id=1')->fetch(),'counts'=>$counts,'live_totals'=>$totals,'backups'=>$pdo->query('SELECT backup_date,status,completed_at,error_code FROM eoffice_drive_backups ORDER BY backup_date DESC LIMIT 3')->fetchAll()]);
 """)
@@ -108,7 +108,7 @@ $result=$backup;unset($result['path']);echo json_encode(['database'=>$result,'ob
     folder.joinpath(target.name+'.metadata.private.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     print(json.dumps({'cloud_database_uploaded_and_downloaded':True,'tables':metadata['tables'],'rows':metadata['rows'],'encrypted_bytes':metadata['encrypted_bytes'],'archive':str(target),'full_document_backup_completed':False}))
 def deploy_runtime(ftp):
-    root=production.hosting.ROOT;names=['config/drive-archive-client.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh']
+    root=production.hosting.ROOT;names=['config/drive-archive-client.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','assets/drive-archive-status.js']
     payload={name:subprocess.check_output(['git','show','HEAD:'+name],cwd=root) for name in names}
     archive=production.TEMP/('eoffice-drive-activation-before-'+time.strftime('%Y%m%d-%H%M%S')+'.tar.gz')
     with tarfile.open(archive,'w:gz') as out:

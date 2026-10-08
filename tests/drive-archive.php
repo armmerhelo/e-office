@@ -48,9 +48,17 @@ app_document_transaction();app_drive_archive_track($id,$name,'original',$path);$
 app_drive_archive_upload_version($olderPending,microtime(true)+30,$transport);
 drive_check(app_drive_archive_current($id,$name,'original')['id']===$newerVersion['id'],'late upload verification never overwrites a newer file-version pointer');
 $pdo->beginTransaction();try{drive_reject(static fn()=>app_drive_archive_snapshot($pdo),'consistent snapshot refuses current files still pending upload');}finally{$pdo->rollBack();}
+$pdo->beginTransaction();try{$partial=app_drive_archive_snapshot($pdo,true);drive_check(!$partial['complete_recovery_set']&&$partial['pending_files']===1,'initial snapshot explicitly reports missing current cloud versions');}finally{$pdo->rollBack();}
 $badGet=static fn(string $id):string=>'changed bytes';
 drive_reject(static fn()=>app_drive_archive_upload_version($newerVersion,microtime(true)+30,['put'=>$put,'get'=>$badGet]),'upload never verifies a version whose cloud read-back differs');
 drive_check(app_drive_archive_current($id,$name,'original')['status']==='pending','failed remote verification keeps the version pending and local source intact');
+$timezone=date_default_timezone_get();$today=date('Y-m-d');
+try{
+    foreach(['Pacific/Kiritimati','Etc/GMT+12'] as $zone){date_default_timezone_set($zone);if(date('Y-m-d')!==$today)break;}
+    $initialDaily=app_drive_archive_backup($transport);
+    drive_check($initialDaily['database_backed_up']&&!$initialDaily['complete_recovery_set']&&$initialDaily['pending_files']===1,'daily database is backed up while document synchronization is incomplete');
+    $q=$pdo->prepare('SELECT status FROM eoffice_drive_backups WHERE backup_date=?');$q->execute([date('Y-m-d')]);drive_check($q->fetchColumn()==='database_only','partial initial backup never receives completed recovery-set status');
+}finally{date_default_timezone_set($timezone);}
 echo 'Drive archive behavior: '.$passed.' passed'.PHP_EOL;
 if(getenv('EOFFICE_DRIVE_HTTP_FIXTURE')==='1'){
     app_drive_archive_restore($signedVersion,$get);

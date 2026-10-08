@@ -11,10 +11,7 @@ if(app_drive_archive_enabled()){
     catch(Throwable $e){fwrite(STDERR,'Drive worker failed ('.get_class($e).")\n");$failed=true;}
     if((int)date('G')>=2){
         try{
-            $pdo=app_pdo();$ready=(bool)$pdo->query('SELECT full_scan_at FROM eoffice_drive_state WHERE id=1')->fetchColumn();
-            $pending=(int)$pdo->query("SELECT COUNT(*) FROM eoffice_drive_files f JOIN eoffice_drive_versions v ON v.id=f.version_id WHERE v.status<>'verified'")->fetchColumn();
-            if($ready&&$pending===0)echo json_encode(['drive_daily'=>app_drive_archive_backup()],JSON_THROW_ON_ERROR).PHP_EOL;
-            else echo json_encode(['drive_daily'=>['deferred'=>true,'reason'=>'initial_sync_pending','pending_versions'=>$pending]],JSON_THROW_ON_ERROR).PHP_EOL;
+            echo json_encode(['drive_daily'=>app_drive_archive_backup()],JSON_THROW_ON_ERROR).PHP_EOL;
         }catch(Throwable $e){fwrite(STDERR,'Drive daily backup failed ('.get_class($e).")\n");$failed=true;}
     }
 }

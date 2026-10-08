@@ -38,6 +38,7 @@ try{
         }finally{fclose($out);}
         app_backup_publish($target.'.partial',$target);$count++;
     }
-    $result=['restored'=>true,'date'=>$date,'files'=>$count,'database_archive'=>$root.'/database.ebak'];
-    file_put_contents($root.'/restore-completed.json',json_encode($result,JSON_THROW_ON_ERROR));echo json_encode($result,JSON_THROW_ON_ERROR).PHP_EOL;
+    $complete=$manifest['complete_recovery_set']??true;
+    $result=['restored'=>true,'complete_recovery_set'=>$complete,'pending_files'=>$manifest['pending_files']??0,'date'=>$date,'files'=>$count,'database_archive'=>$root.'/database.ebak'];
+    file_put_contents($root.'/'.($complete?'restore-completed.json':'database-recovery-completed.json'),json_encode($result,JSON_THROW_ON_ERROR));echo json_encode($result,JSON_THROW_ON_ERROR).PHP_EOL;
 }catch(Throwable $e){fwrite(STDERR,'Drive recovery failed ('.get_class($e).'); no completion marker published'.PHP_EOL);exit(1);}
