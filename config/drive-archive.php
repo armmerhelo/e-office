@@ -76,7 +76,8 @@ function app_drive_archive_restore(array $version,?callable $get=null): string {
         try{
             $hash=hash_init('sha256');$total=0;
             foreach($parts as $part){
-                $bytes=($get??'app_drive_archive_get')($part['object']);
+                $download=$get??static fn(string $id)=>app_drive_archive_get($id,static function(){app_pdo()->query('SELECT 1')->fetchColumn();});
+                $bytes=$download($part['object']);
                 if(!is_string($bytes)||strlen($bytes)>2097152||!hash_equals($part['object'],hash('sha256',$bytes)))throw new RuntimeException('Archive object corrupted');
                 $encrypted=$temporary.'.ebak';if(file_put_contents($encrypted,$bytes)!==strlen($bytes))throw new RuntimeException('Cache write failed');chmod($encrypted,0600);unset($bytes);
                 $result=app_backup_verify($encrypted,$key,static function($plain)use($out,$hash,&$total){$total+=strlen($plain);hash_update($hash,$plain);$offset=0;while($offset<strlen($plain)){$written=fwrite($out,substr($plain,$offset));if(!$written)throw new RuntimeException('Cache write failed');$offset+=$written;}});

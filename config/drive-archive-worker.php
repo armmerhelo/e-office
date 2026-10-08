@@ -4,7 +4,8 @@ require_once __DIR__.'/database-backup.php';
 
 function app_drive_archive_upload_version(array $version,float $deadline,?array $transport=null): bool {
     if($transport!==null&&(!app_settings()['mock']||!str_ends_with(app_settings()['database'],'_test')))throw new RuntimeException('Test transports only');
-    $get=$transport['get']??'app_drive_archive_get';$put=$transport['put']??'app_drive_archive_put';$pdo=app_pdo();
+    $pdo=app_pdo();$heartbeat=static function()use($pdo):void{$pdo->query('SELECT 1')->fetchColumn();};
+    $get=$transport['get']??static fn(string $id)=>app_drive_archive_get($id,$heartbeat);$put=$transport['put']??static fn(string $bytes)=>app_drive_archive_put($bytes,$heartbeat);
     $spool=app_drive_archive_directory('spool');$source=$spool.'/'.$version['id'].'.source';$key=app_drive_archive_key($version['key_id']);
     if(!is_file($source)||filesize($source)!==(int)$version['bytes']||!hash_equals($version['revision'],hash_file('sha256',$source)))throw new RuntimeException('Archive upload source unavailable');
     $parts=json_decode($version['parts']??'[]',true,32,JSON_THROW_ON_ERROR)??[];$offset=0;
@@ -194,8 +195,10 @@ function app_drive_archive_snapshot(PDO $pdo,bool $allowInitial=false): array {
 function app_drive_archive_backup(?array $transport=null): array {
     if($transport!==null&&(!app_settings()['mock']||!str_ends_with(app_settings()['database'],'_test')))throw new RuntimeException('Test transports only');
     if(!app_drive_archive_enabled()||(!app_drive_archive_configured()&&$transport===null))return ['enabled'=>false];
-    $call=$transport['call']??'app_drive_archive_call';$put=$transport['put']??'app_drive_archive_put';$get=$transport['get']??'app_drive_archive_get';
     $pdo=app_pdo();if(!$pdo->query("SELECT GET_LOCK('eoffice:drive-daily',0)")->fetchColumn())return ['skipped'=>true];
+    $heartbeat=static function()use($pdo):void{$pdo->query('SELECT 1')->fetchColumn();};
+    $call=$transport['call']??static fn(array $payload)=>app_drive_archive_call($payload,$heartbeat);
+    $put=$transport['put']??static fn(string $bytes)=>app_drive_archive_put($bytes,$heartbeat);$get=$transport['get']??static fn(string $id)=>app_drive_archive_get($id,$heartbeat);
     $date=date('Y-m-d');
     try{
         $call(['action'=>'health']);

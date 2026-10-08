@@ -6,7 +6,7 @@ production=importlib.util.module_from_spec(spec);spec.loader.exec_module(product
 REPORT=production.hosting.ROOT/'backups'/'drive-activation.private.json'
 def invoke(ftp,body):
     key=secrets.token_hex(32)
-    source=production.php(key)+"ini_set('zend.exception_ignore_args','1');set_time_limit(300);try{\n"+body+"\n}catch(Throwable $e){echo json_encode(['operation_error'=>get_class($e),'location'=>basename($e->getFile()).':'.$e->getLine()]);}"
+    source=production.php(key)+"ini_set('zend.exception_ignore_args','1');set_time_limit(300);try{\n"+body+"\n}catch(Throwable $e){echo json_encode(['operation_error'=>get_class($e),'location'=>basename($e->getFile()).':'.$e->getLine(),'sql_state'=>$e instanceof PDOException?$e->getCode():null,'driver_code'=>$e instanceof PDOException?($e->errorInfo[1]??null):null]);}"
     result=production.invoke(ftp,source,key)
     if 'operation_error' in result:raise RuntimeError(json.dumps(result))
     return result
@@ -74,7 +74,7 @@ def cron_status(ftp):
 require __DIR__.'/config/bootstrap.php';$pdo=app_pdo();$order=$pdo->query('SELECT worker_at FROM eoffice_order_settings WHERE id=1')->fetchColumn();
 $path=dirname(app_settings()['storage']).'/order-emails.log';$lines=[];
 if(is_file($path)){$handle=fopen($path,'rb');fseek($handle,max(0,filesize($path)-8192));$text=stream_get_contents($handle);fclose($handle);foreach(explode("\\n",$text) as $line)if(str_contains($line,'drive_worker')||str_contains($line,'drive_daily')||preg_match('/^\\d+ order jobs processed$/',$line))$lines[]=trim($line);}
-echo json_encode(['server_time'=>date('c'),'order_worker_at'=>$order,'private_log_exists'=>is_file($path),'recent_scheduler_entries'=>array_slice($lines,-10),'drive_state'=>$pdo->query('SELECT * FROM eoffice_drive_state WHERE id=1')->fetch()]);
+echo json_encode(['server_time'=>date('c'),'order_worker_at'=>$order,'database_wait_timeout'=>(int)$pdo->query('SELECT @@SESSION.wait_timeout')->fetchColumn(),'private_log_exists'=>is_file($path),'recent_scheduler_entries'=>array_slice($lines,-10),'drive_state'=>$pdo->query('SELECT * FROM eoffice_drive_state WHERE id=1')->fetch()]);
 """)))
 def daily_database_check(ftp):
     folder=production.hosting.ROOT/'backups';report=folder/'drive-database-check.private.json'
@@ -108,7 +108,7 @@ $result=$backup;unset($result['path']);echo json_encode(['database'=>$result,'ob
     folder.joinpath(target.name+'.metadata.private.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     print(json.dumps({'cloud_database_uploaded_and_downloaded':True,'tables':metadata['tables'],'rows':metadata['rows'],'encrypted_bytes':metadata['encrypted_bytes'],'archive':str(target),'full_document_backup_completed':False}))
 def deploy_runtime(ftp):
-    root=production.hosting.ROOT;names=['config/drive-archive-client.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','assets/drive-archive-status.js']
+    root=production.hosting.ROOT;names=['config/drive-archive-client.php','config/drive-archive.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','assets/drive-archive-status.js']
     payload={name:subprocess.check_output(['git','show','HEAD:'+name],cwd=root) for name in names}
     archive=production.TEMP/('eoffice-drive-activation-before-'+time.strftime('%Y%m%d-%H%M%S')+'.tar.gz')
     with tarfile.open(archive,'w:gz') as out:
