@@ -55,7 +55,7 @@ function app_drive_archive_legacy_fetch(array $doc,string $name,bool $signed,flo
 }
 function app_drive_archive_scan(int $limit=10,?float $deadline=null): int {
     $pdo=app_pdo();$cursor=(int)$pdo->query('SELECT scan_doc FROM eoffice_drive_state WHERE id=1')->fetchColumn();
-    $query=$pdo->prepare("SELECT Doc_Id FROM t_document WHERE Is_Delete='active' AND Doc_Id>? ORDER BY Doc_Id LIMIT ".max(1,min(100,$limit)));$query->execute([$cursor]);$ids=$query->fetchAll(PDO::FETCH_COLUMN);
+    $query=$pdo->prepare("SELECT DISTINCT d.Doc_Id FROM t_document d JOIN t_document_upload u ON u.Doc_File_Link=d.Doc_File_Link WHERE d.Is_Delete='active' AND d.Doc_Id>? ORDER BY d.Doc_Id LIMIT ".max(1,min(100,$limit)));$query->execute([$cursor]);$ids=$query->fetchAll(PDO::FETCH_COLUMN);
     if(!$ids){$pdo->exec('UPDATE eoffice_drive_state SET scan_doc=0,full_scan_at=NOW() WHERE id=1');return 0;}
     foreach($ids as $id){
         if($deadline!==null&&microtime(true)>=$deadline)break;
