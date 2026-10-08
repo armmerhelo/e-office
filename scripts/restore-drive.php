@@ -22,8 +22,9 @@ try{
     $manifest=json_decode($manifest,true,128,JSON_THROW_ON_ERROR);$count=0;
     foreach($manifest['documents'] as $document){
         $year=$document['year'];$name=$document['name'];$variant=$document['variant'];$doc=(int)$document['doc_id'];
-        if(!preg_match('/^\d{4}$/D',$year)||$name!==basename($name)||str_contains($name,'\\')||str_contains($name,':')||$doc<=0||!in_array($variant,['original','signed'],true))throw new RuntimeException('Unsafe restore filename');
+        if(!preg_match('/^\d{4}$/D',$year)||$name===''||in_array($name,['.','..'],true)||$name!==basename($name)||str_contains($name,'\\')||str_contains($name,':')||$doc<=0||!in_array($variant,['original','signed'],true))throw new RuntimeException('Unsafe restore filename');
         $version=$manifest['versions'][$document['version']];$parts=app_drive_archive_parts($version);$fileKey=app_drive_archive_key($version['key_id']);
+        if($document['version']!==$version['id']||(int)$version['doc_id']!==$doc||$version['file_name']!==$name||$version['variant']!==$variant||app_drive_archive_id($doc,$name,$variant,$version['revision'])!==$version['id'])throw new RuntimeException('Recovery manifest identity mismatch');
         $directory=$root.'/file_document/'.($variant==='signed'?'e-sign':'original').'/'.$year;if(!is_dir($directory)&&!mkdir($directory,0700,true))throw new RuntimeException('Restore directory unavailable');
         $target=$directory.'/'.($variant==='signed'?'signed_'.$doc.'_':'').$name;
         if(is_file($target)){if(hash_file('sha256',$target)===$version['revision'])continue;throw new RuntimeException('Conflicting recovery identity');}

@@ -139,6 +139,8 @@ Verified live:
 
 The 120-second hosting DB idle timeout required SQL keepalive between bounded Google requests, preserving advisory locks through uploads/retries. Read-only cloud fetches use the same keepalive. Regression tests cover fresh retry nonces, redirect confinement, keepalive calls, cloud corruption, initial database-only snapshots and concurrent replacements; archive behavior now has **24 passing checks**, plus HTTP/Apps Script tests.
 
+The subsequent [live archive review](DRIVE_ARCHIVE_REVIEW.md) adds per-version retry/backoff and investigation status, authenticated slice verification checkpoints, cache-independent pre-eviction verification and daily snapshot pairing checks. The reviewed behavior suite has 44 passing checks. Admin status shows deferred retry count/time and versions needing investigation; source files remain retained when verification fails.
+
 Initial synchronization is asynchronous and continues through the server Cron. Monitor `/management/drive_archive.html` for the first complete scan, upload backlog and eventual `completed` daily recovery set. Do not enable eviction until that full set has a successful recovery drill and the grace/age requirements are met. No active documents currently fall before 2567; the configured year policy therefore retains the current dataset locally even after verification.
 
 Repeat a dated private checkpoint drill from this workstation:

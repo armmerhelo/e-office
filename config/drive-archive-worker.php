@@ -8,12 +8,22 @@ function app_drive_archive_upload_version(array $version,float $deadline,?array 
     $get=$transport['get']??static fn(string $id)=>app_drive_archive_get($id,$heartbeat);$put=$transport['put']??static fn(string $bytes)=>app_drive_archive_put($bytes,$heartbeat);
     $spool=app_drive_archive_directory('spool');$source=$spool.'/'.$version['id'].'.source';$key=app_drive_archive_key($version['key_id']);
     if(!is_file($source)||filesize($source)!==(int)$version['bytes']||!hash_equals($version['revision'],hash_file('sha256',$source)))throw new RuntimeException('Archive upload source unavailable');
-    $parts=json_decode($version['parts']??'[]',true,32,JSON_THROW_ON_ERROR)??[];$offset=0;
-    foreach($parts as $part){if(($part['offset']??null)!==$offset||!is_int($part['bytes']??null)||$part['bytes']<0||$part['bytes']>1048576||!preg_match('/^[a-f0-9]{64}$/',$part['object']??'')||!preg_match('/^[a-f0-9]{64}$/',$part['sha256']??''))throw new RuntimeException('Upload offset mismatch');$offset+=$part['bytes'];}
-    if($offset>(int)$version['bytes'])throw new RuntimeException('Upload manifest exceeds source');
+    $saved=$version;$saved['parts']=$version['parts']??'[]';$parts=app_drive_archive_parts($saved,true);$offset=0;
     $in=fopen($source,'rb');if(!$in)throw new RuntimeException('Archive upload source unavailable');
     try{
-        if(fseek($in,$offset)!==0)throw new RuntimeException('Archive source seek failed');
+        // Upgrade old checkpoints by authenticating their remote bytes. Persist
+        // each successful check so a resumed large file does not start over.
+        foreach($parts as $index=>$part){
+            $plain=app_backup_read_exact($in,$part['bytes']);
+            if(!hash_equals($part['sha256'],hash('sha256',$plain)))throw new RuntimeException('Saved part differs from source');
+            if(($part['readback_verified']??false)!==true){
+                if(microtime(true)>=$deadline)return false;
+                app_drive_archive_verify_slice($get($part['object']),$part,$key);
+                $parts[$index]['readback_verified']=true;
+                $pdo->prepare('UPDATE eoffice_drive_versions SET parts=? WHERE id=?')->execute([json_encode($parts,JSON_THROW_ON_ERROR),$version['id']]);
+            }
+            $offset+=$part['bytes'];
+        }
         while($offset<(int)$version['bytes']||!$parts){
             if(microtime(true)>=$deadline)return false;
             $length=min(1048576,(int)$version['bytes']-$offset);$plain=app_backup_read_exact($in,$length);
@@ -25,20 +35,52 @@ function app_drive_archive_upload_version(array $version,float $deadline,?array 
             $verification=app_backup_verify($encrypted,$key);
             if($verification['bytes']!==$length||$verification['sha256']!==hash('sha256',$plain))throw new RuntimeException('Spool part mismatch');unset($plain);
             $cipher=file_get_contents($encrypted);$object=$put($cipher);
-            if(!is_string($object)||!hash_equals(hash('sha256',$cipher),$object))throw new RuntimeException('Upload object mismatch');unset($cipher);
-            $parts[]=['offset'=>$offset,'bytes'=>$length,'sha256'=>$verification['sha256'],'object'=>$object];$offset+=$length;
+            if(!is_string($object)||!hash_equals(hash('sha256',$cipher),$object))throw new RuntimeException('Upload object mismatch');
+            $part=['offset'=>$offset,'bytes'=>$length,'sha256'=>$verification['sha256'],'object'=>$object];
+            $remote=$get($object);if($remote!==$cipher)throw new RuntimeException('Remote encrypted part differs');
+            app_drive_archive_verify_slice($remote,$part,$key);unset($cipher,$remote);
+            $part['readback_verified']=true;$parts[]=$part;$offset+=$length;
             $pdo->prepare('UPDATE eoffice_drive_versions SET parts=? WHERE id=?')->execute([json_encode($parts,JSON_THROW_ON_ERROR),$version['id']]);
             if($length===0)break;
         }
     }finally{fclose($in);}
-    // Read back and authenticate the complete remote file before allowing local
-    // eviction. A provider success response alone is not sufficient.
+    // Every slice is authenticated before its checkpoint commit. Validate the
+    // complete manifest/source without trusting a pre-existing plaintext cache.
     $candidate=$version;$candidate['parts']=json_encode($parts,JSON_THROW_ON_ERROR);$candidate['status']='verified';
-    app_drive_archive_restore($candidate,$transport['get']??null);
-    $pdo->prepare("UPDATE eoffice_drive_versions SET status='verified',verified_at=NOW() WHERE id=?")->execute([$version['id']]);
+    app_drive_archive_parts($candidate);
+    if(!hash_equals($version['revision'],hash_file('sha256',$source)))throw new RuntimeException('Archive source changed during upload');
+    $pdo->prepare("UPDATE eoffice_drive_versions SET status='verified',verified_at=NOW(),retry_at=NULL,attempts=0,error_code=NULL WHERE id=?")->execute([$version['id']]);
     if(is_file($source))unlink($source);
     foreach(glob($spool.'/'.$version['id'].'.*.ebak')?:[] as $part)unlink($part);
     return true;
+}
+function app_drive_archive_verify_slice(string $cipher,array $part,string $key): void {
+    if(strlen($cipher)>2097152||!hash_equals($part['object'],hash('sha256',$cipher)))throw new RuntimeException('Remote ciphertext mismatch');
+    $temporary=app_drive_archive_directory('spool').'/verify-'.bin2hex(random_bytes(16)).'.ebak';
+    try{
+        if(file_put_contents($temporary,$cipher)!==strlen($cipher))throw new RuntimeException('Verification staging failed');chmod($temporary,0600);
+        $result=app_backup_verify($temporary,$key);
+        if($result['bytes']!==$part['bytes']||!hash_equals($part['sha256'],$result['sha256']))throw new RuntimeException('Remote plaintext mismatch');
+    }finally{if(is_file($temporary))unlink($temporary);}
+}
+function app_drive_archive_upload_batch(float $deadline,?array $transport=null): array {
+    if($transport!==null&&(!app_settings()['mock']||!str_ends_with(app_settings()['database'],'_test')))throw new RuntimeException('Test transports only');
+    $pdo=app_pdo();$uploaded=0;$retry=0;$review=0;
+    $versions=$pdo->query("SELECT * FROM eoffice_drive_versions WHERE status='pending' AND (retry_at IS NULL OR retry_at<=NOW()) ORDER BY attempts,created_at,id LIMIT 20")->fetchAll();
+    foreach($versions as $version){
+        if(microtime(true)>=$deadline)break;
+        try{
+            if(app_drive_archive_upload_version($version,$deadline,$transport)){$uploaded++;$pdo->exec('UPDATE eoffice_drive_state SET uploaded=uploaded+1 WHERE id=1');}
+        }catch(AppDriveArchiveRetry $e){
+            $attempt=(int)($version['attempts']??0)+1;$delay=min(21600,300*(2**min(6,$attempt-1)));
+            $pdo->prepare("UPDATE eoffice_drive_versions SET attempts=?,retry_at=?,error_code='cloud_retry_pending' WHERE id=? AND status='pending'")->execute([$attempt,date('Y-m-d H:i:s',time()+$delay),$version['id']]);$retry++;
+        }catch(PDOException $e){throw $e;}
+        catch(Throwable $e){
+            // Broken source/key/manifest/ciphertext needs investigation, not an
+            // endless FIFO retry that blocks every later attachment.
+            $pdo->prepare("UPDATE eoffice_drive_versions SET status='review',retry_at=NULL,error_code='verification_failed' WHERE id=? AND status='pending'")->execute([$version['id']]);$review++;
+        }
+    }return ['uploaded'=>$uploaded,'retry_pending'=>$retry,'review_required'=>$review];
 }
 function app_drive_archive_legacy_fetch(array $doc,string $name,bool $signed,float $deadline,?int &$http=null): ?string {
     if($name!==basename($name)||str_contains($name,'\\')||!preg_match('/^\d{4}$/D',(string)$doc['Doc_Year']))throw new RuntimeException('Invalid legacy archive identity');
@@ -110,10 +152,9 @@ function app_drive_archive_evict(array $version,?array $transport=null): bool {
         $manifest=json_decode($backup['manifest'],true,64,JSON_THROW_ON_ERROR);if(!isset($manifest['versions'][$version['id']]))return false;
     $grace=max(7,(int)app_env('EOFFICE_DRIVE_EVICT_GRACE_DAYS','14'));
     if(!$version['verified_at']||strtotime($version['verified_at'])>time()-$grace*86400)return false;
-    // Force a new remote read-back, not a cached successful read, before deletion.
-    $cacheRoot=app_drive_archive_directory('cache');$cache=$cacheRoot.'/'.$version['id'].'.plain';$cacheLock=fopen($cacheRoot.'/'.$version['id'].'.lock','c+b');if(!$cacheLock||!flock($cacheLock,LOCK_EX))throw new RuntimeException('Archive cache lock unavailable');
-    try{if(is_file($cache))unlink($cache);}finally{flock($cacheLock,LOCK_UN);fclose($cacheLock);}
-    app_drive_archive_restore($version,$transport['get']??null);
+    // Holding the cache lock inside restore prevents a concurrent reader from
+    // repopulating the cache and bypassing fresh remote verification.
+    app_drive_archive_restore($version,$transport['get']??null,true);
     $fileLock=app_document_file_lock((int)$version['doc_id']);
     app_document_transaction();$quarantine=null;$local=null;
     try{
@@ -152,8 +193,7 @@ function app_drive_archive_worker(int $seconds=90,?array $transport=null): array
             $scanDeadline=min($deadline,microtime(true)+max(2,$seconds*0.35));
             app_drive_archive_scan(max(1,min(100,(int)app_env('EOFFICE_DRIVE_SCAN_BATCH','100'))),$scanDeadline);
         }
-        $versions=$pdo->query("SELECT * FROM eoffice_drive_versions WHERE status='pending' ORDER BY created_at,id LIMIT 20")->fetchAll();
-        foreach($versions as $version){if(microtime(true)>=$deadline)break;if(app_drive_archive_upload_version($version,$deadline,$transport)){$uploaded++;$pdo->exec('UPDATE eoffice_drive_state SET uploaded=uploaded+1 WHERE id=1');}}
+        $batch=app_drive_archive_upload_batch($deadline,$transport);$uploaded=$batch['uploaded'];
         $q=$pdo->prepare("SELECT v.* FROM eoffice_drive_files f JOIN eoffice_drive_versions v ON v.id=f.version_id JOIN t_document d ON d.Doc_Id=f.doc_id WHERE v.status='verified' AND v.evicted_at IS NULL AND d.Is_Delete='active' AND CAST(d.Doc_Year AS UNSIGNED)<? AND v.verified_at<DATE_SUB(NOW(),INTERVAL ".max(7,(int)app_env('EOFFICE_DRIVE_EVICT_GRACE_DAYS','14'))." DAY) ORDER BY v.verified_at LIMIT 20");$q->execute([(int)date('Y')+543-2]);$versions=$q->fetchAll();
         foreach($versions as $version){if(microtime(true)>=$deadline)break;if(app_drive_archive_evict($version,$transport))$evicted++;}
         $quarantine=app_drive_archive_directory('quarantine');
@@ -164,13 +204,20 @@ function app_drive_archive_worker(int $seconds=90,?array $transport=null): array
             try{
                 $q=$pdo->prepare('SELECT * FROM t_document WHERE Doc_Id=? FOR UPDATE');$q->execute([$version['doc_id']]);$doc=$q->fetch();
                 if($doc){$current=app_drive_archive_current((int)$doc['Doc_Id'],$version['file_name'],$version['variant']);$local=app_drive_archive_local($doc,$version['file_name'],$version['variant']);
-                    if($current&&$current['id']===$id&&!is_file($local)&&hash_equals($version['revision'],hash_file('sha256',$path)))rename($path,$local);
+                    if($current&&$current['id']===$id&&hash_equals($version['revision'],hash_file('sha256',$path))){
+                        if(!is_file($local))app_backup_publish($path,$local);
+                        elseif(hash_equals($version['revision'],hash_file('sha256',$local))&&!unlink($path))throw new RuntimeException('Duplicate quarantine cleanup failed');
+                    }
                 }$pdo->commit();
             }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
         }
         $referenced=array_fill_keys($pdo->query('SELECT id FROM eoffice_drive_versions')->fetchAll(PDO::FETCH_COLUMN),true);
         foreach(glob(app_drive_archive_directory('spool').'/*.source')?:[] as $path){$id=basename($path,'.source');if(filemtime($path)<time()-86400&&!isset($referenced[$id]))unlink($path);}
-        return ['enabled'=>true,'uploaded'=>$uploaded,'evicted'=>$evicted,'cache_removed'=>app_drive_archive_cache_sweep()];
+        $pendingRetry=(int)$pdo->query("SELECT COUNT(*) FROM eoffice_drive_versions WHERE status='pending' AND retry_at IS NOT NULL")->fetchColumn();
+        $pendingReview=(int)$pdo->query("SELECT COUNT(*) FROM eoffice_drive_versions WHERE status='review'")->fetchColumn();
+        $code=$pendingReview?'verification_review_required':($pendingRetry?'cloud_retry_pending':null);
+        $pdo->prepare('UPDATE eoffice_drive_state SET error_code=? WHERE id=1')->execute([$code]);
+        return ['enabled'=>true,'uploaded'=>$uploaded,'evicted'=>$evicted,'retry_pending'=>$pendingRetry,'review_required'=>$pendingReview,'cache_removed'=>app_drive_archive_cache_sweep()];
     }catch(AppDriveArchiveRetry $e){
         if($pdo->inTransaction())$pdo->rollBack();$pdo->exec("UPDATE eoffice_drive_state SET error_code='cloud_retry_pending' WHERE id=1");
         return ['enabled'=>true,'uploaded'=>$uploaded,'evicted'=>$evicted,'retry_pending'=>true,'error_code'=>'cloud_retry_pending'];
@@ -185,14 +232,17 @@ function app_drive_archive_snapshot(PDO $pdo,bool $allowInitial=false): array {
     foreach($files as $file){
         foreach(['original','signed'] as $variant){
             $q=$pdo->prepare('SELECT v.* FROM eoffice_drive_files f JOIN eoffice_drive_versions v ON v.id=f.version_id WHERE f.doc_id=? AND f.file_name=? AND f.variant=?');$q->execute([$file['Doc_Id'],$file['Doc_Upload_Path'],$variant]);$version=$q->fetch();
-            if(!$version&&$variant==='signed'){
-                $q=$pdo->prepare('SELECT revision FROM eoffice_signed_files WHERE Doc_Id=? AND file_name=?');$q->execute([$file['Doc_Id'],$file['Doc_Upload_Path']]);if(!$q->fetchColumn())continue;
+            $expectedSigned=null;
+            if($variant==='signed'){
+                $q=$pdo->prepare('SELECT revision FROM eoffice_signed_files WHERE Doc_Id=? AND file_name=?');$q->execute([$file['Doc_Id'],$file['Doc_Upload_Path']]);$expectedSigned=$q->fetchColumn()?:null;
+                if(!$version&&!$expectedSigned&&!is_file(app_drive_archive_local($file,$file['Doc_Upload_Path'],'signed')))continue;
             }
-            if(!$version||$version['status']!=='verified'){
+            if(!$version||$version['status']!=='verified'||($expectedSigned&&!hash_equals($expectedSigned,$version['revision']))){
                 if(!$allowInitial)throw new RuntimeException('Snapshot references files not verified on Drive');
                 $manifest['pending_files']++;$manifest['complete_recovery_set']=false;continue;
             }
             app_drive_archive_parts($version);
+            if(app_drive_archive_id((int)$file['Doc_Id'],$file['Doc_Upload_Path'],$variant,$version['revision'])!==$version['id'])throw new RuntimeException('Snapshot version identity mismatch');
             $manifest['versions'][$version['id']]=$version;
             $manifest['documents'][]=['doc_id'=>(int)$file['Doc_Id'],'year'=>$file['Doc_Year'],'name'=>$file['Doc_Upload_Path'],'variant'=>$variant,'version'=>$version['id']];
         }
@@ -219,10 +269,19 @@ function app_drive_archive_backup(?array $transport=null): array {
         // Both envelopes are retained as per-run archives. Upload ciphertext
         // pieces by content hash; interrupted retry simply reuses known objects.
         $spool=app_drive_archive_directory('spool');$file=$spool.'/daily-'.$date.'.ebak';
+        $manifestPlain=json_encode($manifest,JSON_THROW_ON_ERROR);$manifestKey=app_drive_archive_key($manifest['key_id']);
+        if(is_file($file)){
+            $checked=app_backup_verify($file,$manifestKey);
+            if($checked['encoding']!=='eoffice-drive-manifest'||$checked['bytes']!==strlen($manifestPlain)||!hash_equals($checked['sha256'],hash('sha256',$manifestPlain)))throw new RuntimeException('Daily manifest does not match captured snapshot');
+        }
         if(!is_file($file)){
             if(is_file($file.'.partial'))unlink($file.'.partial');
-            $writer=new AppBackupWriter($file.'.partial',app_drive_archive_key($manifest['key_id']),'eoffice-drive-manifest');$writer->write(json_encode($manifest,JSON_THROW_ON_ERROR));$writer->finish();unset($writer);app_backup_publish($file.'.partial',$file);
+            $writer=new AppBackupWriter($file.'.partial',$manifestKey,'eoffice-drive-manifest');$writer->write($manifestPlain);$writer->finish();unset($writer);app_backup_publish($file.'.partial',$file);
         }
+        unset($manifestPlain);
+        if(!is_file($manifest['database']['path'])||!hash_equals($manifest['database']['archive_sha256'],hash_file('sha256',$manifest['database']['path'])))throw new RuntimeException('Daily database archive differs from captured snapshot');
+        $databaseVerification=app_backup_verify($manifest['database']['path'],$manifestKey);
+        if(!hash_equals($manifest['database']['stream_sha256'],$databaseVerification['sha256']))throw new RuntimeException('Daily database plaintext differs from captured snapshot');
         $objects=[];
         foreach(['database'=>$manifest['database']['path'],'manifest'=>$file] as $label=>$source){
             $objects[$label]=['sha256'=>hash_file('sha256',$source),'bytes'=>filesize($source),'parts'=>[]];$handle=fopen($source,'rb');

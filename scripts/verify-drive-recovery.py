@@ -42,7 +42,9 @@ def host_recovery(date,directory,env):
             version=manifest['versions'][document['version']]
             if version['key_id']!=key_id:raise RuntimeError('Historical recovery key required')
             name=document['name'];year=document['year'];variant=document['variant']
-            if Path(name).name!=name or '\\' in name or ':' in name or not re.fullmatch(r'\d{4}',year) or variant not in ['original','signed']:raise RuntimeError('Unsafe recovery path')
+            if not name or name in ['.','..'] or Path(name).name!=name or '\\' in name or ':' in name or not re.fullmatch(r'\d{4}',year) or variant not in ['original','signed']:raise RuntimeError('Unsafe recovery path')
+            expected=hashlib.sha256((str(document['doc_id'])+'\0'+name+'\0'+variant+'\0'+version['revision']).encode()).hexdigest()
+            if document['version']!=version['id'] or int(version['doc_id'])!=int(document['doc_id']) or version['file_name']!=name or version['variant']!=variant or expected!=version['id']:raise RuntimeError('Cloud recovery identity mismatch')
             relative=Path('e-sign' if variant=='signed' else 'original')/year/(('signed_'+str(document['doc_id'])+'_')+name if variant=='signed' else name)
             target=directory/'file_document'/relative;target.parent.mkdir(parents=True,exist_ok=True)
             if target.exists():

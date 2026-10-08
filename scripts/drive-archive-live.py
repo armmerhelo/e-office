@@ -108,7 +108,7 @@ $result=$backup;unset($result['path']);echo json_encode(['database'=>$result,'ob
     folder.joinpath(target.name+'.metadata.private.json').write_text(json.dumps(metadata,indent=2),encoding='utf-8')
     print(json.dumps({'cloud_database_uploaded_and_downloaded':True,'tables':metadata['tables'],'rows':metadata['rows'],'encrypted_bytes':metadata['encrypted_bytes'],'archive':str(target),'full_document_backup_completed':False}))
 def deploy_runtime(ftp):
-    root=production.hosting.ROOT;names=['config/drive-archive-client.php','config/drive-archive.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','assets/drive-archive-status.js']
+    root=production.hosting.ROOT;names=['config/drive-archive-schema.php','config/drive-archive-client.php','config/drive-archive.php','config/drive-archive-worker.php','scripts/scheduled-jobs.php','scripts/order-cron.sh','scripts/restore-drive.php','scripts/drive-archive.php','api/drive_archive_status.php','assets/drive-archive-status.js']
     payload={name:subprocess.check_output(['git','show','HEAD:'+name],cwd=root) for name in names}
     archive=production.TEMP/('eoffice-drive-activation-before-'+time.strftime('%Y%m%d-%H%M%S')+'.tar.gz')
     with tarfile.open(archive,'w:gz') as out:
@@ -119,6 +119,9 @@ def deploy_runtime(ftp):
     for name,body in payload.items():
         temporary=name+'.upload-'+secrets.token_hex(6);ftp.storbinary('STOR '+temporary,io.BytesIO(body));ftp.rename(temporary,name)
         if hashlib.sha256(production.hosting.retrieve(ftp,name)).digest()!=hashlib.sha256(body).digest():raise RuntimeError('Runtime checksum mismatch')
+        if name=='config/drive-archive-schema.php':
+            migrated=invoke(ftp,"require __DIR__.'/config/drive-archive-schema.php';require __DIR__.'/config/bootstrap.php';app_drive_archive_migrate(app_pdo());echo json_encode(['retry_schema_migrated'=>true]);")
+            if not migrated.get('retry_schema_migrated'):raise RuntimeError('Retry schema migration failed')
     print(json.dumps({'runtime_files_verified':len(names),'rollback_archive':str(archive),'rollback_sha256':hashlib.sha256(archive.read_bytes()).hexdigest()}))
 def probe(ftp):
     print(json.dumps(invoke(ftp,"""

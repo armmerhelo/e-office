@@ -59,6 +59,7 @@ try{
     drive_check($initialDaily['database_backed_up']&&!$initialDaily['complete_recovery_set']&&$initialDaily['pending_files']===1,'daily database is backed up while document synchronization is incomplete');
     $q=$pdo->prepare('SELECT status FROM eoffice_drive_backups WHERE backup_date=?');$q->execute([date('Y-m-d')]);drive_check($q->fetchColumn()==='database_only','partial initial backup never receives completed recovery-set status');
 }finally{date_default_timezone_set($timezone);}
+require __DIR__.'/drive-review.php';
 echo 'Drive archive behavior: '.$passed.' passed'.PHP_EOL;
 if(getenv('EOFFICE_DRIVE_HTTP_FIXTURE')==='1'){
     app_drive_archive_restore($signedVersion,$get);

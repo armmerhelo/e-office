@@ -53,25 +53,25 @@ function app_drive_archive_local(array $doc,string $name,string $variant): strin
     $modern=app_storage('e-sign',$year,'signed_'.$doc['Doc_Id'].'_'.$name);$legacy=app_storage('e-sign',$year,'signed_'.$name);
     return is_file($modern)?$modern:(is_file($legacy)?$legacy:$modern);
 }
-function app_drive_archive_parts(array $version): array {
+function app_drive_archive_parts(array $version,bool $partial=false): array {
     $parts=json_decode($version['parts']??'null',true,32,JSON_THROW_ON_ERROR);
-    if(!is_array($parts)||!array_is_list($parts)||!$parts)throw new RuntimeException('Archive parts unavailable');
+    if(!is_array($parts)||!array_is_list($parts)||(!$parts&&!$partial)||(int)$version['bytes']<0)throw new RuntimeException('Archive parts unavailable');
     $offset=0;foreach($parts as $part){
-        if(!is_array($part)||($part['offset']??null)!==$offset||!is_int($part['bytes']??null)||$part['bytes']<0||$part['bytes']>1048576||($part['bytes']===0&&count($parts)!==1)||!preg_match('/^[a-f0-9]{64}$/',$part['object']??'')||!preg_match('/^[a-f0-9]{64}$/',$part['sha256']??''))throw new RuntimeException('Invalid archive part manifest');
+        if(!is_array($part)||($part['offset']??null)!==$offset||!is_int($part['bytes']??null)||$part['bytes']<0||$part['bytes']>1048576||($part['bytes']===0&&(count($parts)!==1||(int)$version['bytes']!==0))||!preg_match('/^[a-f0-9]{64}$/',$part['object']??'')||!preg_match('/^[a-f0-9]{64}$/',$part['sha256']??''))throw new RuntimeException('Invalid archive part manifest');
         $offset+=$part['bytes'];
     }
-    if($offset!==(int)$version['bytes'])throw new RuntimeException('Archive manifest size mismatch');return $parts;
+    if($offset>(int)$version['bytes']||(!$partial&&$offset!==(int)$version['bytes']))throw new RuntimeException('Archive manifest size mismatch');return $parts;
 }
-function app_drive_archive_restore(array $version,?callable $get=null): string {
+function app_drive_archive_restore(array $version,?callable $get=null,bool $forceRemote=false): string {
     if($version['status']!=='verified'||!preg_match('/^[a-f0-9]{64}$/',$version['id']))throw new RuntimeException('Verified archive required');
     if($get!==null&&(!app_settings()['mock']||!str_ends_with(app_settings()['database'],'_test')))throw new RuntimeException('Test transports only');
     $key=app_drive_archive_key($version['key_id']);$parts=app_drive_archive_parts($version);$cache=app_drive_archive_directory('cache');$path=$cache.'/'.$version['id'].'.plain';
     $lock=fopen($cache.'/'.$version['id'].'.lock','c+b');if(!$lock||!flock($lock,LOCK_EX))throw new RuntimeException('Archive cache lock unavailable');
     try{
-        if(is_file($path)&&filesize($path)===(int)$version['bytes']&&hash_equals($version['revision'],hash_file('sha256',$path))){touch($path);return $path;}
+        if(!$forceRemote&&is_file($path)&&filesize($path)===(int)$version['bytes']&&hash_equals($version['revision'],hash_file('sha256',$path))){touch($path);return $path;}
         $existing=app_pdo()->inTransaction();
         if($existing)throw new RuntimeException('Archive cache must be prepared before locking document');
-        if(is_file($path))unlink($path);
+        if(!$forceRemote&&is_file($path)&&!unlink($path))throw new RuntimeException('Archive cache replacement failed');
         $temporary=$path.'.'.bin2hex(random_bytes(8)).'.partial';$out=fopen($temporary,'xb');if(!$out)throw new RuntimeException('Archive cache unavailable');chmod($temporary,0600);
         $encrypted=null;
         try{
@@ -86,7 +86,9 @@ function app_drive_archive_restore(array $version,?callable $get=null): string {
                 unlink($encrypted);$encrypted=null;
             }
             if($total!==(int)$version['bytes']||!hash_equals($version['revision'],hash_final($hash))||!fflush($out))throw new RuntimeException('Archive file integrity mismatch');
-            fclose($out);$out=null;app_backup_publish($temporary,$path);return $path;
+            fclose($out);$out=null;
+            if(is_file($path)&&!unlink($path))throw new RuntimeException('Archive cache replacement failed');
+            app_backup_publish($temporary,$path);return $path;
         }finally{if(is_resource($out))fclose($out);if(is_file($temporary))unlink($temporary);if($encrypted&&is_file($encrypted))unlink($encrypted);}
     }finally{flock($lock,LOCK_UN);fclose($lock);}
 }
