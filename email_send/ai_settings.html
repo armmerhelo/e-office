@@ -1,7 +1,78 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ตั้งค่า AI และอีเมลคำสั่ง</title><link rel="stylesheet" href="order-email.css"></head>
-<body><main class="settings"><header><h1>ตั้งค่า AI และอีเมลคำสั่ง</h1><a href="doc_send_email.html">กลับหน้าติดตาม</a></header><p>สำหรับ Admin สูงสุด · Gemini วิเคราะห์ PDF ส่วนอีเมลส่งผ่าน SMTP ที่ตั้งไว้บนเซิร์ฟเวอร์</p><p id="message" role="status" aria-live="polite"></p><form id="settings-form" class="card">
-<p id="summary" class="summary"></p><label>Gemini API key ใหม่<input id="api-key" type="password" maxlength="512" autocomplete="new-password" placeholder="เว้นว่างเพื่อคง key ปัจจุบัน"></label><label class="check"><input id="clear-key" type="checkbox">ล้าง API key (ต้องหยุดส่งอัตโนมัติ)</label>
-<label>AI model<input id="model" maxlength="150" required list="models" placeholder="ชื่อโมเดล Gemini"><datalist id="models"></datalist></label><div class="actions"><button id="load-models" type="button">โหลดรายชื่อโมเดล</button><button id="test-ai" type="button">ทดสอบ key และโมเดล</button></div>
-<label class="check"><input id="enabled" type="checkbox">เปิดส่งอีเมลคำสั่งอัตโนมัติ</label><p class="muted">การเปิดครั้งแรกเริ่มเฉพาะคำสั่งที่สร้างใหม่หลังเปิดใช้ คำสั่งเก่าต้องนำเข้าคิวเอง การหยุดชั่วคราวจะเก็บงานค้างไว้ให้ทำต่อ</p><button id="save" type="submit">บันทึกการตั้งค่า</button>
-</form><section class="card"><h2>การทำงานเบื้องหลัง</h2><p>ตั้ง cron บนเซิร์ฟเวอร์ให้เรียก <code>php scripts/order-emails.php</code> ทุก 5 นาที ด้วย PHP CLI และค่าตั้งค่าเดียวกับเว็บไซต์ หน้านี้แสดงเวลา worker ล่าสุดเพื่อช่วยตรวจสอบการทำงาน</p><p class="muted">การบันทึก API key ผ่านหน้าเว็บต้องตั้ง <code>EOFFICE_SETTINGS_KEY</code> ฝั่งเซิร์ฟเวอร์ก่อน ดูขั้นตอนใน ORDER_EMAILS.md</p></section></main><script src="order-ui.js"></script><script src="ai-settings.js"></script></body></html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ตั้งค่า AI และอีเมลคำสั่ง · E-Office</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="order-email.css">
+    <link rel="stylesheet" href="order-dashboard.css">
+    <link rel="stylesheet" href="ai-settings.css">
+</head>
+<body class="order-dashboard ai-settings-page">
+<main>
+    <header class="page-header">
+        <div class="header-title"><span class="header-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v6c0 4 8 9 8 9s8-5 8-9V6l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span><div><p class="eyebrow">E-OFFICE · สำหรับ Admin สูงสุด</p><h1>ตั้งค่า AI และอีเมลคำสั่ง</h1><p>เชื่อมต่อ Gemini เพื่ออ่าน PDF และจัดการการส่งอีเมลอัตโนมัติ</p></div></div>
+        <a class="settings-link" href="doc_send_email.html">← กลับหน้าติดตามคำสั่ง</a>
+    </header>
+
+    <section id="summary" class="settings-summary" aria-label="การตั้งค่าที่บันทึกไว้" aria-busy="true">
+        <article class="card status-card"><span class="field-label">การส่งอัตโนมัติ</span><p id="saved-delivery">กำลังโหลด…</p><span id="saved-delivery-note" class="muted">สถานะที่บันทึกไว้</span></article>
+        <article class="card status-card"><span class="field-label">Gemini API key</span><p id="saved-key">—</p><span id="saved-key-source" class="muted">ระบบไม่แสดง key ที่บันทึกไว้</span></article>
+        <article class="card status-card"><span class="field-label">การเข้ารหัส API key</span><p id="saved-encryption">—</p><span id="saved-encryption-note" class="muted">สำหรับบันทึก key ผ่านหน้านี้</span></article>
+        <article class="card status-card"><span class="field-label">รอบทำงานล่าสุด (Cron)</span><p id="saved-worker">—</p><span class="muted">เวลาที่ระบบเบื้องหลังทำงานล่าสุด</span></article>
+    </section>
+
+    <p id="message" class="feedback" role="status" aria-live="polite"></p>
+    <section id="load-error" class="card load-error" hidden><h2>ยังไม่สามารถโหลดการตั้งค่าได้</h2><p>ตรวจสอบการเชื่อมต่อและเข้าสู่ระบบด้วยบัญชี Admin สูงสุด แล้วลองอีกครั้ง</p><button id="retry-load" class="button-secondary" type="button">ลองโหลดอีกครั้ง</button></section>
+
+    <div class="settings-layout">
+        <form id="settings-form" aria-busy="true">
+            <fieldset id="settings-fields" disabled>
+                <section class="card config-card" aria-labelledby="connection-title">
+                    <div class="config-heading"><span class="step-number" aria-hidden="true">1</span><div><h2 id="connection-title">เชื่อมต่อ AI</h2><p class="muted">กำหนด API key และโมเดลสำหรับวิเคราะห์เอกสาร PDF</p></div><span class="provider-tag">Gemini</span></div>
+                    <div class="config-content">
+                        <label for="api-key">Gemini API key ใหม่ <span class="optional">ไม่จำเป็น หากมี key แล้ว</span></label>
+                        <div class="key-input"><input id="api-key" type="password" maxlength="512" autocomplete="new-password" spellcheck="false" placeholder="เว้นว่างเพื่อใช้ key ปัจจุบัน" aria-describedby="key-help"><button id="show-key" class="button-secondary" type="button" aria-controls="api-key" aria-pressed="false" disabled>แสดง</button></div>
+                        <p id="key-help" class="field-help">ใส่ค่าเฉพาะเมื่อต้องการเปลี่ยน key ระบบจะไม่แสดง key เดิมที่บันทึกไว้</p>
+                        <p id="encryption-notice" class="inline-notice" hidden>เซิร์ฟเวอร์ยังไม่พร้อมบันทึก API key ผ่านหน้าเว็บ ให้ผู้ดูแลตั้ง EOFFICE_SETTINGS_KEY ก่อน คุณยังแก้ไขโมเดลและหยุดการส่งได้</p>
+
+                        <div class="model-heading"><label for="model">ชื่อโมเดลที่ใช้</label><button id="load-models" class="button-secondary" type="button">โหลดรายชื่อโมเดล</button></div>
+                        <input id="model" maxlength="150" required list="models" placeholder="เช่น gemini-2.5-flash" spellcheck="false" aria-describedby="model-help">
+                        <datalist id="models"></datalist>
+                        <p id="model-help" class="field-help">พิมพ์ชื่อโมเดล หรือโหลดรายการจาก Gemini แล้วเลือกด้านล่าง</p>
+                        <div id="model-picker" hidden><label for="model-options">เลือกจากโมเดลที่โหลดได้</label><select id="model-options"><option value="">เลือกโมเดล…</option></select></div>
+                        <p id="models-message" class="field-help" role="status" aria-live="polite"></p>
+
+                        <div class="test-panel"><div><h3>ตรวจสอบการเชื่อมต่อ</h3><p>ทดสอบ key และโมเดลด้วย PDF ตัวอย่าง ใช้ค่าที่กรอกอยู่โดยยังไม่บันทึก</p></div><button id="test-ai" class="button-secondary" type="button">ทดสอบ AI</button><p id="test-result" class="test-result" role="status" aria-live="polite">ยังไม่ได้ทดสอบค่าชุดนี้</p></div>
+                    </div>
+                </section>
+
+                <section class="card config-card" aria-labelledby="delivery-title">
+                    <div class="config-heading"><span class="step-number" aria-hidden="true">2</span><div><h2 id="delivery-title">การส่งอีเมลอัตโนมัติ</h2><p class="muted">ระบบส่งอีเมลผ่าน SMTP ที่ตั้งไว้บนเซิร์ฟเวอร์</p></div></div>
+                    <div class="config-content">
+                        <label class="delivery-toggle" for="enabled"><span><strong>เปิดส่งอีเมลคำสั่งอัตโนมัติ</strong><span id="delivery-preview" class="muted">กำลังโหลดสถานะ…</span></span><input id="enabled" type="checkbox" role="switch" aria-describedby="delivery-help"><span class="switch-track" aria-hidden="true"></span></label>
+                        <p id="delivery-help" class="field-help">การเปลี่ยนสวิตช์มีผลเมื่อกด “บันทึกการตั้งค่า” เท่านั้น</p>
+                        <div class="delivery-notes"><p><strong>เปิดครั้งแรก</strong> เฉพาะคำสั่งใหม่หลังเปิดใช้จะเข้าคิวอัตโนมัติ คำสั่งเก่าต้องนำเข้าคิวเอง</p><p><strong>หยุดชั่วคราว</strong> เก็บงานค้างไว้ เมื่อเปิดอีกครั้งระบบจะทำงานต่อ</p></div>
+                        <p class="activation-info">เปิดใช้งานครั้งแรก <strong id="activation-date">—</strong></p>
+                    </div>
+                </section>
+
+                <details class="card advanced-card"><summary>จัดการ API key เพิ่มเติม</summary><div><label class="clear-key-label" for="clear-key"><input id="clear-key" type="checkbox"><span><strong>ล้าง API key ที่ใช้งานอยู่</strong><span class="muted">เมื่อเลือก ระบบจะปิดสวิตช์การส่งอัตโนมัติให้ บันทึกเพื่อยืนยันการล้าง key</span></span></label><p class="field-help">หากต้องการเปลี่ยน key ให้กรอก key ใหม่ในส่วนเชื่อมต่อ AI โดยไม่ต้องล้างก่อน</p></div></details>
+            </fieldset>
+            <div class="save-bar"><div><p id="save-state" role="status" aria-live="polite">กำลังโหลดการตั้งค่า…</p><p id="save-help" class="muted">การทดสอบ AI ไม่ได้บันทึกค่าลงระบบ</p></div><button id="save" type="submit" disabled>บันทึกการตั้งค่า</button></div>
+        </form>
+
+        <aside class="settings-sidebar">
+            <section class="card guide-card"><h2>เริ่มใช้งานใน 3 ขั้นตอน</h2><ol><li><strong>กำหนด key และโมเดล</strong><p>ใช้ key ปัจจุบัน หรือใส่ key ใหม่</p></li><li><strong>ทดสอบการเชื่อมต่อ AI</strong><p>ตรวจว่าโมเดลอ่าน PDF และคืนผลได้</p></li><li><strong>เปิดส่งและบันทึก</strong><p>คำสั่งจะถูกประมวลผลในรอบทำงานถัดไป</p></li></ol><div class="guide-note">การทดสอบใช้เอกสารตัวอย่าง ไม่ส่งคำสั่งจริงและไม่ส่งอีเมลถึงบุคลากร</div></section>
+            <section class="card guide-card"><h2>ระบบทำงานอย่างไร</h2><div class="workflow"><span>อ่าน PDF ทุกไฟล์</span><span aria-hidden="true">↓</span><span>รวมรายชื่อผู้รับ</span><span aria-hidden="true">↓</span><span>ส่งอีเมลผ่าน SMTP</span></div><p class="field-help">Gemini ใช้วิเคราะห์เอกสาร ส่วนเซิร์ฟเวอร์เป็นผู้ส่งอีเมลตามรอบ Cron</p></section>
+            <details class="card server-guide"><summary>คู่มือสำหรับผู้ดูแลเซิร์ฟเวอร์</summary><div><p>ตั้ง Cron ให้เรียกคำสั่งนี้ทุก 5 นาที ด้วย PHP CLI และค่าตั้งค่าเดียวกับเว็บไซต์</p><code>php scripts/order-emails.php</code><p>หากไม่พบรอบทำงานล่าสุด ให้ตรวจ Cron และบันทึกการทำงานบนเซิร์ฟเวอร์</p><p>การบันทึก key ผ่านหน้าเว็บต้องตั้ง <code>EOFFICE_SETTINGS_KEY</code> ก่อน ดูขั้นตอนใน <strong>ORDER_EMAILS.md</strong></p></div></details>
+        </aside>
+    </div>
+</main>
+<script src="order-ui.js"></script>
+<script src="ai-settings.js"></script>
+</body>
+</html>
