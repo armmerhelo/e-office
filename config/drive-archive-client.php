@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/bootstrap.php';
+class AppDriveArchiveRetry extends RuntimeException {}
 
 function app_drive_archive_configured(): bool {
     return (string)app_env('EOFFICE_DRIVE_ARCHIVE_URL')!==''&&preg_match('/^[a-f0-9]{64}$/',(string)app_env('EOFFICE_DRIVE_ARCHIVE_SECRET'))===1;
@@ -17,7 +18,7 @@ function app_drive_archive_call(array $payload,?callable $heartbeat=null): array
       $request=json_encode(['route'=>'eoffice-archive-v1','timestamp'=>$timestamp,'nonce'=>$nonce,'payload'=>$encoded,'signature'=>hash_hmac('sha256',$timestamp."\n".$nonce."\n".$encoded,$secret)],JSON_THROW_ON_ERROR);
       for($redirect=0;$redirect<3;$redirect++){
         if($heartbeat)$heartbeat();
-        $remaining=(int)ceil($deadline-microtime(true));if($remaining<=0)throw new RuntimeException('Drive archive request deadline exceeded');
+        $remaining=(int)ceil($deadline-microtime(true));if($remaining<=0)throw new AppDriveArchiveRetry('Drive archive request deadline exceeded');
         $location='';$body='';$ch=curl_init($url);
         curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>false,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>min(10,$remaining),CURLOPT_TIMEOUT=>min(45,$remaining),CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,
             CURLOPT_PROTOCOLS=>CURLPROTO_HTTPS,CURLOPT_HTTPHEADER=>['Content-Type: application/json'],
@@ -25,7 +26,7 @@ function app_drive_archive_call(array $payload,?callable $heartbeat=null): array
             CURLOPT_WRITEFUNCTION=>static function($ch,$bytes)use(&$body){if(strlen($body)+strlen($bytes)>3*1024*1024)return 0;$body.=$bytes;return strlen($bytes);}]);
         if($redirect===0)curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>$request]);
         $ok=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_RESPONSE_CODE);curl_close($ch);
-        if($ok===false){if($attempt<2)break;throw new RuntimeException('Drive archive transport unavailable');}
+        if($ok===false){if($attempt<2)break;throw new AppDriveArchiveRetry('Drive archive transport unavailable');}
         if(in_array($status,[302,303],true)){
             $target=parse_url($location);
             // ContentService can expire/redirect its one-time response back to
@@ -43,7 +44,7 @@ function app_drive_archive_call(array $payload,?callable $heartbeat=null): array
       }
       if($attempt<2)usleep(250000*($attempt+1));
     }
-    throw new RuntimeException('Drive archive response unavailable after retries');
+    throw new AppDriveArchiveRetry('Drive archive response unavailable after retries');
 }
 function app_drive_archive_put(string $bytes,?callable $heartbeat=null): string {
     $object=hash('sha256',$bytes);$data=app_drive_archive_call(['action'=>'put','object'=>$object,'data'=>base64_encode($bytes)],$heartbeat);

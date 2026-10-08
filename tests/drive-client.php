@@ -28,3 +28,7 @@ foreach(['https://accounts.google.com/signin','https://example.com/','https://sc
  if(!$rejected||count($GLOBALS['requests'])!==2)throw new RuntimeException('Unexpected redirect accepted');
 }
 echo "PASS auth/untrusted/other-deployment redirects rejected without following them\n";
+$GLOBALS['requests']=[];$GLOBALS['responses']=array_fill(0,3,['status'=>503,'body'=>'temporary']);$deferred=false;
+try{DriveClientFixture\app_drive_archive_call(['action'=>'health']);}catch(DriveClientFixture\AppDriveArchiveRetry $e){$deferred=true;}
+if(!$deferred||count($GLOBALS['requests'])!==3)throw new RuntimeException('Transient failure was not classified for the next scheduled retry');
+echo "PASS transient provider failures defer safely after bounded retries\n";

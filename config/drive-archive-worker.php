@@ -168,6 +168,9 @@ function app_drive_archive_worker(int $seconds=90,?array $transport=null): array
         $referenced=array_fill_keys($pdo->query('SELECT id FROM eoffice_drive_versions')->fetchAll(PDO::FETCH_COLUMN),true);
         foreach(glob(app_drive_archive_directory('spool').'/*.source')?:[] as $path){$id=basename($path,'.source');if(filemtime($path)<time()-86400&&!isset($referenced[$id]))unlink($path);}
         return ['enabled'=>true,'uploaded'=>$uploaded,'evicted'=>$evicted,'cache_removed'=>app_drive_archive_cache_sweep()];
+    }catch(AppDriveArchiveRetry $e){
+        if($pdo->inTransaction())$pdo->rollBack();$pdo->exec("UPDATE eoffice_drive_state SET error_code='cloud_retry_pending' WHERE id=1");
+        return ['enabled'=>true,'uploaded'=>$uploaded,'evicted'=>$evicted,'retry_pending'=>true,'error_code'=>'cloud_retry_pending'];
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();$pdo->exec("UPDATE eoffice_drive_state SET error_code='worker_failed' WHERE id=1");throw $e;}
     finally{$pdo->query("SELECT RELEASE_LOCK('eoffice:drive-archive')");}
 }
@@ -201,9 +204,9 @@ function app_drive_archive_backup(?array $transport=null): array {
     $put=$transport['put']??static fn(string $bytes)=>app_drive_archive_put($bytes,$heartbeat);$get=$transport['get']??static fn(string $id)=>app_drive_archive_get($id,$heartbeat);
     $date=date('Y-m-d');
     try{
-        $call(['action'=>'health']);
         $q=$pdo->prepare('SELECT * FROM eoffice_drive_backups WHERE backup_date=?');$q->execute([$date]);$run=$q->fetch();
         if($run&&in_array($run['status'],['completed','database_only'],true))return ['already_completed'=>true,'date'=>$date,'complete_recovery_set'=>$run['status']==='completed'];
+        $call(['action'=>'health']);
         $pdo->prepare("INSERT IGNORE INTO eoffice_drive_backups (backup_date) VALUES (?)")->execute([$date]);
         if(!$run||!$run['manifest']){
             $backup=app_database_backup(static fn(PDO $pdo)=>app_drive_archive_snapshot($pdo,true));if(!($backup['created']??false))return ['skipped'=>true];

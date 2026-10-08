@@ -12,7 +12,7 @@
                 line('Worker ล่าสุด: '+(data.state?.worker_at||'ยังไม่ทำงาน'));line('สแกนครบครั้งแรก: '+(data.state?.full_scan_at||'ยังไม่ครบ'));
                 for(const count of data.counts||[])line(count.status+': '+count.files+' เวอร์ชัน / '+Number(count.bytes).toLocaleString()+' bytes');
                 for(const run of data.backups||[])line(run.backup_date+' — '+(run.status==='database_only'?'สำรองฐานข้อมูลแล้ว / เอกสารยังซิงก์ไม่ครบ':run.status)+(run.error_code?' / '+run.error_code:''),runs);
-                if(data.state?.error_code)line('พบข้อผิดพลาด: '+data.state.error_code);
+                if(data.state?.error_code)line(data.state.error_code==='cloud_retry_pending'?'Google ตอบชั่วคราวไม่สำเร็จ — จะทำต่อในรอบ Cron ถัดไป':'พบข้อผิดพลาด: '+data.state.error_code);
             }
             message.textContent='ตรวจสถานะแล้ว';
         }catch(error){message.textContent=error.message;}
