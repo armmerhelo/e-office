@@ -5,8 +5,9 @@ const php = process.env.PHP_BIN || 'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64
 const port = Number(process.env.DEV_PORT || 80);
 const database = process.env.TEST_DATABASE || 'eoffice_review_test';
 if (!database.endsWith('_test')) throw Error('Only *_test databases may be served by this command');
-const env = {...process.env, DB_DATABASE:database, APP_URL:`http://localhost${port === 80 ? '' : ':' + port}`,
-    EOFFICE_MOCK_SERVICES:'true', EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode','eoffice-test-storage')};
+const {prepareTestMemberKey} = require('./test-member-key.cjs');
+const env = prepareTestMemberKey({...process.env, DB_DATABASE:database, APP_URL:`http://localhost${port === 80 ? '' : ':' + port}`,
+    EOFFICE_MOCK_SERVICES:'true', EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode','eoffice-test-storage')}, {php});
 const seed = cp.spawnSync(php, ['tests/seed.php'], {env,encoding:'utf8'});
 if (seed.status !== 0) throw Error(seed.stdout + seed.stderr);
 env.EOFFICE_TEST_AI_RECIPIENTS = JSON.stringify([JSON.parse(seed.stdout).users.recipient]);

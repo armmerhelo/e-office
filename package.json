@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "main": "OneSignalSDKWorker.js",
   "scripts": {
-    "test": "node tests/check-syntax.cjs && node tests/order-email-ui.cjs && node tests/check-staged.cjs && node tests/amss-links.cjs && node tests/google-auth.cjs && node tests/google-signup.cjs && node tests/member-permissions.cjs && node tests/member-ui.cjs && node tests/sign-routing.cjs && node tests/sign-stamp-ui.cjs && node tests/sign-concurrency.cjs && node tests/integration.cjs && node tests/document-races.cjs && node tests/notification-queue.cjs && node tests/order-emails.cjs && node tests/backup-ops.cjs",
+    "test": "node tests/check-syntax.cjs && node tests/order-email-ui.cjs && node tests/check-staged.cjs && node tests/amss-links.cjs && node tests/google-auth.cjs && node tests/google-signup.cjs && node tests/member-key-setup.cjs && python tests/staging-member-key.py && python tests/staging-dependency-plan.py && node tests/member-version.cjs && node tests/member-permissions.cjs && node tests/member-ui.cjs && node tests/sign-routing.cjs && node tests/sign-stamp-ui.cjs && node tests/sign-concurrency.cjs && node tests/integration.cjs && node tests/document-races.cjs && node tests/notification-queue.cjs && node tests/order-emails.cjs && node tests/backup-ops.cjs",
     "test:syntax": "node tests/check-syntax.cjs",
     "test:integration": "node tests/integration.cjs",
-    "test:members": "node tests/member-permissions.cjs && node tests/member-ui.cjs",
+    "test:members": "node tests/member-key-setup.cjs && python tests/staging-member-key.py && python tests/staging-dependency-plan.py && node tests/member-version.cjs && node tests/member-permissions.cjs && node tests/member-ui.cjs",
     "test:order-ui": "node tests/order-email-ui.cjs",
     "test:sign-routing": "node tests/sign-routing.cjs && node tests/sign-stamp-ui.cjs && node tests/sign-concurrency.cjs",
     "test:races": "node tests/document-races.cjs",

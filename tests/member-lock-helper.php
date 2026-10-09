@@ -3,6 +3,9 @@ if(PHP_SAPI!=='cli')exit;
 require __DIR__.'/../config/bootstrap.php';
 if(!preg_match('/^eoffice_members_\d+_test$/D',app_settings()['database'])||!app_settings()['mock'])throw new RuntimeException('Member fixture only');
 $pdo=app_pdo();$action=$argv[1]??'';$id=(int)($argv[2]??0);
+if($action==='legacy-password'){
+    $pdo->prepare('UPDATE t_user SET User_Password=? WHERE User_Id=?')->execute([' Review-Legacy-2026! ',$id]);exit;
+}
 if($action==='waits'){
     $q=$pdo->prepare("SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.data_locks l ON l.ENGINE_LOCK_ID=w.REQUESTING_ENGINE_LOCK_ID WHERE l.OBJECT_SCHEMA=? AND l.OBJECT_NAME='t_user'");
     $q->execute([app_settings()['database']]);echo $q->fetchColumn();exit;

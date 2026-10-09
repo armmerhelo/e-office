@@ -3,10 +3,11 @@ const cp = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 const php = process.env.PHP_BIN || 'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const port = Number(process.env.SIGN_ROUTING_TEST_PORT || 8094), base = `http://localhost:${port}`;
 const storage = path.join(os.tmpdir(), 'opencode', `eoffice-sign-routing-${process.pid}`);
-const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_STORAGE:storage, EOFFICE_SIGN_ROUTES:'{"2":3}'};
+const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64'), EOFFICE_STORAGE:storage, EOFFICE_SIGN_ROUTES:'{"2":3}'};
 let server, users, created = false, passed = 0;
 function fixture(action, file = 'tests/sign-routing-fixture.php') {
     const result = cp.spawnSync(php, [file, action], {env, encoding:'utf8'});

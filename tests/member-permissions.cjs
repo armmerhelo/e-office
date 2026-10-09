@@ -1,9 +1,10 @@
 const assert = require('node:assert/strict');
 const cp = require('node:child_process');
+const crypto = require('node:crypto');
 const php = process.env.PHP_BIN || 'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const port = Number(process.env.MEMBER_TEST_PORT || 8091);
 const base = `http://localhost:${port}`;
-const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true'};
+const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64')};
 let servers = [], users, passed = 0, created = false;
 const lockers = new Set();
 function fixture(action) {
@@ -129,6 +130,23 @@ async function run() {
         const list=await request('/management/get_users_api.php?search=Staff');
         assert.equal(list.data[0].User_Name,'Staff renamed');
         assert.deepEqual(list.data[0].permissions,['email']);
+    });
+    await test('password reset invalidates a snapshot but a fresh version saves successfully',async()=>{
+        const created=await request('/management/new_user_api.php',{body:form({User_name:'Password version fixture',User_Email:'password-version@example.test',User_Status:'User',User_password1:'Member-Test-2026!',User_password2:'Member-Test-2026!'})});
+        const id=created.user_id;
+        helper('legacy-password',id);
+        const before=await request('/management/get_user_departments_api.php?User_Id='+id,{as:'manager'});
+        const offline=crypto.createHash('sha256').update(JSON.stringify([id,before.user.User_Name,before.user.User_Email,before.user.User_Status,' Review-Legacy-2026! ',[]])).digest('hex');
+        assert.notEqual(before.member_version,offline,'API version must not be an offline legacy password oracle');
+        const old={User_Id:id,User_name:before.user.User_Name,User_Email:before.user.User_Email,member_version:before.member_version};
+        await request('/management/update_user_api.php',{body:form({...old,member_version:offline}),status:409});
+        await request('/management/update_user_api.php',{body:form({...old,User_password1:'Changed-Member-2026!',User_password2:'Changed-Member-2026!'})});
+        await request('/management/update_user_api.php',{body:form({...old,User_name:'Stale after password reset'}),status:409});
+        const fresh=await request('/management/get_user_departments_api.php?User_Id='+id);assert.notEqual(fresh.member_version,old.member_version);
+        const otherWorker=await request('/management/get_user_departments_api.php?User_Id='+id,{worker:1});
+        assert.equal(otherWorker.member_version,fresh.member_version);
+        await request('/management/update_user_api.php',{body:form({...old,member_version:fresh.member_version,User_name:'Fresh password version'})});
+        await request('/management/delete_user_api.php',{body:form({User_Id:id})});
     });
     await test('revoking all grants blocks existing sessions on the next request',async()=>{
         await grant('manager',[]);

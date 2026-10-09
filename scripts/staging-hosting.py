@@ -6,6 +6,7 @@ import argparse
 import ftplib
 import io
 import json
+import posixpath
 import re
 import ssl
 import tempfile
@@ -163,11 +164,133 @@ def deployment_files():
             yield name,path.read_bytes()
 
 
+_STATIC_PHP_INCLUDE=re.compile(r"\b(?:require|include)(?:_once)?\s*(?:\(\s*)?__DIR__\s*\.\s*(['\"])([^'\"]+)\1")
+
+
+def sync_dependency_plan(ftp, selected, available):
+    """Return PHP inputs dependency-first, rejecting missing dependencies before writes."""
+    order=[];visited=set();active=[];sources={}
+
+    def visit(name):
+        if name in visited:return
+        if name in active:raise RuntimeError('PHP include cycle in staging update: '+' -> '.join(active+[name]))
+        active.append(name)
+        content=available.get(name)
+        if content is None:
+            # Some runtime files are intentionally not shipped by the source
+            # filter. Include their contents in the closure check as well.
+            try:content=retrieve(ftp,name)
+            except ftplib.error_perm as error:
+                if str(error).startswith('550'):
+                    raise RuntimeError('Staging sync is missing required PHP dependency: '+name) from None
+                raise
+        sources[name]=content
+        for match in (_STATIC_PHP_INCLUDE.finditer(content.decode('utf-8',errors='replace')) if name.endswith('.php') else []):
+            # PHP commonly spells a __DIR__-relative path as __DIR__ . '/file';
+            # the leading slash is a separator here, not an absolute path root.
+            relative=match.group(2).lstrip('/')
+            dependency=posixpath.normpath(posixpath.join(posixpath.dirname(name),relative))
+            if dependency in ('.','..') or dependency.startswith('../') or dependency.startswith('/'):
+                raise RuntimeError('Invalid PHP dependency path in staging update: '+name)
+            visit(dependency)
+        active.pop();visited.add(name);order.append(name)
+
+    for name in sorted(selected):visit(name)
+    return [(name,sources[name]) for name in order if name in available]
+
+
+def configure_staging(ftp, database, metadata, *, key_only=False):
+    """Provision the private key before publishing code; preserve it on redeploy."""
+    if metadata.get('database')!='siyaacth_eoffice_test' or metadata.get('database_host')!='localhost':
+        raise RuntimeError('Staging database verification failed')
+    private_dir=metadata['document_root'].rsplit('/',1)[0]+'/private/file_document'
+    settings={'DB_HOST':'localhost','DB_PORT':'3306','DB_DATABASE':database['database'],'DB_USERNAME':database['user'],'DB_PASSWORD':database['password'],'APP_URL':'https://e-office-test.siya.ac.th','EOFFICE_MOCK_SERVICES':'true','EOFFICE_REMOTE_FILES':'false','EOFFICE_SIGN_ROUTES':'{}','EOFFICE_STORAGE':private_dir}
+    ensure_dir(ftp,'config')
+    key=secrets.token_hex(32)
+    source=protected_php(key)+"""
+ini_set('display_errors','0');
+$path=__DIR__.'/config/local.php';
+$lock=fopen($path.'.member-key.lock','c');
+if(!$lock||!chmod($path.'.member-key.lock',0600)||!flock($lock,LOCK_EX))throw new RuntimeException('Staging member-key setup lock unavailable');
+try{
+if(function_exists('opcache_invalidate'))opcache_invalidate($path,true);
+$before=is_file($path)?require $path:[];
+if(!is_array($before))throw new RuntimeException('Invalid existing staging configuration');
+if(!empty($before['DB_DATABASE'])&&$before['DB_DATABASE']!=='siyaacth_eoffice_test')throw new RuntimeException('Unexpected existing staging database');
+$keyOnly=__KEY_ONLY__;
+$overrides=__SETTINGS__;$settings=$keyOnly?$before:array_replace($before,$overrides);
+// Keep both configured keys, including an existing encryption key. The runtime
+// environment has the same precedence as app_env, even when explicitly empty.
+$resolve=static function($name)use($settings){$value=getenv($name);return $value!==false?$value:($settings[$name]??'');};
+if($keyOnly&&($resolve('DB_DATABASE')!=='siyaacth_eoffice_test'||!filter_var($resolve('EOFFICE_MOCK_SERVICES'),FILTER_VALIDATE_BOOLEAN)))throw new RuntimeException('Targeted sync requires an existing isolated staging configuration; run deploy first');
+$encoded=$resolve('EOFFICE_MEMBER_VERSION_KEY');
+if($encoded==='')$encoded=$resolve('EOFFICE_SETTINGS_KEY');
+$generated=false;
+if($encoded===''){
+    // An empty dedicated environment override would mask the private file.
+    if(getenv('EOFFICE_MEMBER_VERSION_KEY')!==false)throw new RuntimeException('Empty member key environment override masks staging config');
+    $settings['EOFFICE_MEMBER_VERSION_KEY']=base64_encode(random_bytes(32));$encoded=$settings['EOFFICE_MEMBER_VERSION_KEY'];$generated=true;
+}
+if(!is_string($encoded)||($bytes=base64_decode($encoded,true))===false||strlen($bytes)!==32)throw new RuntimeException('Invalid staging member-version key');
+$code="<?php\nreturn ".var_export($settings,true).";\n";
+$temporary=$path.'.upload-'.bin2hex(random_bytes(12));
+try{
+    if(file_put_contents($temporary,$code,LOCK_EX)!==strlen($code)||!chmod($temporary,0600))throw new RuntimeException('Private staging config write failed');
+    if(!rename($temporary,$path))throw new RuntimeException('Private staging config publication failed');
+    if(function_exists('opcache_invalidate'))opcache_invalidate($path,true);
+}finally{if(is_file($temporary))unlink($temporary);}
+echo json_encode(['member_version_key_ready'=>true,'member_version_key_generated'=>$generated,'existing_private_settings_preserved'=>true]);
+}finally{flock($lock,LOCK_UN);fclose($lock);}
+""".replace('__SETTINGS__',php_value(settings)).replace('__KEY_ONLY__','true' if key_only else 'false')
+    result=invoke_probe(ftp,source,key)
+    if result.get('member_version_key_ready') is not True:
+        raise RuntimeError('Staging member-version key provisioning failed')
+    return result
+
+
+def verify_member_key(ftp, *, require_runtime=True):
+    key=secrets.token_hex(32)
+    source=protected_php(key)+"""
+ini_set('display_errors','0');
+$path=__DIR__.'/config/local.php';
+if(function_exists('opcache_invalidate'))opcache_invalidate($path,true);
+$settings=is_file($path)?require $path:[];
+if(!is_array($settings))throw new RuntimeException('Invalid staging configuration');
+$resolve=static function($name)use($settings){$value=getenv($name);return $value!==false?$value:($settings[$name]??'');};
+if($resolve('DB_DATABASE')!=='siyaacth_eoffice_test'||!filter_var($resolve('EOFFICE_MOCK_SERVICES'),FILTER_VALIDATE_BOOLEAN))throw new RuntimeException('Unexpected member-key verification target');
+$encoded=$resolve('EOFFICE_MEMBER_VERSION_KEY');if($encoded==='')$encoded=$resolve('EOFFICE_SETTINGS_KEY');
+if(!is_string($encoded)||($master=base64_decode($encoded,true))===false||strlen($master)!==32)throw new RuntimeException('Invalid staging member-version key');
+// Older staging runtimes can safely sync unrelated assets without a member
+// upgrade. Do not call a function that has not been deployed yet.
+$helper=__DIR__.'/config/member-management.php';
+if(is_file($helper)){
+    if(function_exists('opcache_invalidate')){
+        opcache_invalidate(__DIR__.'/config/bootstrap.php',true);
+        opcache_invalidate($helper,true);
+    }
+    require_once $helper;
+}
+$available=function_exists('app_member_version_key');
+if($available){
+    $derived=hash_hmac('sha256','eoffice:member-version:v1',$master,true);
+    if(!hash_equals($derived,app_member_version_key()))throw new RuntimeException('Member runtime key does not match private configuration');
+}
+echo json_encode(['member_version_key_ready'=>true,'member_hmac_runtime_available'=>$available]);
+"""
+    result=invoke_probe(ftp,source,key)
+    if result.get('member_version_key_ready') is not True:raise RuntimeError('Staging member-version runtime check failed')
+    if require_runtime and result.get('member_hmac_runtime_available') is not True:
+        raise RuntimeError('Staging member HMAC runtime is missing; include config/member-management.php and its dependencies before publishing')
+    return result
+
+
 def deploy(ftp, database):
     metadata=probe(ftp,database)
     if metadata.get('database')!='siyaacth_eoffice_test' or metadata.get('database_host')!='localhost':raise RuntimeError('Staging database verification failed')
     print(json.dumps(backup(ftp)))
     print(json.dumps(database_backup(ftp,database)))
+    print(json.dumps(configure_staging(ftp,database,metadata)))
+    print(json.dumps(verify_member_key(ftp,require_runtime=False)))
     files=list(deployment_files())
     # Upload application first, root rules last. Each file is renamed atomically.
     files.sort(key=lambda item:(item[0]=='.htaccess',item[0]))
@@ -179,10 +302,7 @@ def deploy(ftp, database):
         ftp.rename(temporary,name)
         if (index+1)%30==0:print(json.dumps({'uploaded':index+1,'total':len(files)}),flush=True)
     private_dir=metadata['document_root'].rsplit('/',1)[0]+'/private/file_document'
-    settings={'DB_HOST':'localhost','DB_PORT':'3306','DB_DATABASE':database['database'],'DB_USERNAME':database['user'],'DB_PASSWORD':database['password'],'APP_URL':'https://e-office-test.siya.ac.th','EOFFICE_MOCK_SERVICES':'true','EOFFICE_REMOTE_FILES':'false','EOFFICE_SIGN_ROUTES':'{}','EOFFICE_STORAGE':private_dir}
-    local='<?php\nreturn '+php_value(settings)+';\n'
-    ftp.storbinary('STOR config/local.php',io.BytesIO(local.encode('utf-8')))
-    ftp.sendcmd('SITE CHMOD 600 config/local.php')
+    print(json.dumps(verify_member_key(ftp)))
     print(json.dumps({'uploaded':len(files),'storage':private_dir,'mock_services':True,'config':'config/local.php'}),flush=True)
     key=secrets.token_hex(32)
     source=protected_php(key)+"""
@@ -308,22 +428,29 @@ def main():
             return
         if args.action=='sync':
             selected=set(args.files or [])
-            available={name for name,_ in deployment_files()}
+            files=dict(deployment_files())
+            available=set(files)
             if selected-available:raise RuntimeError('Unknown deployment file paths')
-            for name,content in deployment_files():
-                if selected and name not in selected:continue
+            publish=selected or available
+            # Complete and validate the dependency closure before modifying the
+            # private config, application files, or release manifest.
+            plan=sync_dependency_plan(ftp,publish,files)
+            # Sync is an application-code update, even without --files. Only a
+            # full deploy may replace the site's standard runtime settings.
+            print(json.dumps(configure_staging(ftp,database,probe(ftp,database),key_only=True)))
+            before=verify_member_key(ftp,require_runtime=False)
+            print(json.dumps(before))
+            require_runtime=not selected or 'config/member-management.php' in {name for name,_ in plan} or before.get('member_hmac_runtime_available') is True
+            for name,content in plan:
                 if '/' in name:ensure_dir(ftp,name.rsplit('/',1)[0])
                 temporary=name+'.upload-'+secrets.token_hex(6)
                 ftp.storbinary('STOR '+temporary,io.BytesIO(content))
                 ftp.rename(temporary,name)
-            local=retrieve(ftp,'config/local.php').decode('utf-8')
-            if 'EOFFICE_SIGN_ROUTES' not in local:
-                local=local.rstrip().removesuffix(';')+" + ['EOFFICE_SIGN_ROUTES' => '{}'];\n"
-                ftp.storbinary('STOR config/local.php',io.BytesIO(local.encode('utf-8')))
+            print(json.dumps(verify_member_key(ftp,require_runtime=require_runtime)))
             if selected:
                 manifest=json.loads(retrieve(ftp,'config/staging-manifest.json').decode('utf-8'))
                 manifest['updated_at']=time.strftime('%Y-%m-%dT%H:%M:%S')
-                for name in selected:manifest['files'][name]=hashlib.sha256(retrieve(ftp,name)).hexdigest()
+                for name,_ in plan:manifest['files'][name]=hashlib.sha256(retrieve(ftp,name)).hexdigest()
             else:
                 manifest={'deployed_at':time.strftime('%Y-%m-%dT%H:%M:%S'),'files':{name:hashlib.sha256(retrieve(ftp,name)).hexdigest() for name,_ in deployment_files()}}
             ftp.storbinary('STOR config/staging-manifest.json',io.BytesIO(json.dumps(manifest).encode()))

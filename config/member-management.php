@@ -46,12 +46,25 @@ function app_member_departments(PDO $pdo, int $id): array {
     return $q->fetchAll();
 }
 
+function app_member_version_key(): string {
+    $encoded = (string)app_env('EOFFICE_MEMBER_VERSION_KEY');
+    if ($encoded === '') $encoded = (string)app_env('EOFFICE_SETTINGS_KEY');
+    $master = base64_decode($encoded, true);
+    if ($master === false || strlen($master) !== 32) {
+        throw new RuntimeException('Member version key must be configured as base64-encoded 32 bytes');
+    }
+    // Separate version signing from other uses of the settings master key.
+    return hash_hmac('sha256', 'eoffice:member-version:v1', $master, true);
+}
+
 function app_member_version(array $user, array $departments): string {
-    return hash('sha256', json_encode([
+    // Never expose a plain digest of password-bearing data: legacy plaintext
+    // passwords would turn it into an offline password-guess verification oracle.
+    return hash_hmac('sha256', json_encode([
         (int)$user['User_Id'], $user['User_Name'], $user['User_Email'],
         $user['User_Status'], $user['User_Password'],
         array_map('intval', array_column($departments, 'Department_Id')),
-    ], JSON_THROW_ON_ERROR));
+    ], JSON_THROW_ON_ERROR), app_member_version_key());
 }
 
 function app_member_permission_version(array $user, array $permissions): string {

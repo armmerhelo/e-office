@@ -2,11 +2,12 @@ const assert=require('node:assert/strict');
 const cp=require('node:child_process');
 const path=require('node:path');
 const os=require('node:os');
+const crypto=require('node:crypto');
 const php=process.env.PHP_BIN||'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const remote=process.env.EOFFICE_STAGING_TEST==='1';
 const testPassword=remote?JSON.parse(require('node:fs').readFileSync(path.join(os.homedir(),'AppData/Local/Temp/opencode/eoffice-staging-qa.private.json'),'utf8')).password:'Review-Test-2026!';
 const port=Number(process.env.TEST_PORT||8081),base=remote?'https://e-office-test.siya.ac.th':`http://localhost:${port}`;
-const env={...process.env,DB_DATABASE:process.env.TEST_DATABASE||'eoffice_review_test',APP_URL:base,EOFFICE_MOCK_SERVICES:'true',EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode','eoffice-test-storage')};
+const env={...process.env,DB_DATABASE:process.env.TEST_DATABASE||'eoffice_review_test',APP_URL:base,EOFFICE_MOCK_SERVICES:'true',EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode','eoffice-test-storage')};
 if(!env.DB_DATABASE.endsWith('_test'))throw Error('Test database must end with _test');
 function cli(file){if(remote){if(file==='scripts/migrate.php')return '';const action=file==='tests/seed.php'?'seed':'worker';const r=cp.spawnSync('python',['scripts/staging-hosting.py','test-helper',action],{encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}const r=cp.spawnSync(php,[file],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}
 function inspect(action,value){const r=remote?cp.spawnSync('python',['scripts/staging-hosting.py','test-helper',action,String(value)],{encoding:'utf8'}):cp.spawnSync(php,['tests/inspect.php',action,String(value)],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return JSON.parse(r.stdout);}
