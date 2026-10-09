@@ -35,3 +35,10 @@ Detailed setup/activation: [GOOGLE_DRIVE_ARCHIVE.md](GOOGLE_DRIVE_ARCHIVE.md).
 - Private rollback archive: `eoffice-drive-activation-before-20261008-231347.tar.gz` in the approved temporary directory; SHA-256 `685447ae4f2d2275a50b0cc75e25b91d53acc1f08d1b4a5d8dc14e60a197fc7e`.
 
 Google response latency/retries remain the current bootstrap throughput limit. The queue now progresses independently of individual failures, but the initial dataset must not be reported as fully protected until a complete checkpoint and recovery drill pass.
+
+## Follow-up — 9 October 2026
+
+- Reconciled the production helper's legacy year-whitespace normalization with tracked source; an added signed cloud-read regression covers padded `Doc_Year` values. Archive behavior suite: **45 passing checks**.
+- The hosting Cron ran automatically overnight. The **9 October daily database-only backup completed at 02:03:20 Asia/Bangkok**, without a workstation or manual trigger.
+- At **08:16:41**, Drive held **321 currently registered verified versions / 305,647,601 bytes**, with **131 registered pending versions** and temporary cloud backoff entries. The cumulative upload counter was 322; it is not the same as the current registry count.
+- First complete scan is still pending, no integrity-review entries were reported, and server eviction remains disabled. A full document recovery set must still be verified before enabling eviction.

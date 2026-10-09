@@ -1,6 +1,8 @@
 <?php
 // Included inside the isolated archive fixture; all bytes and accounts synthetic.
 $cached=app_drive_archive_restore($signedVersion,$get);
+$paddedYear=$doc;$paddedYear['Doc_Year']=' 2566 ';
+drive_check(file_get_contents(app_drive_archive_resolve($paddedYear,$name,true))===$signed,'legacy document year padding does not prevent signed cloud-file access');
 $missing=static function(string $object):string{throw new RuntimeException('Synthetic remote object missing');};
 drive_reject(static fn()=>app_drive_archive_restore($signedVersion,$missing,true),'fresh cloud verification cannot be satisfied by valid local cache');
 drive_check(is_file($cached)&&file_get_contents($cached)===$signed,'failed fresh verification preserves the last authenticated cache');

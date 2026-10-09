@@ -48,7 +48,7 @@ function app_drive_archive_current(int $doc,string $name,string $variant): ?arra
     $q=app_pdo()->prepare('SELECT v.* FROM eoffice_drive_files f JOIN eoffice_drive_versions v ON v.id=f.version_id WHERE f.doc_id=? AND f.file_name=? AND f.variant=?');$q->execute([$doc,$name,$variant]);return $q->fetch()?:null;
 }
 function app_drive_archive_local(array $doc,string $name,string $variant): string {
-    $year=(string)$doc['Doc_Year'];
+    $year=trim((string)$doc['Doc_Year']);
     if($variant==='original')return app_storage('original',$year,$name);
     $modern=app_storage('e-sign',$year,'signed_'.$doc['Doc_Id'].'_'.$name);$legacy=app_storage('e-sign',$year,'signed_'.$name);
     return is_file($modern)?$modern:(is_file($legacy)?$legacy:$modern);
