@@ -1,5 +1,49 @@
 # Production deployment — E-Office
 
+## Missing-PDF order fix (9 October 2026)
+
+Permanently missing local/Drive PDFs now move their order to `review / pdf_unavailable`, instead of requeuing analysis indefinitely. Regression verifies later healthy jobs complete and the missing order is not retried on every cron. Order checks pass **70 scenarios** (45 behavior / 25 HTTP).
+
+One worker file was deployed after pausing and draining the queue, then restored to enabled with the original activation boundary. Published SHA-256: `60b88ee99347b7fd00a2d059c0beb36c7c779644965241d264a0dcf4a41d9390`; **0 mismatches / 0 temporary helpers**. Post-release heartbeat: **2026-10-09 08:30:01 Asia/Bangkok**, without logged errors. Users/documents remained **69 / 14,505**.
+
+Private rollback: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261009-082947.tar.gz` (SHA-256 `a95abe479e68a33fbc00bd0661db7b0653d44a9606f918ae78d3a3109b964200`).
+
+## Order email third-review hotfix (8 October 2026)
+
+Fixed the four confirmed follow-up findings: trailing whitespace in legacy years aborting the CLI batch; adding a recipient to `no_pending_recipients` not resuming work; transient Drive failures becoming permanent review; and cache eviction after partial delivery being misclassified as a document revision change.
+
+The additive migration adds job-level `retry_attempts` / `retry_at`. Temporary cloud/cache failures back off and stop after five failures, preserving AI results and delivery markers. Integrity errors and actual revision changes after accepted/uncertain SMTP still require review. Canonical-year PDF links are also validated through the production HTTP file reader.
+
+Verification: **67 order-email**, full `npm.cmd test`, final **42 workflow**, and Drive suite (**44 archive behavior** plus HTTP/cache/signing/scheduler/Apps Script) pass. Production: **4 controlled checks**, **6 targeted files**, **0 checksum mismatches**, **0 temporary helpers**. Synthetic account/recipient/document/job/file removed; baseline users/documents **69 / 14,503** restored. The production smoke did not call AI, SMTP or remote Drive.
+
+Automatic delivery restored to enabled with the original activation boundary **2026-10-08 14:20:51 Asia/Bangkok**. Cron confirmed at **23:20:02 Asia/Bangkok**, with no logged errors.
+
+Main rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-231254.tar.gz` (SHA-256 `73e8367b73ced37bfb1840f92aa70f7fc42729fbb2d38a46060b7d81fc00ebaa`). Additional shared-source backups and published hashes are recorded privately in `eoffice-order-review-release.private.json`.
+
+## Order email second-review hotfix (8 October 2026)
+
+Fixed the remaining three findings: document recipients revoked after the persisted sending marker are rechecked before SMTP; Drive-only PDFs prepare their cold cache outside the document transaction and revalidate binding/bytes under lock; jobs with only cancelled recipients remain reviewable after a confirmed restart so individual retries are possible.
+
+Local verification: **54 order-email checks**, full `npm.cmd test`, and the Drive archive suite pass (**24 archive behavior checks** plus HTTP/signing/scheduler and Apps Script checks). Production verification: **5 controlled checks**, **2 files** with **0 checksum mismatches**, **0 temporary helpers**. The temporary account/document/job were removed; users/documents restored to **69 / 14,503**. SMTP was not contacted by smoke verification.
+
+Deployment paused delivery, waited for the previous worker to finish, and restored the prior enabled state using a settings fingerprint guard. The first activation boundary remains **2026-10-08 14:20:51 Asia/Bangkok**.
+
+Rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-220822.tar.gz` (SHA-256 `ed96cbb8276203ce10253796ef8d607d82f2ca28314dee612cf1d8858eb97955`). Targeted tooling: `scripts/order-review-release.py ... --files config/order-emails.php email_send/order-ui.js`.
+
+Post-release scheduled heartbeat confirmed at **22:10:01 Asia/Bangkok**: automatic delivery remains enabled and no logged errors were found.
+
+## Order email review hotfix (8 October 2026)
+
+Fixed the five reviewed findings: explicit recipients missing from AI-only delivery, implicit restart of cancelled jobs, concurrent settings saves undoing a pause, PDF changes during analysis stopping automatically recoverable work, and manually selected AI matches disappearing during reanalysis.
+
+The additive migration adds a monotonic settings revision. Stale Admin saves return HTTP 409; the Admin UI submits the loaded revision. Cancelled jobs require an explicit confirmed restart, and file changes before any accepted/uncertain delivery automatically rebuild the snapshot.
+
+Local checks: **47 order-email**, **3 UI**, and full `npm.cmd test` pass. Production smoke: **6 passed**; **9 targeted files** checksum-verified with **0 mismatches** and **0 temporary helpers**. The temporary account/document/job were removed; baseline users/documents restored to **69 / 14,503**. No staff email was sent by the verification. The queue was restored to enabled and the first activation boundary is unchanged (**14:20:51 Asia/Bangkok**).
+
+Private rollback: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-205134.tar.gz` (SHA-256 `de64ffb278cc27f341609589d0159032c579fa1fd6b881086b8a5ff7010dbdcf`). Deployment/repair tooling: `scripts/order-review-release.py`.
+
+Post-patch scheduled heartbeat confirmed at **20:55:02 Asia/Bangkok**: enabled status remains true and no logged errors were found.
+
 ## Member pre-commit review (8 October 2026)
 
 Added permission-snapshot validation so a stale work-permission form cannot restore revoked grants. The full local regression suite passes, including **20 member API** and **6 UI** checks. No unresolved blocking findings remain in the member changes after this fix.

@@ -9,5 +9,11 @@ window.OrderUI = (() => {
     function message(id,text,error=false){const el=document.getElementById(id);el.textContent=text;el.classList.toggle('error',error);el.classList.toggle('ok',!error);}
     errors.smtp_configuration_required='SMTP ยังตั้งค่าไม่ครบ กรุณาตรวจสอบการตั้งค่าบนเซิร์ฟเวอร์';
     errors.invalid_document_year='ปีของเอกสารไม่ถูกต้อง กรุณาตรวจสอบข้อมูลเดิม';
+    errors.no_pending_recipients='ไม่มีผู้รับรอส่ง เลือกส่งใหม่รายคนหรือเพิ่มผู้รับได้';
+    errors.recipient_revoked='ผู้รับถูกถอนออกจากเอกสารก่อนส่ง';
+    errors.pdf_cache_not_ready='กำลังเตรียม PDF จาก Drive ระบบจะลองใหม่ในรอบถัดไป';
+    errors.drive_temporary_failure='Drive ขัดข้องชั่วคราว ระบบจะลองใหม่ตามรอบที่กำหนด';
+    errors.drive_retry_exhausted='Drive ขัดข้องครบจำนวนครั้งที่กำหนด กรุณาตรวจสอบแล้วสั่งทำต่อ';
+    errors.cache_retry_exhausted='เตรียม cache ไม่สำเร็จครบจำนวนครั้งที่กำหนด กรุณาตรวจสอบ';
     return {node,badge,button,request,message,error:code=>errors[code]||code||'—'};
 })();

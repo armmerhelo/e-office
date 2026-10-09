@@ -107,7 +107,7 @@ async function testOrderActionFeedback() {
 
 async function testSettingsDraftActions() {
     const document = makeDocument(), requests = [];
-    let settings = {enabled: true, model: 'gemini-test', key_configured: true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null};
+    let settings = {enabled: true, model: 'gemini-test', key_configured: true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null, revision:7};
     const request = async (url, data) => {
         requests.push(data || {method: 'GET'});
         if (!data) return {settings};
@@ -148,6 +148,7 @@ async function testSettingsDraftActions() {
     assert.equal(save.clear_key, true);
     assert.equal(save.enabled, false, 'clearing key must pause automatic delivery');
     assert.equal(save.api_key, '', 'clear-key request must not send any candidate credential');
+    assert.equal(save.revision,7,'settings save binds the loaded revision');
 }
 
 function testSaveBarDoesNotOverlay() {

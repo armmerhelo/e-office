@@ -74,7 +74,8 @@ async function run(){
   const before=rows();await request('/api/create_document.php',{as:'bob',body:form({doc_url:[url],doc_url_name:['Not authorized'],amss_test_action:'expire_session'}),status:401});assert.deepEqual(rows(),before);
  });
  if(seed.order_support)await test('AMSS-only order enters the AI queue with its imported PDF',async()=>{
-  await request('/email_send/ai_settings.php',{as:'admin',body:JSON.stringify({action:'save',model:'gemini-test',enabled:true})});
+   const settings=JSON.parse((await request('/email_send/ai_settings.php',{as:'admin'})).text).settings;
+   await request('/email_send/ai_settings.php',{as:'admin',body:JSON.stringify({action:'save',model:'gemini-test',enabled:true,revision:settings.revision})});
   const result=JSON.parse((await request('/api/create_document.php',{body:form({doc_type:'คำสั่ง',doc_url:[url],doc_url_name:['AMSS order']})})).text);
   const job=JSON.parse((await request('/email_send/order_jobs.php?doc_id='+result.doc_id,{as:'admin'})).text).job;assert.equal(job.status,'analyzing');
  });

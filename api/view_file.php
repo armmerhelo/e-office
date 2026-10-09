@@ -78,7 +78,7 @@ if(!is_file($path)){
    if(!$user){$pdo->rollBack();app_fail('กรุณาเข้าสู่ระบบใหม่',401);}
    $latest=app_locked_document($id,$user);
   }
-  if((string)$latest['Doc_Year']!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);}
+  if(trim((string)$latest['Doc_Year'])!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);}
   app_bound_file($latest,$name);
   // Cache writers use the same document lock as signers. A late legacy fetch
   // can never replace a freshly signed file between an exists check and rename.
@@ -97,7 +97,7 @@ if(!is_file($path)){
 if(app_drive_archive_enabled()){
  $q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");$q->execute([$id]);$latest=$q->fetch();if(!$latest)app_fail('ไม่พบเอกสาร',404);
  if($latest['Doc_Type']!=='External'){$user=app_user();app_document($id,$user);}
- if((string)$latest['Doc_Year']!==$year)app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);app_bound_file($latest,$name);
+ if(trim((string)$latest['Doc_Year'])!==$year)app_fail('ข้อมูลเอกสารเปลี่ยนแปลง',409);app_bound_file($latest,$name);
  // Resolve again only if local bytes are present. For cloud-only reads compare
  // registry identity, so a concurrent new signature cannot serve an old cache.
  $variant='original';$local=app_drive_archive_local($latest,$name,'original');

@@ -33,7 +33,27 @@ if(in_array($action,['seed','drop'],true)){
 }
 $pdo=app_pdo();
 if($action==='corrupt-key'){$pdo->exec("UPDATE eoffice_order_settings SET api_key_cipher='synthetic-corrupted-cipher' WHERE id=1");exit;}
+if($action==='pause-lock'){
+    $pdo->beginTransaction();$pdo->query('SELECT id FROM eoffice_order_settings WHERE id=1 FOR UPDATE');echo "LOCKED\n";flush();fgets(STDIN);
+    $pdo->exec('UPDATE eoffice_order_settings SET enabled=0,revision=revision+1,updated_at=NOW() WHERE id=1');$pdo->commit();echo "PAUSED\n";exit;
+}
+if($action==='blocked-save'){
+    $q=$pdo->prepare("SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE DB=? AND INFO LIKE 'SELECT * FROM eoffice_order_settings WHERE id=1 FOR UPDATE%'");$q->execute([$database]);echo $q->fetchColumn();exit;
+}
 if($action==='worker'){echo app_order_worker();exit;}
+if($action==='worker-empty'){putenv('EOFFICE_TEST_AI_RECIPIENTS=[]');echo app_order_worker();exit;}
+if(str_starts_with($action,'prepare-ai:')){
+    $job=app_order_job((int)substr($action,11));if(!$job)throw new RuntimeException('Missing fixture order');
+    app_order_sync_files($job,app_order_pdf_files(app_order_document((int)$job['doc_id'])));
+    $alice=(int)$pdo->query("SELECT User_Id FROM t_user WHERE User_Name='alice'")->fetchColumn();
+    $pdo->prepare("UPDATE eoffice_order_files SET status='success',targets=? WHERE job_id=?")->execute([json_encode([$alice]),$job['id']]);
+    app_order_build_recipients($job);echo '{}';exit;
+}
+if(str_starts_with($action,'pad-year:')){
+    $id=(int)substr($action,9);$pdo->exec('ALTER TABLE t_document MODIFY Doc_Year VARCHAR(255)');
+    $pdo->prepare('UPDATE t_document SET Doc_Year=? WHERE Doc_Id=?')->execute(['2569 ',$id]);
+    $q=$pdo->prepare('SELECT u.Doc_Upload_Path FROM t_document_upload u JOIN t_document d ON d.Doc_File_Link=u.Doc_File_Link WHERE d.Doc_Id=? LIMIT 1');$q->execute([$id]);echo json_encode(['file_name'=>$q->fetchColumn()]);exit;
+}
 if($action==='snapshot'){
     $tables=['eoffice_order_settings','eoffice_order_jobs','eoffice_order_files','eoffice_order_recipients','eoffice_order_audit','eoffice_outbox'];$result=[];
     foreach($tables as $table)$result[$table]=$pdo->query("SELECT * FROM $table")->fetchAll();

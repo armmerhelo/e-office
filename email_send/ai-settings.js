@@ -94,6 +94,7 @@
         if (action === 'save') {
             data.enabled = clear ? false : el('enabled').checked;
             data.clear_key = clear;
+            data.revision = saved.revision;
             if (data.api_key && !saved.encryption_ready) {
                 saveError = 'ยังบันทึก API key ใหม่ไม่ได้ กรุณาตั้ง EOFFICE_SETTINGS_KEY บนเซิร์ฟเวอร์ก่อน';
                 U.message('message', saveError, true); updateControls();

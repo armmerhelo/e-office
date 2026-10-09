@@ -44,19 +44,20 @@ try{
         else throw new DomainException('มีงานอยู่แล้ว กรุณาดูรายละเอียดและเลือกจัดการรายการ');
     }else{
         if(!$job)throw new DomainException('กรุณานำคำสั่งเข้าคิวก่อน');
-        if($action==='cancel_job')app_order_update((int)$job['id'],'cancelled','operator_cancelled');
+        if($action==='cancel_job')app_order_cancel((int)$job['id']);
         elseif($action==='reanalyze'){
             if(($input['confirmed']??false)!==true)throw new DomainException('กรุณายืนยันการวิเคราะห์ใหม่');
             $pdo->prepare("UPDATE eoffice_order_recipients SET status='uncertain',error_code='smtp_result_unknown' WHERE job_id=? AND status='sending'")->execute([$job['id']]);
             $pdo->prepare('DELETE FROM eoffice_order_files WHERE job_id=?')->execute([$job['id']]);
             $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped')")->execute([$job['id']]);
-            $pdo->prepare('UPDATE eoffice_order_jobs SET model=NULL WHERE id=?')->execute([$job['id']]);
+            $pdo->prepare('UPDATE eoffice_order_jobs SET model=NULL,retry_attempts=0,retry_at=NULL WHERE id=?')->execute([$job['id']]);
             app_order_update((int)$job['id'],'queued');
         }elseif($action==='add_recipient'){
+            if($job['status']==='cancelled')throw new DomainException('งานถูกยกเลิกแล้ว กรุณายืนยันการวิเคราะห์ใหม่ก่อนเพิ่มผู้รับ');
             $uid=(int)($input['user_id']??0);$email=app_text($input,'email',255);$q=$pdo->prepare('SELECT User_Id,User_Name,User_Email FROM t_user WHERE '.($uid>0?'User_Id=?':'User_Email=?'));$q->execute([$uid>0?$uid:$email]);$user=$q->fetch();
             if(!$user)throw new DomainException('ไม่พบผู้ใช้ในระบบ');
             app_order_add_recipient($job,$user,'manual');
-            if(in_array($job['status'],['success','partial','cancelled'],true)||($job['status']==='review'&&$job['error_code']==='no_recipients'))app_order_update((int)$job['id'],'queued');
+            app_order_resume_pending($job);
         }else{
             $q=$pdo->prepare('SELECT * FROM eoffice_order_recipients WHERE id=? AND job_id=? FOR UPDATE');$q->execute([(int)($input['recipient_id']??0),$job['id']]);$recipient=$q->fetch();
             if(!$recipient)throw new DomainException('ไม่พบรายการผู้รับ');
@@ -64,10 +65,11 @@ try{
                 if($recipient['status']!=='pending')throw new DomainException('ยกเลิกได้เฉพาะรายการที่ยังไม่ส่ง');
                 $pdo->prepare("UPDATE eoffice_order_recipients SET status='cancelled',error_code='operator_cancelled' WHERE id=?")->execute([$recipient['id']]);
             }else{
+                if($job['status']==='cancelled')throw new DomainException('งานถูกยกเลิกแล้ว กรุณายืนยันการวิเคราะห์ใหม่ก่อนส่งต่อ');
                 if($recipient['status']==='success')throw new DomainException('รายการนี้ส่งสำเร็จแล้ว');
                 if(in_array($recipient['status'],['uncertain','sending'],true)&&($input['confirmed']??false)!==true)throw new DomainException('กรุณายืนยันว่าได้ตรวจสอบผลส่งแล้ว การส่งใหม่อาจซ้ำ');
                 if(!filter_var($recipient['recipient_email'],FILTER_VALIDATE_EMAIL))throw new DomainException('อีเมลผู้รับไม่ถูกต้อง');
-                $pdo->prepare("UPDATE eoffice_order_recipients SET status='pending',error_code=NULL WHERE id=?")->execute([$recipient['id']]);app_order_update((int)$job['id'],'queued');
+                $pdo->prepare("UPDATE eoffice_order_recipients SET status='pending',error_code=NULL WHERE id=?")->execute([$recipient['id']]);app_order_clear_retry((int)$job['id']);app_order_update((int)$job['id'],'queued');
             }
         }
     }

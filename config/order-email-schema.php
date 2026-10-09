@@ -3,16 +3,20 @@ function app_order_email_migrate(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_order_settings (
         id TINYINT PRIMARY KEY, enabled TINYINT NOT NULL DEFAULT 0, activated_at DATETIME NULL,
         api_key_cipher TEXT NULL, model VARCHAR(150) NULL, updated_by INT NULL,
-        updated_at DATETIME NULL, worker_at DATETIME NULL
+        updated_at DATETIME NULL, worker_at DATETIME NULL, revision BIGINT UNSIGNED NOT NULL DEFAULT 0
     ) ENGINE=InnoDB");
+    if(!$pdo->query("SHOW COLUMNS FROM eoffice_order_settings LIKE 'revision'")->fetch())$pdo->exec('ALTER TABLE eoffice_order_settings ADD COLUMN revision BIGINT UNSIGNED NOT NULL DEFAULT 0');
     $pdo->exec('INSERT IGNORE INTO eoffice_order_settings (id) VALUES (1)');
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_order_jobs (
         id BIGINT AUTO_INCREMENT PRIMARY KEY, doc_id INT NOT NULL UNIQUE,
         source VARCHAR(20) NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'waiting_files',
         model VARCHAR(150) NULL, created_by INT NULL, error_code VARCHAR(80) NULL,
+        retry_attempts INT NOT NULL DEFAULT 0, retry_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         KEY idx_order_jobs_status (status,id)
     ) ENGINE=InnoDB");
+    if(!$pdo->query("SHOW COLUMNS FROM eoffice_order_jobs LIKE 'retry_attempts'")->fetch())$pdo->exec('ALTER TABLE eoffice_order_jobs ADD COLUMN retry_attempts INT NOT NULL DEFAULT 0');
+    if(!$pdo->query("SHOW COLUMNS FROM eoffice_order_jobs LIKE 'retry_at'")->fetch())$pdo->exec('ALTER TABLE eoffice_order_jobs ADD COLUMN retry_at DATETIME NULL');
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_order_files (
         id BIGINT AUTO_INCREMENT PRIMARY KEY, job_id BIGINT NOT NULL, file_name VARCHAR(255) NOT NULL,
         caption VARCHAR(1000) NOT NULL DEFAULT '', file_hash CHAR(64) NOT NULL,

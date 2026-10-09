@@ -60,6 +60,44 @@ Order tests create/drop a disposable `eoffice_orders_<pid>_test` database and te
 - The owner configured cron in the hosting panel, every five minutes. First real heartbeat: **2026-10-08 14:20:02 Asia/Bangkok**, with `0 order jobs processed` and no logged errors. Automatic delivery was enabled at **2026-10-08 14:20:51 Asia/Bangkok**; no old orders were enrolled.
 - Two post-activation production smoke checks passed: enabled settings with a real heartbeat, and automatic enrollment of a new offline-signed order into `waiting_files`. The synthetic order/job/account were removed afterwards; staff mail was not sent by that test.
 - The next scheduled cycle after activation completed at **14:25:01 Asia/Bangkok**, again logging `0 order jobs processed` without errors; delivery remains enabled.
+
+## Review hotfix — 8 October 2026
+
+- Order recipients now include the document's explicitly selected individual recipients as well as AI matches. Their `document` source survives AI reanalysis; revoked unsent document-only recipients are removed. Explicit selection of an existing AI recipient promotes it to `manual` without resetting its accepted, uncertain or cancelled delivery state.
+- Cancelling a job cancels its pending recipients. Adding or retrying recipients cannot implicitly restart a cancelled job; an explicit confirmed reanalysis is required first, and previously cancelled recipients remain cancelled unless individually retried.
+- Admin settings expose a monotonic `revision`. Save requests must carry the revision they loaded, and the API checks it again after AI validation under the settings lock. Stale saves return HTTP 409, including concurrent pause/save and same-second changes. Reload the settings page before saving if it was open during the upgrade.
+- Replacing or adding PDFs during AI analysis automatically queues a fresh snapshot before any email is accepted. A file change after accepted/uncertain delivery still requires manual review. File snapshot synchronization is transactional, and document bindings are locked while obtaining the snapshot, not during the AI request.
+- Local verification: **47 order-email regressions**, **3 UI regressions**, and the full `npm.cmd test` suite pass. Production: **6 controlled HTTP checks**, **9 release files** verified with no checksum mismatches. Temporary account/document/job were removed; no staff mail was sent by the verification.
+- Queue delivery was paused only for the patch rollout and restored to its previous enabled state. The original activation boundary remains **2026-10-08 14:20:51 Asia/Bangkok**. The repair pass found no existing queued jobs requiring correction.
+- Post-patch cron heartbeat confirmed at **20:55:02 Asia/Bangkok**, with no logged errors and delivery enabled.
+
+## Missing-source fix — 9 October 2026
+
+- A PDF missing from local storage with no readable Drive copy now fails only its own job with `review / pdf_unavailable`. It is not converted to `files_changed` or requeued indefinitely. Temporary cloud/cache errors retain their separate bounded retry policy.
+- Regression checks verify the missing order moves to review, a later healthy order still completes in the same batch, and the next cron does not repeat the broken order. The current order suite passes **70 checks** (45 behavior / 25 HTTP).
+- Targeted production update of `config/order-emails.php` was checksum-verified after pausing and draining the worker. Delivery was restored with the first activation boundary unchanged. Heartbeat confirmed at **2026-10-09 08:30:01 Asia/Bangkok**; no logged errors, mismatches or temporary helpers remained.
+- Private rollback: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261009-082947.tar.gz`, SHA-256 `a95abe479e68a33fbc00bd0661db7b0653d44a9606f918ae78d3a3109b964200`. Published worker SHA-256: `60b88ee99347b7fd00a2d059c0beb36c7c779644965241d264a0dcf4a41d9390`.
+
+## Second review hotfix — 8 October 2026
+
+- Before SMTP, the worker re-reads the queue row's current source/state and, for a `document` recipient, its direct document grant under the document lock. This happens before and after committing `sending`. A grant revoked in that gap becomes `cancelled / recipient_revoked` without contacting SMTP; AI/manual recipients retain their separate recipient policy.
+- Cold Drive PDF restoration now runs before the snapshot transaction. The worker then locks the document and checks current bindings and hashes using already available local/spool/cache bytes. A concurrent replacement triggers fresh preparation; no archive download starts inside a document transaction.
+- An active job whose recipients are all cancelled ends in `review / no_pending_recipients`, allowing a deliberate individual retry. Explicitly cancelled jobs still require confirmed reanalysis first, and restarting the job never resets cancelled recipients automatically.
+- Local checks: **54 order-email regressions**, full `npm.cmd test`, and the Drive archive suite pass (including **24 archive behavior checks**). The order tests now isolate their Drive cache/spool beneath each disposable fixture root, preventing cache reuse between test runs.
+- Production: **2 targeted files** checksum-verified, **5 controlled checks** passed, and the temporary account/document/job removed. SMTP was not called by the smoke checks. The queue was paused and its previous worker drained before publishing, then restored to enabled without changing the original activation boundary.
+- Rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-220822.tar.gz`, SHA-256 `ed96cbb8276203ce10253796ef8d607d82f2ca28314dee612cf1d8858eb97955`.
+- Post-release heartbeat confirmed at **22:10:01 Asia/Bangkok**, with delivery enabled and no logged errors.
+
+## Third review hotfix — 8 October 2026
+
+- Legacy document years are trimmed and validated before worker path helpers. Invalid metadata throws a per-job exception rather than an HTTP-style process exit. Canonical-year PDF links also normalize years during HTTP revalidation, including cloud reads.
+- Adding recipients or saving a new explicit document recipient resumes both `no_recipients` and `no_pending_recipients` reviews. Previously cancelled recipients remain cancelled.
+- Transient `AppDriveArchiveRetry` failures and cache preparation use persisted job-level `retry_attempts` / `retry_at` with exponential backoff, stopping after five failures. A confirmed reanalysis or individual retry resets this budget. Integrity failures remain manual review and are not silently retried.
+- Cache eviction after one accepted email preserves cached AI results and every accepted/uncertain/cancelled recipient marker; the next due run restores the same snapshot and sends only pending recipients. An actual hash/revision change after delivery still requires review.
+- Local verification: **67 order-email checks**, full `npm.cmd test`, **42 workflow checks** after final year-normalization changes, and the Drive archive suite pass (**44 archive behavior checks** plus HTTP/cache/signing/scheduler and Apps Script checks).
+- Production: **6 targeted files**, additive retry-column migration, **4 controlled checks** passed, **0 checksum mismatches**, **0 temporary helpers**. Synthetic account/recipient/document/job/file were removed. No AI, SMTP or remote Drive calls were made by this smoke verification.
+- The prior enabled state and activation boundary (**2026-10-08 14:20:51 Asia/Bangkok**) were preserved. Post-release cron heartbeat confirmed at **23:20:02 Asia/Bangkok**, with no logged errors.
+- Main rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-231254.tar.gz`, SHA-256 `73e8367b73ced37bfb1840f92aa70f7fc42729fbb2d38a46060b7d81fc00ebaa`. Shared file changes publish only reviewed year normalization over current production source; additional private backup metadata is recorded in the release state.
 - Hosting is Hostneverdie / DirectAdmin. The web PHP configuration disables command execution and restricts filesystem checks with `open_basedir`; a failed web-PHP executable check is not proof that the CLI binary is absent. The uploaded shell launcher tests supported PHP paths from cron itself without changing the hosting security configuration.
 
 ### Hosting panel cron entry

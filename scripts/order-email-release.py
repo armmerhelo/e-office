@@ -318,7 +318,7 @@ app_order_ai_test(app_order_ai_config());$pdo=app_pdo();$pdo->beginTransaction()
 $settings=$pdo->query('SELECT * FROM eoffice_order_settings WHERE id=1 FOR UPDATE')->fetch();
 if($settings['worker_at']===null||strtotime($settings['worker_at'])<time()-900){$pdo->rollBack();throw new RuntimeException('Recent cron heartbeat required before activation');}
 if($settings['activated_at']===null&&(int)$pdo->query('SELECT COUNT(*) FROM eoffice_order_jobs')->fetchColumn()!==0)throw new RuntimeException('Unexpected old queued work');
-$pdo->exec('UPDATE eoffice_order_settings SET enabled=1,activated_at=COALESCE(activated_at,NOW()),updated_at=NOW() WHERE id=1');app_order_audit('production_activated');$pdo->commit();
+$pdo->exec('UPDATE eoffice_order_settings SET enabled=1,activated_at=COALESCE(activated_at,NOW()),updated_at=NOW(),revision=revision+1 WHERE id=1');app_order_audit('production_activated');$pdo->commit();
 echo json_encode(['enabled'=>true,'activated_at'=>app_order_settings()['activated_at'],'existing_orders_enrolled'=>0]);
 """)
 
@@ -348,8 +348,10 @@ $id=__USER__;$email=__EMAIL__;$pdo=app_pdo();$pdo->beginTransaction();
 $q=$pdo->prepare('SELECT User_Email FROM t_user WHERE User_Id=? FOR UPDATE');$q->execute([$id]);if($q->fetchColumn()!==$email)throw new RuntimeException('Unexpected smoke account');
 $q=$pdo->prepare('SELECT Doc_Id FROM t_document WHERE User_Id=? FOR UPDATE');$q->execute([$id]);$docs=$q->fetchAll(PDO::FETCH_COLUMN);$deleted=0;
 foreach($docs as $doc){$q=$pdo->prepare('DELETE FROM eoffice_order_jobs WHERE doc_id=?');$q->execute([$doc]);$deleted+=$q->rowCount();}
+$pdo->prepare('UPDATE t_document SET Doc_Year=TRIM(Doc_Year) WHERE User_Id=?')->execute([$id]);
+$pdo->prepare("DELETE FROM t_user WHERE User_Email=? AND User_Name='Synthetic order review recipient'")->execute([__EXTRA__]);
 $pdo->commit();echo json_encode(['temporary_order_jobs_removed'=>$deleted]);
-""".replace('__USER__',str(int(state['user_id']))).replace('__EMAIL__',production.hosting.php_value(state['email'])))
+""".replace('__USER__',str(int(state['user_id']))).replace('__EMAIL__',production.hosting.php_value(state['email'])).replace('__EXTRA__',production.hosting.php_value('order-review-extra-'+state['nonce']+'@example.invalid')))
 
 
 def verify(ftp):

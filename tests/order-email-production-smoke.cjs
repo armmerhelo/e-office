@@ -39,4 +39,87 @@ async function runActivation(){
     });
     await request('/api/logout.php',{data:{}});console.log(`Order activation smoke: ${passed} passed`);
 }
-(process.argv.includes('--activation')?runActivation():run()).catch(error=>{console.error(error.message);process.exitCode=1;});
+async function runReview(){
+    let settings,docId,recipientId;
+    await check('review patch exposes revision while preserving the original activation boundary',async()=>{
+        const login=await request('/api/auth_login.php',{data:{username:state.email,password:state.password},auth:false});cookie=login.response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+        settings=(await request('/email_send/ai_settings.php')).result.settings;assert.equal(settings.enabled,false);assert.equal(settings.activated_at,'2026-10-08 14:20:51');assert.ok(Number.isInteger(settings.revision));
+    });
+    await check('missing or stale settings revisions cannot change production pause',async()=>{
+        for(const extra of [{},{revision:settings.revision+1}])await request('/email_send/ai_settings.php',{data:{action:'save',enabled:true,model:settings.model,...extra},status:409});
+        const after=(await request('/email_send/ai_settings.php')).result.settings;assert.equal(after.enabled,false);assert.equal(after.revision,settings.revision);
+    });
+    await check('explicit recipient joins the order queue before any AI or delivery',async()=>{
+        const form=new FormData();for(const [key,value]of Object.entries({doc_number:'REVIEW-'+state.nonce,doc_name:'Synthetic review check without PDFs',doc_type:'คำสั่ง',doc_date_receive:'2026-10-08'}))form.append(key,value);
+        form.append('send_to[]',state.user_id);const created=(await request('/api/create_document.php',{form})).result;docId=created.doc_id;assert.ok(docId);
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.job.status,'waiting_files');assert.equal(detail.recipients.length,1);assert.equal(detail.recipients[0].source,'document');assert.equal(detail.recipients[0].status,'pending');recipientId=detail.recipients[0].id;
+    });
+    await check('explicit manual selection preserves an existing queued recipient',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'add_recipient',email:state.email}});
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.recipients.length,1);assert.equal(detail.recipients[0].source,'manual');assert.equal(detail.recipients[0].status,'pending');
+    });
+    await check('cancelled production job cannot resume through add or recipient retry',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'cancel_job'}});
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'add_recipient',email:state.email},status:409});
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'retry_recipient',recipient_id:recipientId,confirmed:true},status:409});
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.job.status,'cancelled');assert.equal(detail.recipients[0].status,'cancelled');
+    });
+    await check('updated Admin page loads the revision-aware script and styles',async()=>{
+        const page=await request('/email_send/ai_settings.html');assert.ok(page.text.includes('ai-settings.js?v=20261008-review1'));
+        for(const route of ['/email_send/ai-settings.js?v=20261008-review1','/email_send/ai-settings.css','/email_send/order-dashboard.css'])assert.ok((await request(route)).text.length>0);
+    });
+    await request('/api/logout.php',{data:{}});console.log(`Order review production smoke: ${passed} passed`);
+}
+async function runReview2(){
+    let docId,recipientId;
+    await check('second review patch preserves the activation boundary while paused',async()=>{
+        const login=await request('/api/auth_login.php',{data:{username:state.email,password:state.password},auth:false});cookie=login.response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+        const settings=(await request('/email_send/ai_settings.php')).result.settings;assert.equal(settings.enabled,false);assert.equal(settings.activated_at,'2026-10-08 14:20:51');
+    });
+    await check('synthetic explicit recipient is queued without contacting AI or SMTP',async()=>{
+        const form=new FormData();for(const [key,value]of Object.entries({doc_number:'REVIEW2-'+state.nonce,doc_name:'Synthetic second review check',doc_type:'คำสั่ง',doc_date_receive:'2026-10-08'}))form.append(key,value);
+        form.append('send_to[]',state.user_id);docId=(await request('/api/create_document.php',{form})).result.doc_id;assert.ok(docId);
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.recipients[0].source,'document');assert.equal(detail.recipients[0].status,'pending');recipientId=detail.recipients[0].id;
+    });
+    await check('production readiness check cancels a revoked sending marker without SMTP',async()=>{
+        const r=require('node:child_process').spawnSync('python',['scripts/order-review-release.py','smoke_review2'],{encoding:'utf8'});assert.equal(r.status,0,'Controlled readiness helper failed');const result=JSON.parse(r.stdout);
+        assert.equal(result.smtp_called,false);assert.equal(result.revoked_recipient_ready,false);assert.equal(result.recipient.status,'cancelled');assert.equal(result.recipient.error_code,'recipient_revoked');assert.equal(result.job,'review');assert.equal(result.job_error,'no_pending_recipients');
+    });
+    await check('job without pending recipients accepts a deliberate individual retry',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'retry_recipient',recipient_id:recipientId,confirmed:true}});
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.job.status,'queued');assert.equal(detail.recipients[0].status,'pending');await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'cancel_job'}});
+    });
+    await check('tracking UI includes the new revocation and no-pending status messages',async()=>{
+        const ui=(await request('/email_send/order-ui.js')).text;assert.ok(ui.includes('no_pending_recipients'));assert.ok(ui.includes('recipient_revoked'));assert.ok(ui.includes('pdf_cache_not_ready'));
+    });
+    await request('/api/logout.php',{data:{}});console.log(`Order second review production smoke: ${passed} passed`);
+}
+async function runReview3(){
+    let docId,prepared;
+    function helper(mode){const r=require('node:child_process').spawnSync('python',['scripts/order-review-release.py','smoke_review3','--mode',mode],{encoding:'utf8'});assert.equal(r.status,0,'Controlled review helper failed');return JSON.parse(r.stdout);}
+    await check('third review migration preserves paused settings and exposes retry fields',async()=>{
+        const login=await request('/api/auth_login.php',{data:{username:state.email,password:state.password},auth:false});cookie=login.response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
+        const settings=(await request('/email_send/ai_settings.php')).result.settings;assert.equal(settings.enabled,false);assert.equal(settings.activated_at,'2026-10-08 14:20:51');
+        const existing=(await request('/email_send/order_jobs.php?search='+encodeURIComponent('REVIEW3-'+state.nonce))).result.data.find(doc=>doc.doc_number==='REVIEW3-'+state.nonce);
+        if(existing)docId=existing.doc_id;
+        else{const form=new FormData();for(const [key,value]of Object.entries({doc_number:'REVIEW3-'+state.nonce,doc_name:'Synthetic third review verification',doc_type:'คำสั่ง',doc_date_receive:'2026-10-08'}))form.append(key,value);form.append('send_to[]',state.user_id);docId=(await request('/api/create_document.php',{form})).result.doc_id;}
+        assert.ok(docId);
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.job.retry_attempts,0);assert.equal(detail.job.retry_at,null);
+    });
+    await check('padded synthetic legacy year produces a valid snapshot and canonical PDF link',async()=>{
+        prepared=helper('prepare');assert.equal(prepared.snapshot_files,1);
+        const route='/api/view_file.php?Doc_Id='+docId+'&File_Path='+encodeURIComponent(prepared.file_name);
+        assert.match((await request(route+'&Year=2569',{auth:false})).text,/^%PDF/);await request(route+'&Year=2568',{auth:false,status:403});
+    });
+    await check('adding a new synthetic recipient resumes no-pending review and retains cancellations',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'cancel_job'}});await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'reanalyze',confirmed:true}});
+        const finished=helper('no-pending');assert.equal(finished.status,'review');assert.equal(finished.error,'no_pending_recipients');
+        await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'add_recipient',email:prepared.extra_email}});
+        const detail=(await request('/email_send/order_jobs.php?doc_id='+docId)).result;assert.equal(detail.job.status,'queued');assert.equal(detail.recipients.find(r=>r.user_id===state.user_id).status,'cancelled');assert.equal(detail.recipients.find(r=>r.recipient_email===prepared.extra_email).status,'pending');
+    });
+    await check('production MariaDB persists bounded retry metadata without SMTP or Drive calls',async()=>{
+        const retry=helper('retry');assert.equal(retry.status,'queued');assert.equal(retry.attempts,1);assert.equal(retry.scheduled,true);await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'cancel_job'}});
+    });
+    await request('/api/logout.php',{data:{}});console.log(`Order third review production smoke: ${passed} passed`);
+}
+(process.argv.includes('--review3')?runReview3():process.argv.includes('--review2')?runReview2():process.argv.includes('--review')?runReview():process.argv.includes('--activation')?runActivation():run()).catch(error=>{console.error(error.message);process.exitCode=1;});
