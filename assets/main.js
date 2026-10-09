@@ -33,9 +33,20 @@ function restrictedViewPermission(view) {
     return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance'}[view];
 }
 
-window.addEventListener('message', event => {
-    if (event.origin !== location.origin || event.data?.type !== 'eoffice-permissions-changed') return;
-    if (![...document.querySelectorAll('iframe')].some(frame => frame.contentWindow === event.source)) return;
+const MODULE_ROUTES = Object.freeze({
+    members: 'management/user_manage.html',
+    groups: 'management/department_manage.html',
+    room_booking: 'room_booking/index.html',
+    room_booking2: 'room_booking/new_room.html',
+    edit_room_booking: 'room_booking/edit_room_booking.html',
+    book: 'external_number_booking/external_number_booking.html',
+    send_email: 'email_send/doc_send_email.html',
+    my_public: 'email_send/my_dashboard.html',
+    maintenance: 'maintenance_requests/index.html',
+    maintenance_admin: 'maintenance_requests/admin.html'
+});
+
+window.addEventListener('eoffice:permissions-changed', () => {
     refreshPermissionMenus();
 });
 window.addEventListener('focus', () => { if (window.eofficeUser) refreshPermissionMenus(); });
@@ -185,6 +196,11 @@ window.onload = async () => {
     applyPermissionMenus();
     if (id && getCookie("User_Token")) {
         showView('received', "load", '1');
+    } else if (urlParams.get('view')) {
+        showView(urlParams.get('view'), "load");
+    } else if (MODULE_ROUTES[currentPage]) {
+        // An old saved module used to reopen inside the main page. Start at the document inbox instead.
+        showView(window.eofficeUser ? 'received' : 'public', "load");
     } else if (currentPage) {
         // สั่งให้ UI แสดงผล Tab นั้นๆ
         showView(currentPage, "load");
@@ -460,14 +476,6 @@ function inject_thin_scrollbar(iframe) {
 }
 window.fit_iframe_height = fit_iframe_height;
 window.on_iframe_loaded = on_iframe_loaded;
-function fit_visible_iframes() {
-    document.querySelectorAll('iframe[data-fit]').forEach(function (f) {
-        if (f.offsetParent !== null) fit_iframe_height(f);
-    });
-}
-window.addEventListener('resize', fit_visible_iframes);
-if (window.visualViewport) window.visualViewport.addEventListener('resize', fit_visible_iframes);
-
 // Expose functions to the window scope for use in inline HTML event handlers (onclick)
 window.toggleSidebar = toggleSidebar;
 window.toggleModal = toggleModal;
@@ -476,7 +484,7 @@ const urlParams = new URLSearchParams(window.location.search);
 var id = urlParams.get('id'); // ได้ค่า "123"
 // วางโค้ดนี้ลงใน main.js เพื่อคอยสลัดปรับขนาด iframe เมื่อหน้าแจ้งซ่อมส่งสัญญาณมา
 window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'RESIZE_IFRAME') {
+    if (false) {
         const iframe = document.getElementById('iframe_maintenance_requests');
         if (iframe) {
             // ปรับ iframe ให้สูงพอดีกับหน้าฟอร์มจริง (ความสูงแบบพิกเซลจะมาแทนที่ h-[70vh] ทันที)
@@ -489,6 +497,18 @@ window.addEventListener('message', function(event) {
 function showView(showViews, page , page_number) {
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
+
+    const moduleRoute = MODULE_ROUTES[showViews];
+    if (moduleRoute) {
+        if (!window.eofficeUser || getCookie('User_Token') === null) {
+            showViews = 'public';
+        } else {
+            localStorage.setItem('currentPage', showViews);
+            setSidebarOpen(false);
+            window.location.assign(moduleRoute);
+            return false;
+        }
+    }
 
 document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
 components_pagination.style.display = 'block';
@@ -565,7 +585,7 @@ if (! page_number) {
         const management_user = document.getElementById("management_user");
         if (!management_user.querySelector('iframe')) {
             management_user.innerHTML = `
-                <iframe src="management/user_manage.html?v=20261008-review2" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
             `;
         }
         load_data.style.display = "none";
@@ -586,7 +606,7 @@ if (! page_number) {
         const management_department = document.getElementById("management_department");
         if (!management_department.querySelector('iframe')) {
             management_department.innerHTML = `
-                <iframe src="management/department_manage.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
             `;
         }
         load_data.style.display = "none";
@@ -672,7 +692,7 @@ if (! page_number) {
     const containerBooking1 = document.getElementById("content_room_booking");
     if (!containerBooking1.querySelector('iframe')) {
         containerBooking1.innerHTML = `
-            <iframe src="room_booking/index.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
         `;
     }
 
@@ -714,7 +734,7 @@ if (! page_number) {
     const containerEdit = document.getElementById("content_edit_room_booking");
     if (containerEdit && !containerEdit.querySelector('iframe')) {
         containerEdit.innerHTML = `
-            <iframe src="room_booking/edit_room_booking.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
         `;
     }
 }else if (showViews == "book") {
@@ -733,7 +753,7 @@ if (! page_number) {
   const external_number_booking = document.getElementById("external_number_booking");
   if (external_number_booking && !external_number_booking.querySelector('iframe')) {
       external_number_booking.innerHTML = `
-          <iframe src="external_number_booking/external_number_booking.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
       `;
   }
 
@@ -755,7 +775,7 @@ if (! page_number) {
   const group_send_email_div = document.getElementById("group_send_email_div");
   if (group_send_email_div && !group_send_email_div.querySelector('iframe')) {
       group_send_email_div.innerHTML = `
-          <iframe src="email_send/doc_send_email.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
       `;
   }
 
@@ -779,7 +799,7 @@ else if (showViews == "my_public") {
   // 🛡️ แก้บั๊ก: เดิมเช็คผิด container (group_send_email_div) ทำให้ iframe ถูกสร้างซ้ำทุกครั้ง
   if (my_public_div && !my_public_div.querySelector('iframe')) {
       my_public_div.innerHTML = `
-          <iframe src="email_send/my_dashboard.html" data-fit="1" onload="on_iframe_loaded(this)" class="iframe-view-frame w-full border-0 block"></iframe>
+
       `;
   }
 
@@ -801,12 +821,9 @@ document.body.style.overflow = "auto"; // ให้หน้าแม่เล�
   // 🛡️ เพิ่ม guard (เหมือน branch อื่น) กันสร้าง iframe ใหม่ทุกครั้ง -> ฟอร์มไม่หายเมื่อกลับมาหน้าเดิม
   if (maintenance_div && !maintenance_div.querySelector('iframe')) {
       maintenance_div.innerHTML = `
-          <iframe id="iframe_maintenance_requests"
-                src="maintenance_requests/"
-                data-fit="1"
-                onload="on_iframe_loaded(this)"
-                class="iframe-view-frame w-full border-0 block">
-          </iframe>
+
+
+
       `;
   }
 
@@ -827,11 +844,8 @@ document.body.style.overflow = "auto"; // ให้หน้าแม่เล�
   const maintenance_admin_div = document.getElementById("maintenance_admin_div");
   if (maintenance_admin_div && !maintenance_admin_div.querySelector('iframe')) {
       maintenance_admin_div.innerHTML = `
-          <iframe src="maintenance_requests/admin.html"
-                data-fit="1"
-                onload="on_iframe_loaded(this)"
-                class="iframe-view-frame w-full border-0 block">
-          </iframe>
+
+
       `;
   }
 

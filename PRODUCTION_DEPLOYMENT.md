@@ -1,5 +1,16 @@
 # Production deployment — E-Office
 
+## Pending release completed (9 October 2026)
+
+- Reconciled the full deployable application against source commit `60a23f577b2a40876745fbdea0041eabf99fb809`. Published the **11 remaining production files**: member HMAC snapshots, member/routing lock order, signed-PDF compensation, short-lock PDF reading, document-edit file locking, order dashboard assets, the local configuration example and the development router.
+- Verified **180 application/CLI launcher paths** against committed source (normalizing text line endings), with exact SHA-256 hashes of the published bytes recorded in `config/production-manifest.json`. Known earlier targeted releases were reconciled into the manifest.
+- Production member HTTP smoke: **14 passed**. PDF authorization/revision/Range/HEAD/signing smoke: **8 passed**. Public UI/assets: **4 passed**, with guest routing access denied. A temporary database mutex guard held the archive worker during PDF QA; its locks/helpers and synthetic file/registry records were removed afterward.
+- Removed all synthetic accounts/documents/files. Users/documents returned to **69 / 14,505**, with unchanged original role and permission hashes. Private production configuration and its `0600` permissions were preserved.
+- Delivery was paused and the prior worker drained before publication. Automatic delivery was restored to **enabled**, preserving the first activation boundary **2026-10-08 14:20:51 Asia/Bangkok**.
+- Final production verification: **0 checksum mismatches / 0 temporary uploads or helpers**. Post-release order and Drive worker heartbeats both confirmed at **2026-10-09 10:10:01 Asia/Bangkok**, with no current error codes. Drive synchronization remains active with eviction disabled; the existing dated checkpoints remain truthfully `database_only` while the initial scan continues.
+- Local `npm.cmd test` and `TEST_DATABASE=eoffice_review_test npm.cmd run test:drive` pass, including **45 Drive behavior checks** and the HTTP/cache/signing/scheduler/Apps Script checks. Staging received its **85 pending files**, its additive migrations and persistent private member-version key; hosted workflow tests pass **42 scenarios**.
+- Private production rollback: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-pending-production-before-20261009-100542.tar.gz`, SHA-256 `7b6a00071e25f252089939d5f74bb493d93472f50cebe36f13cf273f9fb90b70`. Release inspection/results and the deployment tool are retained privately under the same approved temporary directory.
+
 ## Missing-PDF order fix (9 October 2026)
 
 Permanently missing local/Drive PDFs now move their order to `review / pdf_unavailable`, instead of requeuing analysis indefinitely. Regression verifies later healthy jobs complete and the missing order is not retried on every cron. Order checks pass **70 scenarios** (45 behavior / 25 HTTP).
@@ -43,6 +54,19 @@ Local checks: **47 order-email**, **3 UI**, and full `npm.cmd test` pass. Produc
 Private rollback: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-order-review-before-20261008-205134.tar.gz` (SHA-256 `de64ffb278cc27f341609589d0159032c579fa1fd6b881086b8a5ff7010dbdcf`). Deployment/repair tooling: `scripts/order-review-release.py`.
 
 Post-patch scheduled heartbeat confirmed at **20:55:02 Asia/Bangkok**: enabled status remains true and no logged errors were found.
+
+## Auto send / secretary routing release (8 October 2026)
+
+- Published **14 runtime files** from commit `b67f9a5828ac7ce609f7c489533110d85c87426b` to `https://e-office.siya.ac.th/` using certificate-verified FTPS and atomic file replacement. SHA-256 checks match all 14 Git blobs after deployment and smoke cleanup.
+- Ran the targeted `app_sign_routes_migrate()` migration: created `eoffice_sign_routes` and `eoffice_document_receipts`, imported the **4 existing secretary/deputy pairs** once, and verified the receipt/secretary foreign key uses `ON DELETE RESTRICT`.
+- Admin can configure department/secretary/deputy pairs in **จัดการสมาชิกและสิทธิ์ → Auto send — เลขาฝ่าย / รองฝ่าย**. Existing pairs initially show **ทุกฝ่าย (คู่เดิม)**; choose the matching stamp department to narrow routing.
+- Production smoke **19 checks passed**: authorization, live role assignment/revocation, stale route versions, receipt confirmation/audit, forged legacy metadata rejection, PDF save/rollback/revision checks, existing recipient state, and deletion protection. The new-recipient/notification transaction was verified in a process-local mock **rolled-back dry run**, so no real notification jobs were committed by QA.
+- Removed **4 synthetic accounts**, **1 synthetic document**, its original/signed PDFs, receipt/signing records and test grants. Counts returned to users **69**, documents **14,503**, uploads **12,262**, direct access **24,708**, work-permission grants **18**. Original role, permission and route hashes match the pre-smoke baseline; receipt history returns to **0**.
+- Verified public home/member UI and both new JavaScript assets return HTTP 200; unauthenticated routing API remains HTTP 401. Site access is restored after the short maintenance window. Final checks found **0 checksum mismatches**, **0 staged release uploads** and **0 temporary deployment helpers**.
+- Source rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-sign-routing-before-20261008-203541.tar.gz` (SHA-256 `6775507162dcacbea555f71d73a4cd8d9f82b0863b19656b128c7c89dee0924c`). Database backup: `eoffice-production-db-before-20261008-203549.json.gz` in the same private directory (SHA-256 `ad8be56f27b195ab3e0f0e754ceb62af74d09218a4e524552ccb59dae8affe84`).
+- Targeted release/verify/rollback tooling and private state: `C:\Users\arm_m\AppData\Local\Temp\opencode\sign-routing-release.py` and `eoffice-sign-routing-release.private.json`. QA results: `eoffice-sign-routing-smoke-results.private.json`. Production manifest records `sign_routing_release_commit`.
+
+Users with an already-open stamping page should reload before using the new receipt-confirmation flow. Receipt registration is an explicit declaration by an assigned secretary, not server-side verification of stamp pixels.
 
 ## Member pre-commit review (8 October 2026)
 

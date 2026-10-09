@@ -81,21 +81,6 @@
 }
 }
 
-/* โครงสำหรับหน้า iframe ให้ย่อได้ตามความกว้างของหน้าจอ */
-.iframe-view-container {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-}
-
-.iframe-view-frame {
-    display: block;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    border: 0;
-}
-
 #main_div,
 #main-content-area {
     min-width: 0;

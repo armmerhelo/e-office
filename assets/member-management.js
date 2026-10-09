@@ -29,7 +29,7 @@
         returnFocus?.focus();
     }
     function notifySessionChange() {
-        window.parent.postMessage({type:'eoffice-permissions-changed'}, location.origin);
+        window.dispatchEvent(new Event('eoffice:permissions-changed'));
     }
     function button(text, handler, className = 'btn small') {
         const node = document.createElement('button');

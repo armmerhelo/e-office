@@ -239,7 +239,7 @@ window.addEventListener('load', function() {
 
         <li id="system_management" class="px-4 pt-4 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">จัดการระบบ</li>
         <li id="group_menu_members">
-          <a href="#" id="menu-members" onclick="showView('members','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="management/user_manage.html" id="menu-members" onclick="showView('members','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19a4 4 0 10-8 0m4-8a4 4 0 100-8 4 4 0 000 8zm8-3v6m3-3h-6"></path>
             </svg>
@@ -247,7 +247,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li id="group_menu_groups">
-          <a href="#" id="menu-groups" onclick="showView('groups','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="management/department_manage.html" id="menu-groups" onclick="showView('groups','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"></path>
             </svg>
@@ -256,7 +256,7 @@ window.addEventListener('load', function() {
         </li>
         <li class="px-4 pt-6 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">ทะเบียนเอกสาร</li>
         <li id="group_menu_bookdocnumber">
-          <a href="#book_doc_number" id="menu-bookdocnumber" onclick="showView('book','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="external_number_booking/external_number_booking.html" id="menu-bookdocnumber" onclick="showView('book','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m4 16l4-16M9 9h10M5 15h10"></path>
             </svg>
@@ -274,7 +274,7 @@ window.addEventListener('load', function() {
         </li>
 
         <li>
-          <a href="#" id="my_menu_public" onclick="showView('my_public','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="email_send/my_dashboard.html" id="my_menu_public" onclick="showView('my_public','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
             </svg>
@@ -283,7 +283,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li id="group_send_email">
-          <a href="#" id="send_email" onclick="showView('send_email','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="email_send/doc_send_email.html" id="send_email" onclick="showView('send_email','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
             </svg>
@@ -321,7 +321,7 @@ window.addEventListener('load', function() {
           <li id="other_menu_group" class="px-4 pt-4 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">อื่นๆ</li>
 
           <li id="group_menu_bookingroom">
-            <a href="#" id="menu-bookingroom" onclick="showView('room_booking','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+            <a href="room_booking/index.html" id="menu-bookingroom" onclick="showView('room_booking','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
               <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h.01M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
@@ -329,7 +329,7 @@ window.addEventListener('load', function() {
             </a>
           </li>
           <li id="group_menu_edit_room_booking" >
-            <a href="#" id="menu-edit-room-booking" onclick="showView('edit_room_booking','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+            <a href="room_booking/edit_room_booking.html" id="menu-edit-room-booking" onclick="showView('edit_room_booking','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
               <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
               </svg>
@@ -337,7 +337,7 @@ window.addEventListener('load', function() {
             </a>
           </li>
           <li id="group_maintenance" >
-            <a href="#" id="menu-maintenance" onclick="showView('maintenance','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+            <a href="maintenance_requests/index.html" id="menu-maintenance" onclick="showView('maintenance','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
               <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55.164 1.163.133 1.694-.066.22-.082.415-.208.583-.376l2.441-2.441a.5.5 0 00-.353-.854h-1.738a1 1 0 01-.707-.293l-.586-.586a1 1 0 00-.707-.293h-2.211a1 1 0 00-.707.293l-.586.586a1 1 0 01-.707.293h-1.738a.5.5 0 00-.353.854l2.44 2.441a2.25 2.25 0 01.583.376z"></path>
               </svg>
@@ -345,7 +345,7 @@ window.addEventListener('load', function() {
             </a>
           </li>
           <li id="group_maintenance_admin">
-            <a href="#" id="menu-maintenance-admin" onclick="showView('maintenance_admin','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+            <a href="maintenance_requests/admin.html" id="menu-maintenance-admin" onclick="showView('maintenance_admin','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
               <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z"></path>
               </svg>
@@ -545,7 +545,7 @@ window.addEventListener('message', function(event) {
     // if (event.origin !== 'https://child-domain.com') return;
 
     // ตรวจสอบประเภท Message
-    if (event.data && event.data.type === 'RESIZE_IFRAME') {
+    if (false) {
         const iframe = document.getElementById('iframe_maintenance_requests');
         const maintenance_div = document.getElementById('maintenance_div'); // แก้เพิ่มตรงนี้!
         
@@ -568,15 +568,6 @@ window.addEventListener('message', function(event) {
 
           </div>
         </div>
-<div id="content_room_booking" class="iframe-view-container" style="display:none"></div>
-<div id="external_number_booking" class="iframe-view-container" style="display:none"></div>
-<div id="content_edit_room_booking" class="iframe-view-container" style="display:none"></div>
-<div id="management_user" class="iframe-view-container" style="display:none"></div>
-<div id="management_department" class="iframe-view-container" style="display:none"></div>
-<div id="group_send_email_div" class="iframe-view-container" style="display:none"></div>
-<div id="my_public_div" class="iframe-view-container" style="display:none"></div>
-<div id="maintenance_div" class="iframe-view-container" style="display:none"></div>
-<div id="maintenance_admin_div" class="iframe-view-container" style="display:none"></div>
       </main>
 
 
@@ -584,6 +575,16 @@ window.addEventListener('message', function(event) {
   </div>
 
 
+
+  <div id="content_room_booking" style="display:none"></div>
+  <div id="external_number_booking" style="display:none"></div>
+  <div id="content_edit_room_booking" style="display:none"></div>
+  <div id="management_user" style="display:none"></div>
+  <div id="management_department" style="display:none"></div>
+  <div id="group_send_email_div" style="display:none"></div>
+  <div id="my_public_div" style="display:none"></div>
+  <div id="maintenance_div" style="display:none"></div>
+  <div id="maintenance_admin_div" style="display:none"></div>
 
   <div id="login_html"></div>
   <div id="doc_detail_html"></div>

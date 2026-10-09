@@ -22,10 +22,10 @@
 
 body {
     font-family: 'Prompt', sans-serif;
-    background-color: transparent; /* For iframe */
+    background-color: var(--bg-color);
     color: var(--text-main);
     line-height: 1.6;
-    padding: 0; /* ให้การ์ดแนบกับขอบ iframe (ขอบนอกจัดการโดยหน้าแม่) */
+    padding: 0;
 }
 
 /* Base Layout */

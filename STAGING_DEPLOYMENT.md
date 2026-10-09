@@ -1,5 +1,15 @@
 # Staging deployment — E-Office
 
+## Pending release completed — 9 October 2026
+
+- Updated **85 pending application/CLI launcher files** at **https://e-office-test.siya.ac.th/** from commit `60a23f577b2a40876745fbdea0041eabf99fb809`; verified **180 deployable paths** against committed source and the published SHA-256 manifest.
+- Applied the additive application/order/routing/Drive registry migrations. Provisioned a persistent private member-version key before publishing the HMAC runtime; existing private runtime settings were preserved and `config/local.php` remains `0600`.
+- Hosted integration/workflow tests: **42 passed**. Removed the temporary QA helper afterward; final verification found **0 mismatches / 0 temporary uploads or helpers**. The isolated staging QA data remains available for inspection.
+- Source/config/manifest rollback archive: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-pending-staging-before-20261009-095940.tar.gz`, SHA-256 `9fe476b91c87397e26e76cec0a05a947e049efe3e20734f2daca9b93768030ed`.
+- Pre-migration database snapshot: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-staging-db-before-20261009-095940.json.gz` (**25 tables**).
+
+The older sections below describe the initial staging deployment. Current production status is documented in `PRODUCTION_DEPLOYMENT.md`.
+
 ## Sidebar layout fix
 
 - เอา stylesheet Tailwind ชุดเก่าที่ component โหลดซ้ำออก (ทำให้ `.fixed` override desktop sticky)
@@ -68,4 +78,4 @@ python scripts/staging-hosting.py finish-tests
 
 คำสั่งตรวจชุดไฟล์: `python scripts/staging-hosting.py verify`
 
-Production ยังไม่ได้ deploy มี template `config/production.example.php` สำหรับเตรียมค่าบนโฮสต์ และขั้นตอนใน `DEPLOYMENT.md` ก่อนเปิดบริการจริงต้องตั้งค่า credentials ของ SMTP/OneSignal/Gemini/Drive/อุปกรณ์ และหมุนเวียน credentials เดิมที่เคยฝังในซอร์ส การปิด mock ต้องทำหลังเตรียมบริการและผู้รับทดสอบพร้อมแล้ว
+ณ การติดตั้ง staging ครั้งแรก production ยังไม่ได้ deploy; ปัจจุบันเผยแพร่ production แล้ว ดูสถานะล่าสุดใน `PRODUCTION_DEPLOYMENT.md` มี template `config/production.example.php` สำหรับเตรียมค่าบนโฮสต์ และขั้นตอนใน `DEPLOYMENT.md`

@@ -1,5 +1,33 @@
 # การจัดการสมาชิกและสิทธิ์รายบุคคล
 
+## สถานะเผยแพร่ล่าสุด — 9 ตุลาคม 2026
+
+เผยแพร่แพตช์ HMAC และ concurrency ที่เคยค้างใน local ไป production และ staging แล้ว จาก commit `60a23f577b2a40876745fbdea0041eabf99fb809` โดย production ใช้ settings key เดิมผ่าน domain separation และ staging จัดเตรียม member-version key ถาวรใน private config ผลตรวจ production สมาชิก **14 กรณี** และ PDF/ลงนาม **8 กรณี** ผ่าน ล้างบัญชี/เอกสารทดสอบครบและสิทธิ์เดิมไม่เปลี่ยน; staging workflow **42 กรณี** ผ่าน รายละเอียด release/สำรองอยู่ใน `PRODUCTION_DEPLOYMENT.md` และ `STAGING_DEPLOYMENT.md`
+
+ข้อความที่ระบุว่ายังอยู่ใน local ด้านล่างเป็นผลตรวจ ณ เวลาที่บันทึกก่อน release นี้ ผู้ใช้ที่เปิดฟอร์มสมาชิกค้างก่อนอัปเดตให้ปิดและเปิดฟอร์มใหม่เพื่อรับ snapshot version ล่าสุด
+
+## การป้องกันรหัสผ่านผ่าน snapshot version
+
+`member_version` ใช้ HMAC-SHA-256 ด้วยกุญแจลับเฉพาะเซิร์ฟเวอร์ แทน SHA-256 ปกติ เพื่อไม่ให้ใช้ version ตรวจเดารหัสผ่านแบบออฟไลน์ โดยเฉพาะบัญชีเก่าที่ยังเก็บรหัสผ่านแบบข้อความ ฟอร์มยังถูกปฏิเสธด้วย `409` เมื่อข้อมูล กลุ่มงาน ระดับผู้ใช้ หรือรหัสผ่านเปลี่ยน รวมถึงเมื่อย้ายรหัสผ่านเก่าเป็น hash
+
+- ตั้งค่า `EOFFICE_MEMBER_VERSION_KEY` เป็น Base64 ของ random bytes 32 bytes ใน environment หรือ private `config/local.php` หรือใช้ `EOFFICE_SETTINGS_KEY` ที่ตั้งค่าไว้แล้ว ระบบแยกกุญแจงาน version ด้วย domain separation
+- หากกำหนดกุญแจเฉพาะไว้ จะใช้กุญแจนั้นก่อน หากกุญแจขาดหรือผิดรูปแบบ ระบบจะไม่สร้าง version แบบไม่มีกุญแจ
+- ต้องใช้ค่าเดียวกันและคงที่ทุก PHP worker การเปลี่ยนกุญแจทำให้ฟอร์มเก่าต้องเปิดข้อมูลใหม่
+- `npm.cmd run serve:test` ตรวจค่าจาก environment/private config ก่อนเปิดเว็บ หากไม่มีทั้งสองกุญแจจะสร้างกุญแจเฉพาะ mock/test และเก็บไว้ใน `%TEMP%\opencode\member-version-keys\` แยกตามโครงการและฐานข้อมูล เพื่อใช้ค่าเดิมเมื่อเปิดเซิร์ฟเวอร์ใหม่ ไม่แสดงกุญแจใน console
+- `scripts/staging-hosting.py deploy` และ `sync` จัดเตรียมกุญแจใน private `config/local.php` ก่อนอัปโหลดโค้ด รักษากุญแจและค่าลับเดิมเมื่อ deploy ซ้ำ และตรวจความพร้อมทั้งก่อนและหลังอัปโหลด การตั้งค่าพร้อมกันใช้ file lock เพื่อไม่สร้างกุญแจคนละค่า
+- `sync` เพิ่มเฉพาะกุญแจที่ขาด ไม่เปลี่ยน storage path, คู่ลงนาม, credentials หรือค่าตั้ง runtime เดิมทั้งกรณีระบุและไม่ระบุ `--files` หากไม่มี private staging config ที่ถูกต้องจะหยุดก่อนเปลี่ยนไฟล์แอป ให้ติดตั้งด้วย `deploy` ก่อน
+- targeted staging `sync` หา PHP `require/include __DIR__` แบบ static จากไฟล์ที่เลือก แล้วส่ง dependency ที่อยู่ใน release ด้วยก่อน helper; dependency ที่ไม่มีทั้งใน release และบน staging ทำให้หยุดก่อนแตะ config, ไฟล์แอป หรือ manifest
+- การ sync ไฟล์อื่นบน staging ก่อนแพตช์ HMAC ตรวจรูปแบบกุญแจได้โดยไม่เรียกฟังก์ชันที่ยังไม่มี พร้อมอัปเดต manifest ตามไฟล์จริง ส่วน full deploy หรือ sync ที่อัปเดต member runtime จะต้องยืนยันว่ารองรับ HMAC หลังเผยแพร่; runtime ที่ผิดพลาดจะหยุดตั้งแต่ preflight
+- หากกุญแจเดิมเสียหาย จะหยุด setup แทนการหมุนกุญแจเงียบ ๆ; บน staging หาก environment กำหนดกุญแจเฉพาะเป็นค่าว่างจนบัง private config ต้องแก้ environment ก่อน deploy
+- ไม่ต้องเปลี่ยน schema ฐานข้อมูล ฟอร์มที่เปิดก่อนอัปเดตต้องปิดและเปิดใหม่หนึ่งครั้ง
+- ชุด `test:members` มีการตรวจ legacy password oracle, invalid/missing key, key rotation, settings-key fallback, password changes และการใช้ version ข้าม HTTP worker
+
+ผลตรวจแพตช์ HMAC: version checks **16 ผ่าน**, member API **21 ผ่าน**, member UI **6 ผ่าน** และชุด `npm.cmd test` ผ่านครบในสำเนาแยกของ commit ปัจจุบันพร้อมแพตช์สมาชิก เนื่องจาก working tree มีงานอีเมลเรื่อง revision ที่แก้พร้อมกันและทำให้ชุด order-email เดิมตอบ `409` รอบนี้ยังไม่ได้เผยแพร่แพตช์ HMAC บน production
+
+เพิ่ม regression สำหรับการจัดเตรียมกุญแจ local **8 กรณี** และ staging **16 กรณี** รวม local HTTP snapshot `200` หลัง restart, deploy ซ้ำ, concurrent setup, การรักษากุญแจเดิมและค่า private อื่น, configuration ผิดรูปแบบ, targeted staging sync ก่อน HMAC, การรักษา custom storage/routing, dependency closure แบบ recursive, manifest หลัง sync และการหยุดก่อนอัปโหลดเมื่อ dependency/runtime เสีย โดยจำลอง FTPS/โฮสต์และรัน PHP helper จริงใน web root ชั่วคราว
+
+หลังแก้ขั้นตอน setup รัน `npm.cmd test` ใน working tree ผ่านครบทุกชุด รวม setup local/staging, HMAC, สมาชิก, ลงนาม, เอกสาร, อีเมล และ backup โดยยังไม่ได้ deploy การเปลี่ยนแปลงรอบนี้ไป staging หรือ production
+
 ## Auto send — เลขาฝ่าย / รองฝ่าย
 
 ### แก้ concurrency หลัง deploy (local)
@@ -7,13 +35,15 @@
 - แก้รีวิว warm-cache TTL: การอ่าน cache ผ่าน HTTP อัปเดตเวลาใช้งานหลังเปิด inode ที่ตรวจ revision แล้ว ใช้ cache mutex แบบไม่รอ และตรวจ dev/inode ก่อน `touch()` เพื่อไม่สร้างไฟล์ว่างหลัง cache ถูกลบหรือแตะไฟล์ replacement จาก handle เก่า ตัว sweep ตรวจ mtime ซ้ำภายใน mutex ก่อนลบเพื่อไม่ใช้ snapshot เก่า ผลทดสอบครอบคลุมอ่าน → sweep → อ่านซ้ำโดยไม่ดาวน์โหลด cloud เพิ่ม, cache ถูกลบ/แทนที่, maintenance mutex ถูกถืออยู่ และการ refresh หลัง sweep อ่าน snapshot ไปแล้ว การแก้ยังอยู่ใน local
 
 - แก้รีวิว slow cloud read: ปล่อย document mutex ก่อนดาวน์โหลด Drive/legacy และก่อนรอ revision-specific cache lock จากนั้น reacquire เพื่อตรวจสิทธิ์ การผูกไฟล์ และ revision ก่อนเปิดไฟล์ คำขออ่าน local attachment อื่นไม่ถูกบล็อกตลอด cloud download; mutex timeout ตอบ `503` พร้อม `Retry-After: 2`
-- เพิ่ม HTTP regression โดยหยุด mock cloud transport ค้างไว้แล้วอ่าน local file พร้อมกัน รวมเปลี่ยนลายเซ็น/registry หรือถอนสิทธิ์ระหว่างดาวน์โหลด, timeout และอ่าน pending revision จาก spool การทดสอบใช้ API source จริงและ PHP workers แยก เฉพาะ transport ภายนอกและเวลารอ fixture ถูกแทนที่ ผล `test:drive` ผ่าน behavior 24 กรณีและ HTTP regressions ทั้งหมด; `npm.cmd test` ผ่านครบ การแก้ส่วนนี้ยังไม่ได้ deploy
+- เพิ่ม HTTP regression โดยหยุด mock cloud transport ค้างไว้แล้วอ่าน local file พร้อมกัน รวมเปลี่ยนลายเซ็น/registry หรือถอนสิทธิ์ระหว่างดาวน์โหลด, timeout และอ่าน pending revision จาก spool การทดสอบใช้ API source จริงและ PHP workers แยก เฉพาะ transport ภายนอกและเวลารอ fixture ถูกแทนที่ ผล `test:drive` ผ่าน behavior 24 กรณีและ HTTP regressions ทั้งหมด; `npm.cmd test` ผ่านครบ การแก้ส่วนนี้ยังไม่ได้ commit/deploy
 
 - ตรวจบทบาทเลขาฝ่ายก่อนติดตั้ง PDF หรือ pin ไฟล์ลง Drive spool และใช้ routing gate ร่วมกัน: การรับเอกสารถือ shared gate ก่อน document/user/routes ส่วนการแก้สมาชิก/คู่ routing ถือ exclusive gate ก่อน Admin roster
 - เพิ่ม lock ไฟล์รายเอกสารใน private `EOFFICE_STORAGE/.document-locks` ให้การลงนาม การอ่าน/cache PDF การแก้ไฟล์แนบ และการ scan/evict คลัง Drive ใช้ร่วมกัน Lock นี้ไม่หายเมื่อฐานข้อมูล rollback จึงคืน PDF ได้โดยไม่เขียนทับลายเซ็นของคำขออื่น
 - การลงนามคืนไฟล์ก่อน explicit rollback และยังรักษา file mutex หาก InnoDB rollback อัตโนมัติ กรณี SQL deadlock/timeout ตอบ `409` ให้ลองบันทึกใหม่โดยไม่ retry notification อัตโนมัติ
 - เพิ่ม `tests/sign-concurrency.cjs` / `tests/sign-concurrency-helper.php` ใช้ PHP workers หลายตัวและ FK ของ `t_access_rights` แบบ production ตรวจ 6 กรณี รวม Admin เป็นรองพร้อมแก้ routing, rollback หลังติดตั้ง PDF, failure ผ่าน HTTP และ deadlock จริงของ InnoDB หลังติดตั้ง PDF ตรวจว่า bytes/revision/audit/outbox ถูกคืนครบ
 - ผลตรวจ local: routing API **18 ผ่าน**, UI **15 ผ่าน**, concurrency **6 ผ่าน**; `npm.cmd test` ผ่านครบ และ `TEST_DATABASE=eoffice_review_test npm run test:drive` ผ่าน behavior **24 กรณี** พร้อม HTTP/cloud/Apps Script checks การแก้รอบนี้ยังไม่ได้ deploy
+
+**สถานะ production:** deploy commit `b67f9a5` แล้วเมื่อ 8 ตุลาคม 2026 ตรวจ checksum ไฟล์ runtime 14 ไฟล์ตรงทั้งหมด, production smoke 19 กรณีผ่านและล้างข้อมูลทดสอบครบ นำคู่เลขา/รองเดิมเข้าได้ 4 คู่ รายละเอียดสำรองและผลตรวจอยู่ใน `PRODUCTION_DEPLOYMENT.md` หัวข้อ Auto send / secretary routing release
 
 - ฟังก์ชันเดิมยังอยู่ที่ `e-sign/upload_pdf.php` เดิมอ้างอิงคู่รหัสผู้ใช้จาก `EOFFICE_SIGN_ROUTES` และส่งทุกครั้งที่บันทึก PDF
 - เพิ่มส่วน **Auto send — เลขาฝ่าย / รองฝ่าย** ในหน้าจัดการสมาชิกและสิทธิ์ เฉพาะ Admin สูงสุด เลือกฝ่าย เลขาผู้ประทับตรา และรองผู้รับอัตโนมัติ แล้วกด **บันทึก Auto send**

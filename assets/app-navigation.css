@@ -1,0 +1,146 @@
+.eoffice-app-navigation {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 1000;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 58px;
+    padding: 9px clamp(12px, 3vw, 32px);
+    color: #e0e7ff;
+    background: #312e81;
+    box-shadow: 0 2px 10px rgb(15 23 42 / 14%);
+    font: 500 14px/1.4 system-ui, sans-serif;
+}
+
+body {
+    padding-top: 58px;
+}
+
+.eoffice-app-navigation a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.eoffice-app-navigation a:hover,
+.eoffice-app-navigation a:focus-visible,
+.eoffice-app-navigation summary:hover,
+.eoffice-app-navigation summary:focus-visible {
+    color: #fff;
+    outline-color: #c7d2fe;
+}
+
+.eoffice-app-navigation__brand {
+    flex: 0 0 auto;
+    color: #fff !important;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.eoffice-app-navigation__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: #c7d2fe;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.eoffice-app-navigation__home,
+.eoffice-app-navigation__logout,
+.eoffice-app-navigation__menu > summary {
+    flex: 0 0 auto;
+    padding: 8px 11px;
+    border: 1px solid rgb(199 210 254 / 32%);
+    border-radius: 8px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.eoffice-app-navigation__logout {
+    color: inherit;
+    background: transparent;
+    font: inherit;
+}
+
+.eoffice-app-navigation__logout[hidden] {
+    display: none;
+}
+
+.eoffice-app-navigation__menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.eoffice-app-navigation__menu > summary::after {
+    margin-left: 7px;
+    content: '▾';
+}
+
+.eoffice-app-navigation__links {
+    position: absolute;
+    top: calc(100% - 2px);
+    right: clamp(12px, 3vw, 32px);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(190px, 1fr));
+    gap: 3px;
+    width: min(520px, calc(100vw - 24px));
+    max-height: min(70vh, 520px);
+    padding: 8px;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 12px 28px rgb(15 23 42 / 18%);
+}
+
+.eoffice-app-navigation__links[hidden],
+.eoffice-app-navigation__links a[hidden] {
+    display: none;
+}
+
+.eoffice-app-navigation__links a {
+    padding: 10px 12px;
+    color: #334155;
+    border-radius: 7px;
+}
+
+.eoffice-app-navigation__links a:hover,
+.eoffice-app-navigation__links a:focus-visible,
+.eoffice-app-navigation__links a.is-current {
+    color: #3730a3;
+    background: #eef2ff;
+}
+
+@media (max-width: 600px) {
+    .eoffice-app-navigation {
+        gap: 8px;
+        min-height: 54px;
+        padding-inline: 10px;
+        font-size: 12px;
+    }
+
+    body {
+        padding-top: 54px;
+    }
+
+    .eoffice-app-navigation__brand {
+        font-size: 15px;
+    }
+
+    .eoffice-app-navigation__title {
+        display: none;
+    }
+
+    .eoffice-app-navigation__home,
+    .eoffice-app-navigation__logout,
+    .eoffice-app-navigation__menu > summary {
+        padding: 7px 8px;
+    }
+
+    .eoffice-app-navigation__links {
+        right: 10px;
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
