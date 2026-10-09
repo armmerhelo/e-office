@@ -150,3 +150,5 @@ python scripts/verify-drive-recovery.py 2026-10-08
 ```
 
 This uses the configured hosting bridge to retrieve ciphertext (avoiding transient workstation ContentService response issues), verifies/decrypts locally, reports complete-vs-partial status, and removes private drill plaintext. It does not send staff notifications or import into production.
+
+Add `--sql` to also restore the recovered database into a fresh isolated local `_test` database and verify actual schema/row import, then remove that database. The test server is loopback port 3307 by default (`LOCAL_TEST_DB_PORT` overrides it). Overnight scheduled backup/recovery verification is recorded in [DRIVE_ARCHIVE_REVIEW.md](DRIVE_ARCHIVE_REVIEW.md#follow-up--9-october-2026).

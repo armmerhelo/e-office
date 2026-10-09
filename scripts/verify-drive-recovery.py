@@ -69,17 +69,33 @@ def host_recovery(date,directory,env):
             count+=1
         return {'files':count,'complete_recovery_set':manifest.get('complete_recovery_set',True),'pending_files':manifest.get('pending_files',0)}
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('date');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('date');parser.add_argument('--sql',action='store_true',help='Also import into a fresh isolated local _test database');args=parser.parse_args()
     setup=json.loads(ROOT.joinpath('backups/keys/drive-appscript-setup.private.json').read_text(encoding='utf-8'))
     keys=json.loads(ROOT.joinpath('backups/keys/eoffice-operations-keys.private.json').read_text(encoding='utf-8'))
     env={**os.environ,'EOFFICE_DRIVE_ARCHIVE_URL':setup['url'],'EOFFICE_DRIVE_ARCHIVE_SECRET':setup['script_properties']['EOFFICE_ARCHIVE_SECRET'],'EOFFICE_BACKUP_KEY':keys['backup_key']}
     directory=ROOT/'backups'/('drive-recovery-drill-'+secrets.token_hex(8))
+    database_name='drive_recovery_'+secrets.token_hex(8)+'_test';created=False
+    local_env={**env,'DB_HOST':'127.0.0.1','DB_PORT':os.environ.get('LOCAL_TEST_DB_PORT','3307'),'DB_DATABASE':database_name,'DB_USERNAME':'root','DB_PASSWORD':''}
+    def local_sql(statement):
+        code='require "config/bootstrap.php";app_pdo()->exec('+json.dumps(statement)+');'
+        process=subprocess.run([restore.PHP,'-r',code],cwd=ROOT,env={**local_env,'DB_DATABASE':'mysql'},capture_output=True)
+        if process.returncode:raise RuntimeError('Isolated local SQL recovery command failed')
     try:
         recovered=host_recovery(args.date,directory,env)
         database=restore.unpack_database(directory/'database.ebak',ROOT/'backups/keys/eoffice-operations-keys.private.json',directory/'db-verified')
-        report={'cloud_checkpoint_recovered':True,'date':args.date,'files_recovered':recovered['files'],'complete_recovery_set':recovered['complete_recovery_set'],'pending_files':recovered['pending_files'],'database_tables':database['tables'],'database_rows':database['rows'],'plaintext_removed':True}
+        if args.sql:
+            local_sql('CREATE DATABASE `'+database_name+'` CHARACTER SET utf8mb4');created=True
+            with open(directory/'db-verified/database.jsonl','rb') as incoming:
+                process=subprocess.run([restore.PHP,str(ROOT/'scripts/restore-database.php')],env=local_env,stdin=incoming,capture_output=True)
+            if process.returncode:raise RuntimeError('Isolated checkpoint SQL import failed')
+            imported=json.loads(process.stdout)
+            if not imported.get('restored') or imported['tables']!=database['tables'] or imported['rows']!=database['rows']:raise RuntimeError('Checkpoint SQL recovery counts mismatch')
+        report={'cloud_checkpoint_recovered':True,'date':args.date,'files_recovered':recovered['files'],'complete_recovery_set':recovered['complete_recovery_set'],'pending_files':recovered['pending_files'],'database_tables':database['tables'],'database_rows':database['rows'],'sql_import_verified':args.sql,'plaintext_removed':True,'test_database_removed':created}
     finally:
-        if directory.exists():shutil.rmtree(directory)
+        try:
+            if created:local_sql('DROP DATABASE `'+database_name+'`')
+        finally:
+            if directory.exists():shutil.rmtree(directory)
     ROOT.joinpath('backups/drive-checkpoint-recovery.private.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     print(json.dumps(report))
 if __name__=='__main__':
