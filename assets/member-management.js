@@ -16,6 +16,8 @@
         return data;
     }
     function showDialog(id) {
+        const forms = {modal_user_manage:'form_user_data', modal_status:'form_status', modal_permissions:'form_permissions'};
+        if (forms[id]) markFormClean(forms[id]);
         returnFocus = document.activeElement;
         el(id).hidden = false;
         el(id).querySelector('input:not([type=hidden]), button')?.focus();
@@ -30,6 +32,12 @@
     }
     function notifySessionChange() {
         window.dispatchEvent(new Event('eoffice:permissions-changed'));
+    }
+    function markFormClean(id) {
+        el(id).dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
+    }
+    function markFormDirty(id) {
+        el(id).dispatchEvent(new Event('eoffice:form-dirty', {bubbles:true}));
     }
     function button(text, handler, className = 'btn small') {
         const node = document.createElement('button');
@@ -94,7 +102,7 @@
         for (const dept of state.departments) {
             const chip = document.createElement('span'); chip.className = 'department-chip';
             const label = document.createElement('span'); label.textContent = dept.Department_Name;
-            const remove = button('×', () => { if(state.busy || !state.departmentsReady)return; state.departments = state.departments.filter(item => item.Department_Id !== dept.Department_Id); renderDepartments(); }, '');
+            const remove = button('×', () => { if(state.busy || !state.departmentsReady)return; state.departments = state.departments.filter(item => item.Department_Id !== dept.Department_Id); renderDepartments(); markFormDirty('form_user_data'); }, '');
             remove.disabled = !state.departmentsReady || state.busy;
             remove.setAttribute('aria-label', `ถอนกลุ่มงาน ${dept.Department_Name}`);
             chip.append(label, remove); container.append(chip);
@@ -160,6 +168,7 @@
                     if (!state.departmentsReady || state.busy || request !== state.departmentRequest) return;
                     if (!state.departments.some(item => Number(item.Department_Id) === Number(dept.Department_Id))) state.departments.push(dept);
                     renderDepartments(); list.hidden = true; el('department-search').value = ''; state.departmentRequest++;
+                    markFormDirty('form_user_data');
                 }, ''));
                 list.append(li);
             }
@@ -178,6 +187,7 @@
         state.busy = true; el('save-member').disabled = true;
         try {
             const data = await api(wasNew ? 'new_user_api.php' : 'update_user_api.php', {method:'POST', body:form});
+            markFormClean('form_user_data');
             state.busy = false; closeDialog('modal_user_manage');
             message('page-message', data.message); notifySessionChange();
             if (wasNew) { state.page = 1; el('search_txt').value = ''; el('permission-filter').value = ''; }
@@ -211,6 +221,7 @@
         state.busy = true; el('save-status').disabled = true;
         try {
             const data = await api('save_user_status_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:state.statusUser.User_Id,status,member_version:state.statusUser.member_version})});
+            markFormClean('form_status');
             state.busy = false; closeDialog('modal_status');
             message('page-message', data.message); notifySessionChange(); await loadUsers();
         } catch (error) { message('status-error', error.message, true); }
@@ -251,6 +262,7 @@
         state.busy = true; el('save-permissions').disabled = true;
         try {
             const data = await api('save_user_permissions_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:state.permissionId, permissions,permission_version:state.permissionVersion})});
+            markFormClean('form_permissions');
             state.busy = false; closeDialog('modal_permissions');
             message('page-message', data.message); notifySessionChange(); await loadUsers();
         } catch (error) { message('permissions-error', error.message, true); }
@@ -262,6 +274,7 @@
         try {
             const form = new FormData(); form.append('User_Id', state.editId);
             const data = await api('delete_user_api.php', {method:'POST', body:form});
+            markFormClean('form_user_data');
             state.busy = false; closeDialog('modal_user_manage'); message('page-message', data.message); await loadUsers();
         } catch (error) { message('member-error', error.message, true); }
         finally { state.busy = false; el('btn_delete_user').disabled = false; }

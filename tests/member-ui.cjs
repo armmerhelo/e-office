@@ -3,22 +3,24 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 class Element {
     constructor(id=''){this.id=id;this.hidden=false;this.disabled=false;this.value='';this.children=[];this.events={};this.classList={toggle(){},add(){},remove(){}};}
     addEventListener(name,fn){this.events[name]=fn;}
+    dispatchEvent(event){formEvents.push({form:this.id,type:event.type});if(event.type==='eoffice:form-saved')dirtyForms.delete(this.id);if(event.type==='eoffice:form-dirty')dirtyForms.add(this.id);return true;}
     append(...nodes){this.children.push(...nodes);}
     replaceChildren(...nodes){this.children=nodes;}
     querySelector(selector){if(selector==='option[value=Editor]')return null;if(selector==='.actions')return this.actions??=new Element();return new Element();}
     setAttribute(){} focus(){} reset(){} add(node){this.children.push(node);} getClientRects(){return[{}];}
 }
 const elements=new Map();const el=id=>elements.get(id)??(elements.set(id,new Element(id)),elements.get(id));
+const formEvents=[],dirtyForms=new Set();
 let keydown;
 const document={getElementById:el,createElement:()=>new Element(),querySelectorAll:()=>[],addEventListener(name,fn){if(name==='keydown')keydown=fn;},activeElement:new Element()};
 const user={User_Id:4,User_Name:'basic',User_Email:'basic@example.test',User_Status:'User',permissions:[],can_edit:true};
-const membershipRequests=[],writes=[];let searches=0;
+const membershipRequests=[],writes=[];let searches=0,nextWriteFailure=false;
 const response=data=>({ok:true,json:async()=>data});
 const fetch=async (route,options)=>{
     if(route.startsWith('get_users_api'))return response({status:'success',data:[user],total:1,page:1,permission_catalog:{},can_manage_permissions:true});
     if(route.startsWith('get_user_departments_api'))return new Promise(resolve=>membershipRequests.push(resolve));
     if(route.startsWith('search_departments_api')){searches++;return response({status:'success',data:[{Department_Id:2,Department_Name:'Beta'}]});}
-    if(route==='update_user_api.php'||route==='save_user_status_api.php'||route==='save_user_permissions_api.php'){writes.push({route,body:options.body});return response({status:'success',message:'Saved'});}
+    if(route==='update_user_api.php'||route==='save_user_status_api.php'||route==='save_user_permissions_api.php'){writes.push({route,body:options.body});if(nextWriteFailure){nextWriteFailure=false;return {ok:false,json:async()=>({status:'error',message:'write failed'})};}return response({status:'success',message:'Saved'});}
     throw Error('Unexpected route: '+route);
 };
 const source=fs.readFileSync('assets/member-management.js','utf8');
@@ -43,6 +45,7 @@ async function run(){
     el('department-search').events.input();await new Promise(resolve=>setTimeout(resolve,300));
     el('txtHint_department').children[0].children[0].events.click();
     assert.deepEqual(selected(),['Alpha','Beta']);
+    assert.equal(dirtyForms.has('form_user_data'),true,'button-driven department assignment should mark the profile dirty');
     console.log('PASS group controls stay disabled until the initial snapshot loads; selections then persist');
 
     const editAgain=el('userTableBody').children[0].actions.children.find(button=>button.textContent==='แก้ไข');
@@ -60,14 +63,17 @@ async function run(){
     console.log('PASS a pending edit response cannot overwrite a new-member form');
     editAgain.events.click();await tick();membershipRequests.shift()(snapshot('Alpha'));await tick();
     el('edit_name').value='Changed name';
+    dirtyForms.add('form_user_data');
     await el('form_user_data').events.submit({preventDefault(){}});
+    assert.equal(dirtyForms.has('form_user_data'),false,'a successful profile save clears the shared guard');
     const saved=writes.at(-1);assert.equal(saved.route,'update_user_api.php');
     assert.equal(saved.body.get('User_Status'),null);assert.equal(saved.body.get('member_version'),'a'.repeat(64));
     assert.equal(saved.body.get('User_name'),'Changed name');
     console.log('PASS profile submissions carry the snapshot version and never carry an Admin status');
     const level=el('userTableBody').children[0].actions.children.find(button=>button.textContent==='ระดับ');
     level.events.click();await tick();membershipRequests.shift()(snapshot('Alpha'));await tick();
-    el('status-select').value='Admin';await el('form_status').events.submit({preventDefault(){}});
+    dirtyForms.add('form_status');el('status-select').value='Admin';await el('form_status').events.submit({preventDefault(){}});
+    assert.equal(dirtyForms.has('form_status'),false,'a successful role save clears the shared guard');
     const roleWrite=writes.at(-1);assert.equal(roleWrite.route,'save_user_status_api.php');
     assert.deepEqual(JSON.parse(roleWrite.body),{user_id:4,status:'Admin',member_version:'a'.repeat(64)});
     console.log('PASS explicit Admin promotion uses the separate version-checked status endpoint');
@@ -76,9 +82,21 @@ async function run(){
     assert.equal(el('save-permissions').disabled,true);
     membershipRequests.shift()(snapshot('Alpha'));await tick();
     assert.equal(el('save-permissions').disabled,false);
-    await el('form_permissions').events.submit({preventDefault(){}});
+    dirtyForms.add('form_permissions');await el('form_permissions').events.submit({preventDefault(){}});
+    assert.equal(dirtyForms.has('form_permissions'),false,'a successful permission save clears the shared guard');
     const permissionWrite=writes.at(-1);assert.equal(permissionWrite.route,'save_user_permissions_api.php');
     assert.deepEqual(JSON.parse(permissionWrite.body),{user_id:4,permissions:[],permission_version:'b'.repeat(64)});
     console.log('PASS permission forms reload their current snapshot and submit its version');
+    for(const [action,form] of [[level,'form_status'],[rights,'form_permissions']]) {
+        dirtyForms.add(form);action.events.click();await tick();
+        assert.equal(dirtyForms.has(form),false,'a new dialog must not inherit dirty state from its previous opening');
+        membershipRequests.shift()(snapshot('Alpha'));await tick();
+        dirtyForms.add(form);if(form==='form_status')el('status-select').value='Admin';
+        nextWriteFailure=true;await el(form).events.submit({preventDefault(){}});
+        assert.equal(dirtyForms.has(form),true,'failed saves must retain the shared dirty warning');
+        action.events.click();await tick();membershipRequests.shift()(snapshot('Alpha'));await tick();
+        assert.equal(dirtyForms.has(form),false,'reopening a fresh snapshot without edits must not warn');
+    }
+    console.log('PASS shared form lifecycle: successful saves clear dirty state, failed saves preserve it, and reopened snapshots start clean');
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261010-reset">
 </head>
 <body>
     <div class="form-container">
@@ -17,7 +17,8 @@
             <p>กลุ่มบริหารทั่วไป โรงเรียนศรียานุสรณ์</p>
         </div>
 
-        <form id="maintenanceForm">
+        <form id="maintenanceForm" data-eoffice-requires-draft="true">
+            <fieldset disabled data-eoffice-bootstrap style="border:0;margin:0;padding:0;min-width:0">
             <!-- ส่วนของผู้แจ้ง -->
             <section class="form-section">
                 <div class="section-title">ส่วนที่ 1: ข้อมูลผู้แจ้งซ่อม</div>
@@ -84,7 +85,7 @@
                         </label>
                     </div>
                     <div class="form-group hidden" id="otherTypeContainer">
-                        <input type="text" id="otherTypeDetail" name="otherTypeDetail" placeholder="โปรดระบุรายละเอียดอื่นๆ">
+                        <input type="text" id="otherTypeDetail" name="otherTypeDetail" data-draft-clear-when="otherTypeCheckbox" placeholder="โปรดระบุรายละเอียดอื่นๆ">
                     </div>
                 </div>
 
@@ -117,15 +118,22 @@
                 </div>
             </section>
             <div class="form-actions">
-                <button type="submit" class="submit-btn" id="submitBtn">
+                <button type="reset" class="reset-btn">ล้างฟอร์มเพื่อเริ่มคำขอใหม่</button>
+                <button type="submit" class="submit-btn" id="submitBtn" disabled>
                     <span class="btn-text">ส่งใบแจ้งซ่อม</span>
                     <div class="loader hidden"></div>
                 </button>
             </div>
+            </fieldset>
         </form>
     </div>
     
-    <script src="script.js"></script>
-    <script src="../assets/app-navigation.js?v=20261009-top-level" defer></script>
+    <script src="../assets/form-owner-boundary.js?v=20261010-3"></script>
+    <script src="../assets/draft-commits.js?v=20261010-5"></script>
+    <script src="../assets/create-form-lifecycle.js?v=20261010-10"></script>
+    <script src="../assets/form-dates.js?v=20261013-bounds"></script>
+    <script src="script.js?v=20261012-date-reset"></script>
+    <script src="../assets/app-navigation.js?v=20261010-sidebar10" defer></script>
+    <script src="../assets/module-drafts.js?v=20261012-time-defaults" defer></script>
 </body>
 </html>

@@ -133,6 +133,7 @@
             } else {
                 render(result.settings); invalidateTest();
                 U.message('message', result.message);
+                el('settings-form').dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
             }
         } catch (error) {
             if (action === 'save') saveError = error.message;
@@ -162,6 +163,14 @@
         else el('enabled').checked = enabledBeforeClear;
         hideKey(); invalidateTest(); updateControls();
     });
-    window.addEventListener('beforeunload', event => { if (dirty()) { event.preventDefault(); event.returnValue = ''; } });
+    let leavingConfirmed = false;
+    window.addEventListener('eoffice:leaving-confirmed', () => { leavingConfirmed = true; });
+    window.addEventListener('eoffice:leaving-cancelled', () => { leavingConfirmed = false; });
+    const revokeLeaving = () => {leavingConfirmed=false;};
+    el('settings-form').addEventListener('input',revokeLeaving);
+    el('settings-form').addEventListener('change',revokeLeaving);
+    el('settings-form').addEventListener('eoffice:form-dirty',revokeLeaving);
+    window.addEventListener('pageshow', () => { leavingConfirmed = false; });
+    window.addEventListener('beforeunload', event => { if (!leavingConfirmed && dirty()) { event.preventDefault(); event.returnValue = ''; } });
     load();
 })();

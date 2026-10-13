@@ -3,6 +3,7 @@ require_once __DIR__.'/../config/order-emails.php';
 require_once __DIR__.'/../config/amss-links.php';
 require_once __DIR__.'/../config/drive-archive.php';
 app_method('POST');$user=app_user();$pdo=app_pdo();
+app_expected_owner($_POST,$user);
 $edit=($_POST['formtype']??'')==='edit_document';$id=(int)($_POST['doc_id']??0);
 $doc=null;
 if($edit)$doc=app_document($id,$user);
@@ -25,7 +26,7 @@ $links=[];$amssLinks=[];foreach($urls as $i=>$url){
  if(!is_string($url)||strlen($url)>2000||!isset($urlNames[$i])||!is_string($urlNames[$i]))app_fail('Invalid link');$url=trim($url);
  if(!filter_var($url,FILTER_VALIDATE_URL)||!in_array(strtolower((string)parse_url($url,PHP_URL_SCHEME)),['http','https'],true))app_fail('Invalid link');
  $amssUrl=app_amss_pdf_url($url);
- if($amssUrl!==null){$detail=trim($urlNames[$i]);if($detail==='')$detail=rawurldecode(basename(parse_url($amssUrl,PHP_URL_PATH)));if(mb_strlen($detail)>1000)app_fail('Invalid filename');$amssLinks[]=[$detail,$amssUrl];}
+ if($amssUrl!==null){$detail=trim($urlNames[$i]);if($detail==='')$detail=rawurldecode(basename(parse_url($amssUrl,PHP_URL_PATH)));if(mb_strlen($detail)>1000)app_fail('Invalid filename');$amssLinks[]=[$detail,$amssUrl,$i];}
  else $links[]=[$urlNames[$i]=>$url];
 }
 $fileNames=$_POST['doc_file_name']??[];$fileIds=$_POST['file_id']??[];$versions=$_POST['file_version']??null;
@@ -48,14 +49,14 @@ $checkAttachmentLimit=static function(array $current)use($edit,$keep,$fileNames,
  foreach($fileNames as $i=>$detail)if(!(int)($fileIds[$i]??0))$new++;
  if($retained+$new+count($amssLinks)>max(20,count($current)))app_fail('ไฟล์แนบรวม PDF จาก AMSS ต้องไม่เกิน 20 ไฟล์ (เอกสารเดิมที่เกินจำนวนนี้เพิ่มไฟล์ไม่ได้)');
 };
-$checkAttachmentLimit($existing);$moved=[];$oldFiles=[];$staged=[];$fileLock=null;
+$checkAttachmentLimit($existing);$moved=[];$oldFiles=[];$staged=[];$fileLock=null;$savedAttachments=[];$importedAttachments=[];
 try{
  // Keep slow external I/O outside document/session/settings locks. tmpfile()
  // removes staged bytes even if PHP aborts or a validation response exits.
  $deadline=microtime(true)+60;
- foreach($amssLinks as [$detail,$url]){
+ foreach($amssLinks as [$detail,$url,$sourceIndex]){
   $remaining=(int)ceil($deadline-microtime(true));if($remaining<=0)throw new AppAmssException('ดาวน์โหลด PDF จาก AMSS ใช้เวลานานเกินไป กรุณาลองใหม่');
-  $body=app_amss_download_pdf($url,min(30,$remaining));$handle=tmpfile();if($handle===false)throw new RuntimeException('AMSS temporary storage unavailable');$staged[]=[$detail,$handle];
+  $body=app_amss_download_pdf($url,min(30,$remaining));$handle=tmpfile();if($handle===false)throw new RuntimeException('AMSS temporary storage unavailable');$staged[]=[$detail,$handle,$sourceIndex];
   if(fwrite($handle,$body)!==strlen($body)||!rewind($handle))throw new RuntimeException('AMSS temporary storage failed');unset($body);
  }
  if($edit){
@@ -66,7 +67,7 @@ try{
   $currentIds=array_keys($existing);sort($beforeIds);sort($currentIds);if(($_POST['replace_files']??'')==='1'&&$currentIds!==$beforeIds)app_fail('รายการไฟล์ถูกแก้ไขแล้ว กรุณาโหลดเอกสารใหม่',409);
   foreach($fileNames as $i=>$detail){$fid=(int)($fileIds[$i]??0);if($fid&&!isset($existing[$fid]))app_fail('ไฟล์ไม่ตรงกับเอกสาร',403);if($fid&&$versions!==null&&!hash_equals($existing[$fid]['Doc_Upload_Path'],$versions[$i]))app_fail('ไฟล์ถูกแก้ไขแล้ว กรุณาโหลดเอกสารใหม่',409);}
   $checkAttachmentLimit($existing);
- }else{$pdo->beginTransaction();$user=app_user(true,true);}
+  }else{$pdo->beginTransaction();$user=app_user(true,true);app_expected_owner($_POST,$user);}
  $orderSettings=app_order_settings(!$edit);
  $values=[$number,$name,json_encode($links,JSON_UNESCAPED_UNICODE),$type,date('d/m/Y H:i'),($_POST['status']??'')==='ด่วน'?'Urgent':'Nomal',app_text($_POST,'doc_number_receive'),$date,app_text($_POST,'doc_receive_from'),app_text($_POST,'doc_action'),app_text($_POST,'doc_other'),$type==='External'?(int)($_POST['external_number']??strtok($number,'/')):0,''];
  if($edit){$q=$pdo->prepare('UPDATE t_document SET Doc_Number=?,Doc_Name=?,Doc_Url=?,Doc_Type=?,Doc_Date_Update=?,Status=?,Doc_Number_Receive=?,Doc_Date_Receive=?,Doc_Receive_From=?,Doc_Action=?,Doc_Other=?,External_Number=?,Doc_Url_Name=? WHERE Doc_Id=?');$q->execute([...$values,$id]);$link=$doc['Doc_File_Link'];}
@@ -87,14 +88,16 @@ try{
   if(isset($uploads[$i])){[$f,$newName]=$uploads[$i];$target=$dir.$newName;if(!move_uploaded_file($f['tmp_name'],$target))throw new RuntimeException('Upload failed');$moved[]=$target;if($fid)$oldFiles[]=$dir.$path;$path=$newName;}
   if($fid&&isset($uploads[$i]))$pdo->prepare('UPDATE t_document_upload SET Doc_Upload_Detail=?,Doc_Upload_Path=? WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$detail,$path,$fid,$link]);
   elseif($fid)$pdo->prepare('UPDATE t_document_upload SET Doc_Upload_Detail=? WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$detail,$fid,$link]);
-   else $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   else {$pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);$fid=(int)$pdo->lastInsertId();}
+   $savedAttachments[]=['input_index'=>(int)$i,'file_id'=>$fid,'path'=>$path,'detail'=>$detail];
    if(isset($uploads[$i]))app_drive_archive_track($id,$path,'original',$dir.$path);
  }
  if($edit&&($_POST['replace_files']??'')==='1')foreach($existing as $fid=>$file)if(!in_array($fid,$keep,true)){$pdo->prepare('DELETE FROM t_document_upload WHERE Doc_Upload_Id=? AND Doc_File_Link=?')->execute([$fid,$link]);$oldFiles[]=$dir.$file['Doc_Upload_Path'];}
- foreach($staged as [$detail,$handle]){
+ foreach($staged as [$detail,$handle,$sourceIndex]){
   $path=bin2hex(random_bytes(16)).'.pdf';$target=$dir.$path;$output=fopen($target,'xb');if($output===false)throw new RuntimeException('AMSS PDF storage unavailable');$moved[]=$target;
   try{if(stream_copy_to_stream($handle,$output)!==fstat($handle)['size']||!fflush($output))throw new RuntimeException('AMSS PDF storage failed');}finally{fclose($output);}
    $pdo->prepare('INSERT INTO t_document_upload (Doc_Upload_Detail,Doc_Upload_Path,Doc_File_Link,User_Id) VALUES (?,?,?,?)')->execute([$detail,$path,$link,$user['User_Id']]);
+   $importedAttachments[]=['link_index'=>(int)$sourceIndex,'file_id'=>(int)$pdo->lastInsertId(),'path'=>$path,'detail'=>$detail];
    app_drive_archive_track($id,$path,'original',$target);
  }
  app_order_saved($id,!$edit,$type,$orderSettings);
@@ -103,4 +106,4 @@ try{
 finally{foreach($staged as [$detail,$handle])if(is_resource($handle))fclose($handle);}
 foreach($oldFiles as $old)if(is_file($old)&&!unlink($old))error_log('Obsolete document file cleanup failed');
 $fileLock?->release();
-app_json(['status'=>'success','message'=>'บันทึกเอกสารสำเร็จ','doc_id'=>$id,'files'=>['status'=>'success']]);
+app_json(['status'=>'success','message'=>'บันทึกเอกสารสำเร็จ','doc_id'=>$id,'files'=>['status'=>'success','year'=>$year,'entries'=>$savedAttachments,'imported'=>$importedAttachments]]);

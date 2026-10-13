@@ -34,7 +34,17 @@ function getCookie(name) {
 
 // สร้างตัวแปรไว้นอกฟังก์ชันเพื่อเก็บลำดับของแถว
 let fileIndex = 0;
-function addNewInputFile(name, file_id,doc_id,path,year) {
+function notifyDocumentEdit() {
+  document.getElementById('document-form')?.dispatchEvent(new Event('eoffice:form-dirty', {bubbles:true}));
+}
+
+function removeDocumentRow(row) {
+  if (!row) return;
+  row.remove();
+  notifyDocumentEdit();
+}
+
+function addNewInputFile(name, file_id,doc_id,path,year,userChange=true) {
   let doc_type_send = localStorage.getItem("doc_type");
   fileIndex++; // เพิ่มลำดับทุกครั้งที่กดปุ่มบวก
   const safeName = escapeHtml(name);
@@ -105,7 +115,7 @@ function addNewInputFile(name, file_id,doc_id,path,year) {
                 </label>
 
                   ${view_file}
-                <button type="button" onclick="this.closest('#file_row_${fileIndex}').remove()"
+                <button type="button" onclick="removeDocumentRow(this.closest('#file_row_${fileIndex}'))"
                         class="flex items-center justify-center w-10 h-10 border-2 border-red-200 rounded-lg bg-red-50 hover:bg-red-100 flex-shrink-0 transition">
                     <img src="img/remove.png" class="w-5 h-5">
                 </button>
@@ -118,10 +128,12 @@ function addNewInputFile(name, file_id,doc_id,path,year) {
 
   var file_send = document.getElementById("file_send");
   file_send.insertAdjacentHTML("beforeend", text_add);
+  if (userChange) notifyDocumentEdit();
+  return document.getElementById(`file_row_${fileIndex}`);
 }
 
 let LinkIndex = 0;
-function addNewLink(name, url) {
+function addNewLink(name, url, userChange=true) {
   if (!name || !url) {
     name = "";
     url = "";
@@ -159,7 +171,7 @@ function addNewLink(name, url) {
                   class="flex items-center justify-center w-10 h-10 border-2 border-green-200 rounded-lg  hover:bg-green-100 flex-shrink-0 transition">
               <img src="img/web_open.png" class="w-5 h-5">
           </a>
-              <button type="button" onclick="this.closest('#link_row_${LinkIndex}').remove()"
+              <button type="button" onclick="removeDocumentRow(this.closest('#link_row_${LinkIndex}'))"
                       class="flex items-center justify-center w-10 h-10 border-2 border-red-200 rounded-lg bg-red-50 hover:bg-red-100 flex-shrink-0 transition">
                   <img src="img/remove.png" class="w-5 h-5">
               </button>
@@ -171,6 +183,7 @@ function addNewLink(name, url) {
 
   var doc_file_link_main = document.getElementById("doc_file_link_main");
   doc_file_link_main.insertAdjacentHTML("beforeend", text_add);
+  if (userChange) notifyDocumentEdit();
 }
 
 
@@ -214,7 +227,7 @@ function add_doc_detail_change() {
 
   // คุณสามารถเขียนเงื่อนไขต่อจากตรงนี้ได้เลย
 }
-function add_group_send(group_id, group_name,doc_type) {
+function add_group_send(group_id, group_name,doc_type,userChange=true) {
   if (!document.getElementById('group_send_'+group_id)) {
     console.log(group_id + " || " + group_name);
     group_send = document.getElementById("group_send");
@@ -234,7 +247,7 @@ if (doc_type == 'Stamp') {
   <div id="group_send_${safeGroupId}" class="flex justify-between border-b  p-4 border-gray-400">
     <input type="hidden" name="send_to_group[]" value="${safeGroupId}">
     <p >${safeGroupName}</p>
-    <img onclick="document.querySelector('#group_send_${safeGroupId}').remove(); " style="width:25px;height:auto;" src="img/remove.png">
+    <img onclick="removeDocumentRow(document.getElementById('group_send_${safeGroupId}'));" style="width:25px;height:auto;" src="img/remove.png">
   </div>`;
 }
 
@@ -242,11 +255,12 @@ if (doc_type == 'Stamp') {
 
     //user_send.innerHTML = user_send.innerHTML + text_add;
     group_send.insertAdjacentHTML("afterbegin", text_add);
+    if (userChange) notifyDocumentEdit();
   } else {
     console.log("มี user_send อยู่ในรายการแล้ว");
   }
 }
-function add_user_send(user_id, user_name,doc_type) {
+function add_user_send(user_id, user_name,doc_type,userChange=true) {
 
 
   if (!document.getElementById('user_send_'+user_id)) {
@@ -266,13 +280,14 @@ function add_user_send(user_id, user_name,doc_type) {
       <div id="user_send_${safeUserId}" class="flex justify-between border-b  p-4 border-gray-400">
         <input type="hidden" name="send_to[]" value="${safeUserId}">
         <p >${safeUserName}</p>
-        <img onclick="document.querySelector('#user_send_${safeUserId}').remove(); " style="width:25px;height:auto;" src="img/remove.png">
+        <img onclick="removeDocumentRow(document.getElementById('user_send_${safeUserId}'));" style="width:25px;height:auto;" src="img/remove.png">
       </div>`;
     }
 
 
     //user_send.innerHTML = user_send.innerHTML + text_add;
     user_send.insertAdjacentHTML("afterbegin", text_add);
+    if (userChange) notifyDocumentEdit();
   } else {
     console.log("มี user_send อยู่ในรายการแล้ว");
   }
@@ -300,7 +315,7 @@ function loop_show_file(doc_id) {
             console.log(`file_id: ${file.file_id}`);
             console.log(`detail: ${file.detail}`);
             console.log('-------------'); // ขีดคั่นเพื่อให้ดูง่าย
-            addNewInputFile(file.detail, file.file_id,doc_id,file.path,data_edit.doc_year);
+            addNewInputFile(file.detail, file.file_id,doc_id,file.path,data_edit.doc_year,false);
         });
 
     }
@@ -493,7 +508,7 @@ console.log('doc_id : '+doc_id);
       Object.entries(itemObj).forEach(([name_url, url]) => {
         //console.log(`Key: ${name_url}`);
       //  console.log(`URL: ${url}`);
-        addNewLink(name_url, url);
+        addNewLink(name_url, url, false);
       });
     });
 
@@ -517,7 +532,7 @@ console.log('doc_id : '+doc_id);
               }
               //console.log('User : '+detail);
               //console.log("User ID:", detail.user_id, "| Name:", detail.user_name , "| Status:", detail.user_status);
-              add_user_send(detail.user_id, detail.user_name,doc_type_send);
+              add_user_send(detail.user_id, detail.user_name,doc_type_send,false);
               if (detail.Is_Signed == 'true') {
                 var is_sign = `<img src="img/readed.png" width="15px" alt="">`;
               }else {
@@ -545,7 +560,7 @@ console.log('doc_id : '+doc_id);
       Object.entries(department_arr).forEach(([group_id, name]) => {
           console.log(`GROUP ID: ${group_id}, Name: ${name}`);
 
-           add_group_send(group_id, name);
+           add_group_send(group_id, name,undefined,false);
       });
   } else {
       console.log('ไม่มีข้อมูลใน department_arr');

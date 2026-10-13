@@ -31,6 +31,7 @@ class Element {
     replaceChildren(...nodes) { this._text = ''; this.children = nodes; }
     addEventListener(name, callback) { (this.events[name] ??= []).push(callback); }
     dispatch(name, event = {}) { for (const callback of this.events[name] || []) callback({target: this, preventDefault() {}, ...event}); }
+    dispatchEvent(event) { this.dispatch(event.type,event);return true; }
     click() { if (typeof this.onclick === 'function') this.onclick({target: this, preventDefault() {}}); this.dispatch('click'); }
     setAttribute(name, value) { this.attributes[name] = String(value); }
     getAttribute(name) { return this.attributes[name] ?? null; }
@@ -83,7 +84,7 @@ async function testOrderActionFeedback() {
         return {total: 1, years: [], is_admin: false, worker: {enabled: false}, data: [item]};
     };
     vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js', 'utf8'), {
-        OrderUI: uiFor(document, request), document, URLSearchParams,
+        OrderUI: uiFor(document, request), document, URLSearchParams, Event,
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
         confirm: () => true, setInterval: callback => { poll = callback; },
     }, {filename: 'email_send/order-dashboard.js'});
@@ -105,6 +106,52 @@ async function testOrderActionFeedback() {
     assert.equal(calls.filter(call => call.data?.action === 'enqueue').length, 2);
 }
 
+async function testRecipientFormLifecycle() {
+    const document = makeDocument(), form = document.getElementById('add-recipient'), input = document.getElementById('recipient-email');
+    const item = {doc_id: 17, doc_number: '17', doc_year: '2569', doc_name: 'QA order', status: 'sending'};
+    let dirty = false, cleanEvents = 0, rejectWrite = false, failRefresh = false, deferWrite = false, finishWrite;
+    input.addEventListener('input', () => { dirty = true; });
+    form.addEventListener('eoffice:form-saved', () => { dirty = false; cleanEvents++; });
+    const request = async (url, data) => {
+        if (data) {
+            if (rejectWrite) throw Error('recipient rejected');
+            assert.equal(data.action, 'add_recipient');
+            if (deferWrite) return new Promise(resolve => {finishWrite=resolve;});
+            return {message: 'recipient saved'};
+        }
+        if (failRefresh) throw Error('refresh failed after successful write');
+        if (url.includes('doc_id=')) return {job: {status: 'sending'}, files: [], recipients: []};
+        return {total: 1, years: [], is_admin: false, worker: {enabled: false}, data: [item]};
+    };
+    vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js', 'utf8'), {
+        OrderUI: uiFor(document, request), document, URLSearchParams, Event,
+        Option: class { constructor(text, value) { this.text = text; this.value = value; } },
+        confirm: () => true, setInterval() {},
+    });
+    await settle();
+    const open = () => document.querySelectorAll('#rows button, #recipient-rows button')[0].click();
+    const submit = () => form.onsubmit({preventDefault() {}});
+    open(); await settle();
+    input.value = 'new@example.test'; input.dispatch('input'); assert.equal(dirty, true);
+    submit(); await settle();
+    assert.equal(dirty, false); assert.equal(input.value, '');
+    document.getElementById('detail').close();
+    // A previous cancelled draft must not make a freshly initialized dialog dirty.
+    dirty = true; input.value = 'abandoned@example.test'; open(); await settle();
+    assert.equal(dirty, false); assert.equal(input.value, '');
+    input.value = 'failed@example.test'; input.dispatch('input'); rejectWrite = true;
+    const beforeFailure = cleanEvents; submit(); await settle();
+    assert.equal(dirty, true); assert.equal(input.value, 'failed@example.test'); assert.equal(cleanEvents, beforeFailure);
+    rejectWrite = false; failRefresh = true; submit(); await settle();
+    assert.equal(dirty, false, 'an accepted write clears the form even when subsequent list/detail refresh fails');
+    assert.equal(input.value, '');
+    failRefresh = false; document.getElementById('detail').close(); open(); await settle();
+    input.value = 'pending@example.test'; input.dispatch('input'); deferWrite = true; submit();
+    document.getElementById('detail').close(); finishWrite({message: 'saved after dialog closed'}); await settle();
+    assert.equal(dirty, false, 'an accepted write still clears cached dirty state if the dialog was closed while saving');
+    assert.equal(input.value, '');
+}
+
 async function testSettingsDraftActions() {
     const document = makeDocument(), requests = [];
     let settings = {enabled: true, model: 'gemini-test', key_configured: true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null, revision:7};
@@ -121,15 +168,20 @@ async function testSettingsDraftActions() {
     const modelOptions = document.getElementById('model-options');
     modelOptions.append(new Element('option'));
     document.getElementById('model').required = true;
-    const window = {addEventListener() {}};
+    const windowEvents={};const window = {addEventListener(type,callback) {(windowEvents[type] ||= []).push(callback);}};
     vm.runInNewContext(fs.readFileSync('email_send/ai-settings.js', 'utf8'), {
-        OrderUI: uiFor(document, request), document, window,
+        OrderUI: uiFor(document, request), document, window, Event,
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     }, {filename: 'email_send/ai-settings.js'});
     await settle();
 
     const model = document.getElementById('model'), testButton = document.getElementById('test-ai');
     model.value = 'gemini-candidate'; model.dispatch('input'); await settle();
+    const warns=()=>{let warned=false;for(const callback of windowEvents.beforeunload)callback({preventDefault(){warned=true;}});return warned;};
+    assert.equal(warns(),true);
+    windowEvents['eoffice:leaving-confirmed'][0]();assert.equal(warns(),false);
+    document.getElementById('settings-form').dispatch('input');assert.equal(warns(),true,'new settings edits must revoke confirmed departure');
+    windowEvents['eoffice:leaving-confirmed'][0]();windowEvents['eoffice:leaving-cancelled'][0]();assert.equal(warns(),true,'a cancelled/failed departure must restore the AI guard');
     testButton.click(); await settle();
     assert.equal(requests.at(-1).action, 'test');
     assert.equal(requests.at(-1).model, 'gemini-candidate');
@@ -162,6 +214,8 @@ function testSaveBarDoesNotOverlay() {
 (async () => {
     await testOrderActionFeedback();
     console.log('PASS an action failure remains visible after a successful automatic refresh');
+    await testRecipientFormLifecycle();
+    console.log('PASS recipient form: successful save, reopen, rejected write and failed post-save refresh synchronize the shared guard');
     await testSettingsDraftActions();
     console.log('PASS AI test invalidation and clearing the key pauses delivery without sending a new key');
     testSaveBarDoesNotOverlay();

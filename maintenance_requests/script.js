@@ -1,14 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('maintenanceForm');
+    const lifecycle = window.eofficeCreateFormLifecycle;
+    const markEdited = () => form.dispatchEvent(new Event('eoffice:form-dirty', {bubbles:true}));
     // 1. Set default date to today
     const dateInput = document.getElementById('requestDate');
-    if (dateInput) {
-        const today = new Date().toISOString().split('T')[0];
+    if (dateInput && !dateInput.value) {
+        const today = window.eofficeDates.today();
         dateInput.value = today;
     }
 
     // 1.1 Prefill requester name from Cookie if exists
     const requesterNameInput = document.getElementById('requesterName');
-    if (requesterNameInput) {
+    if (requesterNameInput && !requesterNameInput.value) {
         const userDisplayName = getCookie('User_DisplayName');
         if (userDisplayName) {
             try {
@@ -27,11 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const otherDetailInput = document.getElementById('otherTypeDetail');
 
     if (otherCheckbox && otherContainer) {
-        otherCheckbox.addEventListener('change', function() {
+        otherCheckbox.addEventListener('change', function(event) {
             if (this.checked) {
                 otherContainer.classList.remove('hidden');
                 otherDetailInput.setAttribute('required', 'required');
-                otherDetailInput.focus();
+                if (event.isTrusted) otherDetailInput.focus();
             } else {
                 otherContainer.classList.add('hidden');
                 otherDetailInput.removeAttribute('required');
@@ -44,10 +47,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const imageFilesInput = document.getElementById('imageFiles');
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
     let selectedImages = []; // เก็บออบเจกต์ภาพ { filename, mimeType, base64Data }
+    const pendingImages = new Set();
+    let imageGeneration = 0, imageReadFailed = false;
 
     if (imageFilesInput && imagePreviewContainer) {
         imageFilesInput.addEventListener('change', function(e) {
+            if (lifecycle.busy(form)) return;
             const files = Array.from(e.target.files);
+            let acceptedRetry=false;
             
             files.forEach(file => {
                 if (!file.type.startsWith('image/')) {
@@ -60,8 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
+                if (!acceptedRetry) {imageReadFailed=false;acceptedRetry=true;}
                 const reader = new FileReader();
+                const generation = imageGeneration;
+                pendingImages.add(reader);
                 reader.onload = function(evt) {
+                    if (!pendingImages.delete(reader) || generation !== imageGeneration) return;
                     const base64Data = evt.target.result;
                     const imageObj = {
                         filename: file.name,
@@ -71,8 +82,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     selectedImages.push(imageObj);
                     renderImagePreviews();
+                    markEdited();
                 };
-                reader.readAsDataURL(file);
+                reader.onerror = reader.onabort = () => {
+                    if (!pendingImages.delete(reader) || generation !== imageGeneration) return;
+                    imageReadFailed = true;showToast('อ่านรูปภาพไม่สำเร็จ กรุณาเลือกใหม่', 'error');
+                };
+                try {reader.readAsDataURL(file);} catch {reader.onerror();}
             });
             
             imageFilesInput.value = '';
@@ -94,8 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
             removeBtn.className = 'remove-preview-btn';
             removeBtn.innerHTML = '&times;';
             removeBtn.addEventListener('click', () => {
+                if (lifecycle.busy(form)) return;
                 selectedImages.splice(index, 1);
                 renderImagePreviews();
+                markEdited();
             });
             
             wrapper.appendChild(image);
@@ -105,14 +123,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. Handle Form Submission — เชื่อมต่อ API จริง
-    const form = document.getElementById('maintenanceForm');
     const submitBtn = document.getElementById('submitBtn');
     const btnText = submitBtn.querySelector('.btn-text');
     const loader = submitBtn.querySelector('.loader');
 
     if (form) {
+        form.addEventListener('reset', () => {
+            imageGeneration++;selectedImages=[];imageReadFailed=false;
+            const readers = [...pendingImages];pendingImages.clear();
+            for (const reader of readers) if (reader.readyState === 1) reader.abort();
+            renderImagePreviews();
+            if (otherContainer) otherContainer.classList.add('hidden');
+            otherDetailInput?.removeAttribute('required');
+            const generation=imageGeneration;
+            queueMicrotask(()=>{
+                if (generation===imageGeneration && !lifecycle.busy(form) && dateInput && !dateInput.value) dateInput.value=window.eofficeDates.today();
+            });
+        });
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
+            if (lifecycle.busy(form)) return;
+            if (pendingImages.size) {showToast('กำลังอ่านรูปภาพ กรุณารอสักครู่ก่อนส่ง', 'error');return;}
+            if (imageReadFailed) {showToast('มีรูปภาพที่อ่านไม่สำเร็จ กรุณาเลือกใหม่หรือรีเซ็ตฟอร์มก่อนส่ง', 'error');return;}
             
             // Basic validation check
             if (!form.checkValidity()) {
@@ -127,6 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const token = lifecycle.begin(form);
+            if (!token) return;
             // Show loading state
             btnText.classList.add('hidden');
             loader.classList.remove('hidden');
@@ -143,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // สร้าง payload
             const payload = {
+                _expected_owner: token.owner,
                 // ข้อมูลผู้ใช้จาก Cookie
                 user_token:      getCookie('User_Token') || '1',
 
@@ -173,24 +208,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 const result = await response.json();
+                if (response.status===401 || result.code==='form_owner_changed') window.dispatchEvent(new Event('eoffice:permissions-changed'));
 
-                if (result.status === 'success') {
-                    showToast('ส่งใบแจ้งซ่อมเรียบร้อยแล้ว!', 'success');
-                    
-                    // รีเซ็ตฟอร์ม
-                    form.reset();
-                    // ตั้งค่าวันที่กลับเป็นวันนี้
-                    if (dateInput) {
-                        dateInput.value = new Date().toISOString().split('T')[0];
-                    }
-                    // ซ่อนช่อง "อื่นๆ" กลับ
-                    if (otherContainer) {
-                        otherContainer.classList.add('hidden');
-                    }
-
-                    // รีเซ็ตรูปภาพประกอบ
-                    selectedImages = [];
-                    renderImagePreviews();
+                if (response.ok && result.status === 'success') {
+                    lifecycle.recordCommitted(token,result);
+                    const applied = await lifecycle.applyCommitted(token, () => {
+                        showToast('ส่งใบแจ้งซ่อมเรียบร้อยแล้ว!', 'success');
+                        form.reset();
+                        if (dateInput) dateInput.value = window.eofficeDates.today();
+                    });
+                    if (!applied) showToast('ส่งใบแจ้งซ่อมชุดที่ส่งไปแล้ว โดยรักษาการแก้ไขใหม่ที่ยังไม่ได้ส่งไว้', 'success');
 
                 } else {
                     showToast(result.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่', 'error');
@@ -200,12 +227,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Submit error:', error);
                 showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง', 'error');
             } finally {
+                lifecycle.end(token);
                 // Reset button state
                 btnText.classList.remove('hidden');
                 loader.classList.add('hidden');
-                submitBtn.disabled = false;
             }
         });
+    }
+
+    if (form) {
+        form.dataset.eofficeDraftReady = 'true';
+        submitBtn.disabled=false;
+        form.dispatchEvent(new Event('eoffice:form-ready'));
+        if (imageFilesInput?.files?.length) imageFilesInput.dispatchEvent(new Event('change',{bubbles:true}));
     }
 
     // ═══════════════════════════════════════════
@@ -238,9 +272,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         toast.innerHTML = `
             <span class="toast-icon ${type}">${icon}</span>
-            <span class="toast-message">${message}</span>
+            <span class="toast-message"></span>
         `;
         
+        toast.querySelector('.toast-message').textContent = message;
         document.body.appendChild(toast);
 
         // แสดง toast ด้วย animation

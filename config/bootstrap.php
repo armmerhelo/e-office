@@ -86,6 +86,36 @@ function app_admin(): array {
     if ($user['User_Status'] !== 'Admin') app_fail('คุณไม่มีสิทธิ์ทำรายการนี้', 403);
     return $user;
 }
+function app_expected_owner(array $input, ?array $user): void {
+    // Legacy callers may omit this field. New forms bind their captured owner
+    // to the request session so a cookie change cannot reattribute their data.
+    if (!array_key_exists('_expected_owner', $input)) return;
+    $expected = $input['_expected_owner'];
+    if ((!is_int($expected) && !(is_string($expected) && preg_match('/^[1-9][0-9]*$/D', $expected))) ||
+        filter_var($expected, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]) === false) app_fail('Invalid form owner');
+    if (!$user) app_fail('กรุณาเข้าสู่ระบบใหม่', 401);
+    if ((int)$user['User_Id'] !== (int)$expected) app_json(['status'=>'error','code'=>'form_owner_changed','message'=>'บัญชีผู้ใช้เปลี่ยนแล้ว กรุณาโหลดหน้าใหม่ก่อนส่งข้อมูล'], 409);
+}
+class AppCreateOwnerChanged extends RuntimeException {
+    public function __construct(public int $status) {parent::__construct($status===401?'กรุณาเข้าสู่ระบบใหม่':'บัญชีผู้ใช้เปลี่ยนแล้ว กรุณาโหลดหน้าใหม่ก่อนส่งข้อมูล');}
+}
+function app_lock_create_owner(array $input, string $table): array {
+    if(!in_array($table,['maintenance_requests','room_bookings'],true))throw new InvalidArgumentException('Invalid create table');
+    $pdo=app_pdo();
+    if($pdo->inTransaction())throw new RuntimeException('Create transaction already active');
+    $pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');$pdo->beginTransaction();
+    // Acquire table metadata before auth locks: a table-lock wait must not keep
+    // the session alive or hide a logout completed while the request was queued.
+    $pdo->query("SELECT id FROM `$table` LIMIT 0");
+    $q=$pdo->prepare('SELECT User_Id FROM t_user WHERE User_Id=? LOCK IN SHARE MODE');$q->execute([(int)$input['_expected_owner']]);
+    if(!$q->fetchColumn()){$pdo->rollBack();throw new AppCreateOwnerChanged(401);}
+    $user=app_user(false,true);
+    if(!$user || (int)$user['User_Id']!==(int)$input['_expected_owner']) {
+        $pdo->rollBack();throw new AppCreateOwnerChanged($user?409:401);
+    }
+    // The user/session share locks remain held through the INSERT commit.
+    return $user;
+}
 function app_can(array $user, string $permission): bool {
     if (!isset(app_permission_catalog()[$permission])) return false;
     if($user['User_Status']==='Admin')return true;

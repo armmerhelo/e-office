@@ -25,8 +25,16 @@ let sendTableRequestSequence = 0;
 let sendRequestSequence = 0;
 let publicRequestSequence = 0;
 
+function invalidateDocumentRequests() {
+    receivedRequestSequence++;
+    sendTableRequestSequence++;
+    sendRequestSequence++;
+    publicRequestSequence++;
+}
+
 
 async function logOut() {
+    if (window.eofficeApproveDocumentLeaving?.(true) === false) return;
     try {
         // 1. เรียก API ปลายทาง (ยิงไปที่ api/logout.php)
         const response = await fetch('api/logout.php', {
@@ -35,7 +43,13 @@ async function logOut() {
 
         const data = await response.json();
 
-        if (data.status === 'success') {
+        if (response.ok && data.status === 'success') {
+            window.eofficeRevokeSession?.();
+            if (window.eofficeApproveDocumentLeaving?.(true) === false) {
+                window.eofficeUser=null;
+                window.dispatchEvent(new Event('eoffice:permissions-changed'));
+                return;
+            }
             // 2. ล้างค่าในหน่วยความจำของ Browser ทั้งหมด (LocalStorage และ SessionStorage)
             localStorage.clear(); // ล้างข้อมูลทั้งหมดใน LocalStorage (รวมถึง User_Token และข้อมูลอื่นๆ)
             sessionStorage.clear(); // ล้าง SessionStorage
@@ -51,13 +65,12 @@ async function logOut() {
             window.location.href = 'index.php';
         } else {
             alert("ไม่สามารถออกจากระบบได้: " + data.message);
+            window.eofficeCancelDocumentLeaving?.();
         }
     } catch (error) {
         console.error('Logout failed:', error);
-        // หาก API พัง อย่างน้อยก็ควรล้างค่าฝั่ง Client แล้วส่งกลับหน้า Login
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = 'index.php';
+        window.eofficeCancelDocumentLeaving?.();
+        alert('ไม่สามารถออกจากระบบได้ กรุณาลองใหม่อีกครั้ง');
     }
 }
 async function loginUser(username, password) {
@@ -368,7 +381,9 @@ if (width >= 1300) {
         if (requestSequence === receivedRequestSequence && load_data) load_data.style.display = "none";
     }
     if (requestSequence === receivedRequestSequence) {
-        window.history.replaceState(null, null, window.location.pathname);
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('id');
+        window.history.replaceState(null, '', currentUrl);
     }
 
 }
@@ -807,7 +822,7 @@ async function get_data_api_send_table(Page_number,search_txt, Year, user_token)
                         }
                         //console.log('User : '+detail);
                         //console.log("User ID:", detail.user_id, "| Name:", detail.user_name , "| Status:", detail.user_status);
-                        add_user_send(detail.user_id, detail.user_name);
+                        add_user_send(detail.user_id, detail.user_name,undefined,false);
                         user_status_text = user_status_text + `
                         <tr class="h-9">
                                 <td align="center" class="border border-gray-300 "><p class="pt-2"></p>${j+1}</td>
@@ -1032,7 +1047,7 @@ async function get_data_api_send(Page_number,search_txt, Year, user_token) {
                         //console.log('User : '+detail);
                         //console.log("User ID:", detail.user_id, "| Name:", detail.user_name , "| Status:", detail.user_status);
 
-                        add_user_send(detail.user_id, detail.user_name,doc_type);
+                        add_user_send(detail.user_id, detail.user_name,doc_type,false);
                         user_status_text = user_status_text + `
                         <tr class="h-9">
                                 <td align="center" class="border border-gray-300 "><p class="pt-2"></p>${j+1}</td>

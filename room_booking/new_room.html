@@ -36,7 +36,8 @@
 
             <div class="lg:col-span-2">
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-                    <form id="bookingForm" onsubmit="handleBooking(event)">
+                    <form id="bookingForm" data-eoffice-requires-draft="true" onsubmit="handleBooking(event)">
+                        <fieldset disabled data-eoffice-bootstrap style="border:0;margin:0;padding:0;min-width:0">
 
                         <h3 class="text-lg font-semibold mb-4 text-gray-800"><i class="fa-solid fa-user text-blue-600 mr-2"></i> ข้อมูลผู้ขออนุญาต</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -71,7 +72,7 @@
                             </div>
                             <div id="otherRoomContainer" class="hidden">
                                 <label for="otherRoom" class="block text-sm font-medium text-gray-700 mb-2">ระบุสถานที่อื่น ๆ <span class="text-red-500">*</span></label>
-                                <input type="text" id="otherRoom" placeholder="เช่น สนามฟุตบอล, ลานอเนกประสงค์" class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <input type="text" id="otherRoom" data-draft-clear-when="roomSelect" data-draft-active-value="อื่นๆ" placeholder="เช่น สนามฟุตบอล, ลานอเนกประสงค์" class="block w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </div>
 
@@ -150,7 +151,7 @@
                                     <input type="checkbox" id="equipOtherCheck" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" onchange="toggleOtherEquip()">
                                     <span class="ml-2 text-sm text-gray-600">อื่น ๆ (ระบุ)</span>
                                 </label>
-                                <input type="text" id="equipOtherText" placeholder="ระบุอุปกรณ์เพิ่มเติม" class="hidden w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <input type="text" id="equipOtherText" data-draft-composed="equipOtherCheck" placeholder="ระบุอุปกรณ์เพิ่มเติม" class="hidden w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             </div>
                         </div>
 
@@ -167,10 +168,11 @@
                             <button type="button" class="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition w-full sm:w-auto" onclick="document.getElementById('bookingForm').reset(); updateRoomPreview(); toggleOtherRoom(); toggleOtherEquip();">
                                 ล้างข้อมูล
                             </button>
-                            <button type="submit" class="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/30 transition w-full sm:w-auto flex justify-center items-center">
+                            <button type="submit" disabled class="px-8 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/30 transition w-full sm:w-auto flex justify-center items-center">
                                 <i class="fa-solid fa-paper-plane mr-2"></i> ส่งคำขออนุญาต
                             </button>
                         </div>
+                        </fieldset>
                     </form>
                 </div>
             </div>
@@ -243,6 +245,10 @@
         </div>
     </div>
 
+    <script src="../assets/form-owner-boundary.js?v=20261010-3"></script>
+    <script src="../assets/draft-commits.js?v=20261010-5"></script>
+    <script src="../assets/create-form-lifecycle.js?v=20261010-10"></script>
+    <script src="../assets/form-dates.js?v=20261013-bounds"></script>
     <script>
         // จำลองฐานข้อมูลเก็บประวัติการจองในระบบ (เพื่อใช้ตรวจสอบเวลาซ้ำ)
         let existingBookings = [];
@@ -285,6 +291,11 @@
         async function submit_bookingroom(event) {
             // ป้องกันหน้าเว็บรีเฟรช (ถ้าเรียกจาก onsubmit)
             if (event) event.preventDefault();
+            const form = document.getElementById('bookingForm');
+            const lifecycle = window.eofficeCreateFormLifecycle;
+            if (lifecycle.busy(form)) return;
+            window.eofficeDates.refreshBookingBounds(document);
+            if (!form.checkValidity()) {form.reportValidity();return;}
 
             const url = 'api/room_booking.php';
 
@@ -316,6 +327,9 @@
                 agreement: document.getElementById('agreement').checked
             };
 
+            const token = lifecycle.begin(form);
+            if (!token) return;
+            payload._expected_owner=token.owner;
             // --- 2. ส่ง Fetch API ---
             try {
                 // แสดง Loading (ถ้ามีปุ่มส่ง)
@@ -333,26 +347,31 @@
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => null);
+                    if (response.status===401 || errorData?.code==='form_owner_changed') window.dispatchEvent(new Event('eoffice:permissions-changed'));
                     throw new Error(errorData ? errorData.message : `HTTP Error: ${response.status}`);
                 }
 
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                  //  alert('ส่งคำขออนุญาตเรียบร้อยแล้ว!');
-                  document.getElementById('successModal').classList.remove('hidden');
-                    document.getElementById('bookingForm').reset(); // ล้างข้อมูล
+                    lifecycle.recordCommitted(token,data);
+                    const applied = await lifecycle.applyCommitted(token, () => {
+                        form.reset();
+                        updateRoomPreview();toggleOtherRoom();toggleOtherEquip();
+                        document.getElementById('successModal').classList.remove('hidden');
+                    });
+                    if (!applied) {
+                        alert('บันทึกคำขอชุดที่ส่งไปแล้ว โดยรักษาการแก้ไขใหม่ที่ยังไม่ได้ส่งไว้');
+                    }
                 } else {
                     alert('⚠️ ' + data.message);
                 }
 
             } catch (error) {
                 console.error('❌ เกิดข้อผิดพลาด:', error.message);
-                //alert('เกิดข้อผิดพลาด: ' + error.message);
+                alert('ไม่สามารถบันทึกคำขอได้: ' + error.message);
             } finally {
-                // คืนค่าปุ่มให้กดได้ปกติ
-                const submitBtn = event?.target.querySelector('button[type="submit"]');
-                if (submitBtn) submitBtn.disabled = false;
+                lifecycle.end(token);
             }
         }
 
@@ -466,6 +485,10 @@
         // ฟังก์ชันจัดการตอนกด Submit
     function handleBooking(event) {
         event.preventDefault();
+        if (window.eofficeCreateFormLifecycle.busy(document.getElementById('bookingForm'))) return;
+        window.eofficeDates.refreshBookingBounds(document);
+        const form=document.getElementById('bookingForm');
+        if (!form.checkValidity()) {form.reportValidity();return;}
 
         let selectedRoom = document.getElementById('roomSelect').value;
         if(selectedRoom === 'อื่นๆ'){
@@ -512,7 +535,6 @@
         // ฟังก์ชันปิด Modal
         function closeModal() {
             document.getElementById('successModal').classList.add('hidden');
-            document.getElementById('bookingForm').reset();
             updateRoomPreview();
             toggleOtherRoom();
             toggleOtherEquip();
@@ -520,43 +542,25 @@
         }
 
         // เซ็ตค่า Default วันที่และตรวจจับ Cookie ชื่อผู้ใช้ตอนโหลดหน้าเว็บ
-        window.onload = function() {
-          if(getCookie("User_DisplayName")){
-              var User_DisplayName = getCookie("User_DisplayName");
-              // ใช้ decodeURIComponent เพื่อแปลง %E0%B8... ให้กลับมาเป็นภาษาไทยปกติ
-              // และใช้ .replace(/\+/g, ' ') เผื่อกรณีที่เว้นวรรคถูกแปลงเป็นเครื่องหมายบวก (+)
-              var decodedName = decodeURIComponent(User_DisplayName).replace(/\+/g, ' ');
-
-              document.getElementById('requesterName').value = decodedName;
+        function initializeBookingForm() {
+          const requester = document.getElementById('requesterName');
+          const storedName=getCookie('User_DisplayName');
+          if(storedName && !requester.value){
+              try {requester.value=decodeURIComponent(storedName).replace(/\+/g,' ');}
+              catch {requester.value=storedName;}
           }
-          const today = new Date().toISOString().split('T')[0];
+          const today = window.eofficeDates.today();
           document.getElementById('startDate').setAttribute('min', today);
-          document.getElementById('startDate').value = today;
+          if (!document.getElementById('startDate').value) document.getElementById('startDate').value = today;
           document.getElementById('endDate').setAttribute('min', today);
-          document.getElementById('endDate').value = today;
+          if (!document.getElementById('endDate').value) document.getElementById('endDate').value = today;
 
-          // --- ส่วนที่เพิ่มเข้ามาใหม่ ---
-          // อำนวยความสะดวก: เมื่อเลือกเวลาเริ่ม ให้เวลาสิ้นสุดบวกเพิ่ม 1 ชม. อัตโนมัติ
-          document.getElementById('startTime').addEventListener('change', function() {
-              let startVal = this.value;
-              if(startVal) {
-                  let [hours, minutes] = startVal.split(':');
-                  // บวก 1 ชั่วโมง
-                  let endHours = String((parseInt(hours) + 1) % 24).padStart(2, '0');
-
-                  // ปรับค่าให้เฉพาะกรณีที่ผู้ใช้ยังไม่ได้เลือกเวลาสิ้นสุด
-                  // หรือวันที่เริ่มต้นและสิ้นสุดคือวันเดียวกัน
-                  let startD = document.getElementById('startDate').value;
-                  let endD = document.getElementById('endDate').value;
-
-                  if (startD === endD) {
-                      document.getElementById('endTime').value = `${endHours}:${minutes}`;
-                      // ล้างแจ้งเตือนสีแดงออกถ้ามี
-                      document.getElementById('endTime').classList.remove('border-red-500', 'ring-red-500');
-                  }
-              }
-          });
-      };
+          window.eofficeDates.attachBookingTimes(document.getElementById('bookingForm'), document);
+       }
+       // Set defaults when the form DOM is available, before waiting for page resources.
+        initializeBookingForm();
+        document.getElementById('bookingForm').dataset.eofficeDraftReady = 'true';
+        document.querySelector('#bookingForm button[type="submit"]').disabled=false;
 
         function getCookie(name) {
             // 1. สร้างรูปแบบที่ต้องการค้นหา เช่น "user_id="
@@ -575,6 +579,7 @@
             return null;
         }
     </script>
-    <script src="../assets/app-navigation.js?v=20261009-top-level" defer></script>
+    <script src="../assets/app-navigation.js?v=20261010-sidebar10" defer></script>
+    <script src="../assets/module-drafts.js?v=20261012-time-defaults" defer></script>
 </body>
 </html>

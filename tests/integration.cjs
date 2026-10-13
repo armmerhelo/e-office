@@ -37,7 +37,30 @@ async function run(){
  await test('admin department save and pagination',async()=>{await request('/management/save_department_api.php',{cookie:admin,form:form({Department_Name:'QA '+stamp,Department_Detail:"O'Reilly <img src=x onerror=alert(1)>"})});const {body}=await request('/management/get_departments_api.php?limit=1',{cookie:admin});assert.equal(body.data.length,1);assert.ok(body.total>0);});
  await test('upload PHP-as-PDF rejected atomically',async()=>request('/api/create_document.php',{cookie:owner,form:form({doc_number:'BAD'+stamp,doc_name:'QA',doc_type:'หนังสือ',doc_date_receive:'2026-10-07',doc_file_name:['bad'],file_id:['']},{'doc_upload[]':{data:'<?php echo 1;',name:'bad.pdf'}}),status:400}));
  const values={doc_number:'QA'+stamp,doc_name:'QA landscape document',doc_type:'หนังสือ',doc_date_receive:'2026-10-07',doc_receive_from:'QA',doc_file_name:['Landscape'],file_id:[''],send_to:[seed.users.recipient]};
- await test('document create with recipient and PDF',async()=>{const {body}=await request('/api/create_document.php',{cookie:owner,form:form(values,{'doc_upload[]':{data:pdf,name:'qa.pdf'}})});doc=body.doc_id;assert.ok(doc);const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.ok(Array.isArray(list.body),list.text);fileName=list.body[0].doc_upload_path[0].path;});
+  await test('document create with recipient and PDF',async()=>{const {body}=await request('/api/create_document.php',{cookie:owner,form:form({...values,_expected_owner:seed.users.owner},{'doc_upload[]':{data:pdf,name:'qa.pdf'}})});doc=body.doc_id;assert.ok(doc);const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.ok(Array.isArray(list.body),list.text);fileName=list.body[0].doc_upload_path[0].path;});
+  await test('save APIs bind the captured form owner to the actual request session',async()=>{
+    const expected=seed.users.owner;
+    const repair={_expected_owner:expected,requesterName:'QA expected owner',requestDate:'2026-10-07',repairTypes:['ไฟฟ้า'],building:'1',room:'1',damageDetails:'QA owner guard',phone:'0123456789'};
+    const room={_expected_owner:expected,requesterName:'QA expected owner',roomSelect:'QA owner guard '+stamp,topic:'QA owner guard',department:'QA',attendees:3,startDate:'2027-01-01',endDate:'2027-01-01',startTime:'10:00',endTime:'11:00',equipment:{}};
+    for(const [route,data]of [['/maintenance_requests/api/submit_maintenance.php',repair],['/room_booking/api/room_booking.php',room]]){
+      await request(route,{cookie:outsider,data,status:409});await request(route,{data,status:401});
+      await request(route,{cookie:owner,data:{...data,_expected_owner:true},status:400});
+      await request(route,{cookie:owner,data});
+    }
+    await request('/api/create_document.php',{cookie:outsider,form:form({...values,_expected_owner:expected,doc_number:'OWNER-GUARD'+stamp,doc_file_name:[],file_id:[],send_to:[]}),status:409});
+    await request('/api/create_document.php',{cookie:owner,form:form({...values,_expected_owner:0,doc_number:'OWNER-GUARD-INVALID'+stamp,doc_file_name:[],file_id:[],send_to:[]}),status:400});
+  });
+  await test('attachment save receipt supports replacement followed by a text-only save and rejects the old version',async()=>{
+    const number='RECEIPT'+stamp,created=(await request('/api/create_document.php',{cookie:owner,form:form({...values,doc_number:number,send_to:[]},{'doc_upload[]':{data:pdf,name:'first.pdf'}})})).body;
+    const original=created.files.entries[0];assert.equal(original.input_index,0);assert.ok(original.file_id);assert.equal(created.files.year,'2569');
+    const edit={...values,doc_number:number,formtype:'edit_document',doc_id:created.doc_id,replace_files:1,send_to:[],file_id:[original.file_id],file_version:[original.path]};
+    const saved=(await request('/api/create_document.php',{cookie:owner,form:form(edit,{'doc_upload[]':{data:pdf,name:'replacement.pdf'}})})).body;
+    const latest=saved.files.entries[0];assert.equal(latest.file_id,original.file_id);assert.notEqual(latest.path,original.path);
+    await request('/api/create_document.php',{cookie:owner,form:form({...edit,file_version:[latest.path],doc_name:'QA later title'})});
+    await request('/api/create_document.php',{cookie:owner,form:form(edit),status:409});
+    const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:number}});
+    assert.equal(list.body[0].doc_name,'QA later title');assert.equal(list.body[0].doc_upload_path.length,1);assert.equal(list.body[0].doc_upload_path[0].path,latest.path);
+  });
  await test('private PDF unavailable to guest/outsider',async()=>{await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}`,{status:401});await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}`,{cookie:outsider,status:403});});
  await test('recipient can read bound PDF with revision',async()=>{const result=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:recipient});assert.match(result.text,/^%PDF/);revision=result.r.headers.get('X-Document-Revision');assert.ok(revision);});
  await test('read status requires actual access',async()=>{await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc},status:403});await request('/api/update_read_status.php',{cookie:recipient,data:{doc_id:doc}});});

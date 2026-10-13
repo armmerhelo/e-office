@@ -1,6 +1,10 @@
 (() => {
     const el = id => document.getElementById(id);
     const state = {users:[], departments:[], version:'', request:0, busy:false, dirty:false};
+    function setDirty(dirty) {
+        state.dirty = dirty;
+        el('form_sign_routes').dispatchEvent(new Event(dirty ? 'eoffice:form-dirty' : 'eoffice:form-saved', {bubbles:true}));
+    }
     function message(text, error = false) {
         const node = el('sign-routing-message');
         node.textContent = text; node.hidden = !text; node.classList.toggle('error', error);
@@ -31,12 +35,12 @@
                 state.users.forEach(user => select.add(new Option(`${user.User_Name} (${user.User_Email})`, user.User_Id)));
                 select.value = route[key] ?? '';
             }
-            select.addEventListener('change', () => { state.dirty = true; });
+            select.addEventListener('change', () => { setDirty(true); });
             cell.append(select); row.append(cell);
         }
         const cell = document.createElement('td'), remove = document.createElement('button');
         remove.type = 'button'; remove.className = 'btn small danger'; remove.textContent = 'ลบคู่';
-        remove.addEventListener('click', () => { if (state.busy) return; row.remove(); state.dirty = true; emptyHint(); });
+        remove.addEventListener('click', () => { if (state.busy) return; row.remove(); setDirty(true); emptyHint(); });
         cell.append(remove); row.append(cell); el('sign-route-rows').append(row); emptyHint();
     }
     async function load() {
@@ -48,10 +52,10 @@
             if (request !== state.request) return;
             state.users = data.users; state.departments = data.departments; state.version = data.route_version;
             el('sign-route-rows').replaceChildren(); data.routes.forEach(addRow); emptyHint();
-            state.dirty = false; controls(true); message('');
+            setDirty(false); controls(true); message('');
         } catch (error) { if (request === state.request) message(error.message, true); }
     }
-    el('add-sign-route').addEventListener('click', () => { if (state.busy || !state.version) return; addRow(); state.dirty = true; });
+    el('add-sign-route').addEventListener('click', () => { if (state.busy || !state.version) return; addRow(); setDirty(true); });
     el('reload-sign-routes').addEventListener('click', load);
     el('form_sign_routes').addEventListener('submit', async event => {
         event.preventDefault(); if (state.busy || !state.version) return;
@@ -63,7 +67,7 @@
         state.busy = true; controls(false); message('กำลังบันทึก Auto send...');
         try {
             const data = await api('save_sign_routes_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({routes, route_version:state.version})});
-            state.version = data.route_version; state.dirty = false; message(data.message);
+            state.version = data.route_version; setDirty(false); message(data.message);
             window.dispatchEvent(new Event('eoffice-sign-routes-changed'));
         } catch (error) { message(error.message, true); }
         finally { state.busy = false; controls(true); }

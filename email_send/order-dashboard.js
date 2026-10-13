@@ -119,6 +119,11 @@
         }
     }
 
+    function resetRecipientForm() {
+        el('recipient-email').value = '';
+        el('add-recipient').dispatchEvent(new Event('eoffice:form-saved', {bubbles: true}));
+    }
+
     async function action(docId, name, extra = {}) {
         if (busy) return;
         busy = true; updateControls();
@@ -126,11 +131,12 @@
         U.message(feedbackId, 'กำลังบันทึกงาน…');
         try {
             const result = await U.request('order_jobs.php', {doc_id: docId, action: name, ...extra});
+            // The write succeeded even if the subsequent list/detail refresh fails.
+            if (name === 'add_recipient') resetRecipientForm();
             await load(true);
             U.message(feedbackId, result.message);
             if (activeDoc?.doc_id === docId && el('detail').open) {
                 U.message('detail-message', result.message);
-                if (name === 'add_recipient') el('recipient-email').value = '';
                 await detail();
             }
         } catch (error) {
@@ -143,7 +149,7 @@
         activeDoc = item; detailReady = false;
         el('detail-title').textContent = item.doc_name;
         el('detail-number').textContent = `คำสั่ง ${item.doc_number} / ${item.doc_year}`;
-        el('recipient-email').value = '';
+        resetRecipientForm();
         U.message('detail-message', '');
         el('detail').showModal();
         await detail();

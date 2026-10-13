@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/../../config/services.php';require_once __DIR__.'/drive.php';
 app_method('POST');$d=app_input();$user=app_user(false);
+app_expected_owner($d,$user);
 $name=app_text($d,'requesterName',255,true);$date=app_date(app_text($d,'requestDate',10,true));$phone=app_text($d,'phone',50,true);$building=app_text($d,'building',255,true);$room=app_text($d,'room',255,true);$details=app_text($d,'damageDetails',10000,true);
 $position=app_text($d,'position',255);$department=app_text($d,'department',255);$otherType=app_text($d,'otherTypeDetail',255);
 $types=$d['repairTypes']??[];if(!is_array($types)||!$types||count($types)>20)app_fail('Invalid repair types');foreach($types as $type)if(!is_string($type)||mb_strlen($type)>50)app_fail('Invalid repair type');$types=implode(',',$types);
@@ -15,6 +16,18 @@ foreach($images as $image){
 try{foreach($prepared as [$base,$filename,$mime])$urls[]=upload_maintenance_image((int)substr($date,0,4)+543,$base,$filename,$mime);}
 catch(Throwable $e){error_log((string)$e);if($urls)app_queue(['type'=>'drive_cleanup_required','urls'=>$urls]);app_fail('อัปโหลดรูปไม่สำเร็จ',502);}
 $pdo=app_pdo();
-try{$q=$pdo->prepare("INSERT INTO maintenance_requests (User_Id,requester_name,position,department,phone,request_date,repair_types,other_type_detail,building,room,damage_details,images,consideration_status,action_result) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending')");$q->execute([$user['User_Id']??null,$name,$position,$department,$phone,$date,$types,$otherType,$building,$room,$details,$urls?json_encode($urls):null]);}
-catch(Throwable $e){if($urls)app_queue(['type'=>'drive_cleanup_required','urls'=>$urls]);throw $e;}
-app_json(['status'=>'success','message'=>'บันทึกใบแจ้งซ่อมสำเร็จ','id'=>(int)$pdo->lastInsertId()]);
+if(array_key_exists('_expected_owner',$d) || $user) {
+ try {
+  $ownerInput=$d;
+  if(!array_key_exists('_expected_owner',$ownerInput))$ownerInput['_expected_owner']=(int)$user['User_Id'];
+  $user=app_lock_create_owner($ownerInput,'maintenance_requests');
+ }catch(Throwable $e){
+  if($pdo->inTransaction())$pdo->rollBack();
+  if($urls)app_queue(['type'=>'drive_cleanup_required','urls'=>$urls]);
+  if($e instanceof AppCreateOwnerChanged)app_json(['status'=>'error','code'=>$e->status===409?'form_owner_changed':'session_required','message'=>$e->getMessage()],$e->status);
+  throw $e;
+ }
+}
+try{$q=$pdo->prepare("INSERT INTO maintenance_requests (User_Id,requester_name,position,department,phone,request_date,repair_types,other_type_detail,building,room,damage_details,images,consideration_status,action_result) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending')");$q->execute([$user['User_Id']??null,$name,$position,$department,$phone,$date,$types,$otherType,$building,$room,$details,$urls?json_encode($urls):null]);$id=(int)$pdo->lastInsertId();if($pdo->inTransaction())$pdo->commit();}
+catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($urls)app_queue(['type'=>'drive_cleanup_required','urls'=>$urls]);throw $e;}
+app_json(['status'=>'success','message'=>'บันทึกใบแจ้งซ่อมสำเร็จ','id'=>$id]);

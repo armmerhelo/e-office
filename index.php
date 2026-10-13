@@ -264,7 +264,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li>
-          <a href="#public" id="menu-public" onclick="showView('public','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="index.php?view=public" id="menu-public" onclick="return navigateView(event, 'public');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.768-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
             </svg>
@@ -292,7 +292,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li id="li_menu_received">
-          <a href="#received" id="menu-received" onclick="showView('received','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="index.php?view=received" id="menu-received" onclick="return navigateView(event, 'received');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
             </svg>
@@ -301,7 +301,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li id="group_menu_send_table_1" class="hidden max-sm:block">
-          <a href="#send" id="menu-send"  onclick="showView('send','','1');" class=" menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="index.php?view=send" id="menu-send" onclick="return navigateView(event, 'send');" class=" menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
@@ -309,7 +309,7 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li id="group_menu_send_table_2" class="max-sm:hidden">
-          <a href="#sentable" id="menu-send-table" onclick="showView('send_table','','1');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+          <a href="index.php?view=send_table" id="menu-send-table" onclick="return navigateView(event, 'send_table');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
             </svg>
@@ -539,29 +539,6 @@ window.addEventListener('load', function() {
             </div>
 
           
-<script>
-window.addEventListener('message', function(event) {
-    // 🔒 ตรวจสอบความปลอดภัย (แนะนำให้เปิดใช้เมื่อขึ้นระบบจริง)
-    // if (event.origin !== 'https://child-domain.com') return;
-
-    // ตรวจสอบประเภท Message
-    if (false) {
-        const iframe = document.getElementById('iframe_maintenance_requests');
-        const maintenance_div = document.getElementById('maintenance_div'); // แก้เพิ่มตรงนี้!
-        
-        if (iframe) {
-            // ปรับความสูงของ iframe ตามที่หน้าลูกส่งมา
-            iframe.style.height = event.data.height + 'px';
-        }
-        
-        if (maintenance_div) {
-            // ปรับความสูงของตัวครอบด้วย (ถ้าจำเป็น) 
-            // แต่จริง ๆ ถ้า iframe สูงขึ้น ตัว div นี้จะยืดตามเองครับ
-            maintenance_div.style.height = event.data.height + 'px';
-        }
-    }
-});
-</script>
 
 
 
@@ -576,15 +553,6 @@ window.addEventListener('message', function(event) {
 
 
 
-  <div id="content_room_booking" style="display:none"></div>
-  <div id="external_number_booking" style="display:none"></div>
-  <div id="content_edit_room_booking" style="display:none"></div>
-  <div id="management_user" style="display:none"></div>
-  <div id="management_department" style="display:none"></div>
-  <div id="group_send_email_div" style="display:none"></div>
-  <div id="my_public_div" style="display:none"></div>
-  <div id="maintenance_div" style="display:none"></div>
-  <div id="maintenance_admin_div" style="display:none"></div>
 
   <div id="login_html"></div>
   <div id="doc_detail_html"></div>
@@ -596,6 +564,9 @@ window.addEventListener('message', function(event) {
   <script src="assets/security.js?v=<?php echo filemtime(__DIR__.'/assets/security.js'); ?>"></script>
   <script src="assets/api-service.js?v=<?php echo filemtime(__DIR__.'/assets/api-service.js'); ?>"></script>
   <script src="assets/utils.js?v=<?php echo filemtime(__DIR__.'/assets/utils.js'); ?>"></script>
+  <script src="assets/form-owner-boundary.js?v=<?php echo filemtime(__DIR__.'/assets/form-owner-boundary.js'); ?>"></script>
+  <script src="assets/document-form-guard.js?v=<?php echo filemtime(__DIR__.'/assets/document-form-guard.js'); ?>"></script>
+  <script src="assets/document-file-state.js?v=<?php echo filemtime(__DIR__.'/assets/document-file-state.js'); ?>"></script>
   <script src="assets/main.js?v=<?php echo filemtime(__DIR__.'/assets/main.js'); ?>"></script>
   <script src="assets/modal.js?v=<?php echo filemtime(__DIR__.'/assets/modal.js'); ?>"></script>
   <!-- <script src="room_booking/main-room.js?v=<?php echo time(); ?>"></script> -->

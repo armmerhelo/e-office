@@ -83,17 +83,17 @@
 .ai-settings-page .server-guide div > code { display: block; padding: 12px; margin: 12px 0; background: #f1f5f9; border-radius: 8px; font-size: .74rem; }
 .ai-settings-page .load-error { background: #fff1f2; border-color: #fecdd3; }
 .ai-settings-page .load-error p { font-size: .82rem; margin: 8px 0 14px; }
-@media (max-width: 1000px) {
+@container eoffice-content (max-width: 1000px) {
     .ai-settings-page .settings-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ai-settings-page .settings-layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; }
 }
-@media (max-width: 800px) {
+@container eoffice-content (max-width: 800px) {
     .ai-settings-page .settings-layout { grid-template-columns: minmax(0, 1fr); }
     .ai-settings-page .settings-sidebar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     .ai-settings-page .settings-sidebar .card { margin: 0; }
     .ai-settings-page .server-guide { grid-column: 1 / -1; }
 }
-@media (max-width: 520px) {
+@container eoffice-content (max-width: 520px) {
     .ai-settings-page .settings-summary { gap: 10px; }
     .ai-settings-page .status-card { padding: 14px 12px; }
     .ai-settings-page .status-card > p { font-size: .78rem; }

@@ -18,15 +18,44 @@ function applyPermissionMenus() {
     display_style('system_management', eofficeCan('members') || eofficeCan('departments') ? 'block' : 'none');
 }
 
+let permissionRefreshSequence = 0;
+let mainSessionRevision = 0, mainPageOwner = window.eofficeUser?.id ? String(window.eofficeUser.id) : null;
+function publishMainSession(status, user = null) {
+    if (!mainPageOwner && user?.id) mainPageOwner = String(user.id);
+    const state = Object.freeze({revision:++mainSessionRevision,status,user,pageOwnerId:mainPageOwner});
+    window.eofficeSessionState = state;
+    window.dispatchEvent(new CustomEvent('eoffice:session-updated', {detail:state}));
+}
+publishMainSession(window.eofficeUser?.id ? 'authenticated' : 'pending', window.eofficeUser || null);
+Promise.resolve(window.sessionReady).then(user => {
+    if (permissionRefreshSequence === 0) {
+        window.eofficeUser=user || null;publishMainSession(user?.id ? 'authenticated' : 'guest', user || null);
+    } else {
+        window.eofficeUser=window.eofficeSessionState.status === 'authenticated' ? window.eofficeSessionState.user : null;
+    }
+}).catch(() => {
+    if (permissionRefreshSequence === 0) {window.eofficeUser=null;publishMainSession('unavailable');}
+});
+window.eofficeRevokeSession = () => {
+    permissionRefreshSequence++;window.eofficeUser=null;publishMainSession('guest');applyPermissionMenus();
+};
 async function refreshPermissionMenus() {
+    const request = ++permissionRefreshSequence;
+    publishMainSession('pending');
     try {
         const response = await fetch('api/me.php');
-        if (!response.ok) return;
-        window.eofficeUser = (await response.json()).user;
+        if (!response.ok) throw new Error('Session verification failed');
+        const data = await response.json();
+        if (request !== permissionRefreshSequence) return;
+        window.eofficeUser = data.user;
+        publishMainSession(data.user?.id ? 'authenticated' : 'guest', data.user || null);
         applyPermissionMenus();
         const current = localStorage.getItem('currentPage');
         if (restrictedViewPermission(current) && !eofficeCan(restrictedViewPermission(current))) showView(window.eofficeUser ? 'received' : 'public', 'load');
-    } catch (error) { console.error(error); }
+    } catch (error) {
+        if (request !== permissionRefreshSequence) return;
+        window.eofficeUser=null;publishMainSession('unavailable');applyPermissionMenus();console.error(error);
+    }
 }
 
 function restrictedViewPermission(view) {
@@ -46,10 +75,41 @@ const MODULE_ROUTES = Object.freeze({
     maintenance_admin: 'maintenance_requests/admin.html'
 });
 
+const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
+const LOGIN_VIEW_KEY = 'eoffice-login-view';
+
+function requestedViewFromUrl() {
+    const url = new URL(window.location.href);
+    return url.searchParams.get('view') || ({received:'received', send:'send', public:'public', sentable:'send_table'})[url.hash.slice(1)];
+}
+
+function takeLoginView() {
+    if (!window.eofficeUser) return null;
+    const pending = sessionStorage.getItem(LOGIN_VIEW_KEY);
+    sessionStorage.removeItem(LOGIN_VIEW_KEY);
+    return Object.hasOwn(MODULE_ROUTES, pending) ? pending : null;
+}
+
+function navigateView(event, view) {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return true;
+    showView(view, '', '1');
+    return false;
+}
+
+window.addEventListener('popstate', async () => {
+    await window.sessionReady;
+    id = new URL(window.location.href).searchParams.get('id');
+    closeModal();
+    showView(id && window.eofficeUser ? 'received' : (requestedViewFromUrl() || (window.eofficeUser ? 'received' : 'public')), 'history');
+});
+
 window.addEventListener('eoffice:permissions-changed', () => {
     refreshPermissionMenus();
 });
-window.addEventListener('focus', () => { if (window.eofficeUser) refreshPermissionMenus(); });
+window.addEventListener('focus', () => { refreshPermissionMenus(); });
+window.addEventListener('pageshow', event => {
+    if (event.persisted) refreshPermissionMenus();
+});
 
 var Page_number = 1;
 var data_save = [];
@@ -72,7 +132,6 @@ const sub_head = document.getElementById("sub_head");
 const menu_members = document.getElementById("menu-members");
 const menu_edit_room_booking = document.getElementById("menu-edit-room-booking");
 const menu_public = document.getElementById("menu-public");
-const content_room_booking = document.getElementById("content_room_booking");
 const menu_bookingroom  =  document.getElementById("menu-bookingroom");
 const menu_groups = document.getElementById("menu-groups");
 const menu_send = document.getElementById("menu-send");
@@ -98,7 +157,6 @@ const closeIcon = document.getElementById("closeIcon");
 const cancelBtn = document.getElementById("cancelBtn");
 const closeDocDetail = document.getElementById("closeDocDetail");
 const doc_detail = document.getElementById("doc_detail");
-const content_edit_room_booking = document.getElementById("content_edit_room_booking");
 // --- Main Initialization (MOCK) ---
 
 // menu-members
@@ -119,6 +177,16 @@ window.addEventListener('pageshow', function (event) {
 
 window.onload = async () => {
     await window.sessionReady;
+    // A focus refresh can supersede the first request before load. Wait for its
+    // accepted result rather than initializing login/UI from the cached reply.
+    if (window.eofficeSessionState.status === 'pending') await new Promise(resolve => {
+        const accepted = () => {
+            if (window.eofficeSessionState.status === 'pending') return;
+            window.removeEventListener('eoffice:session-updated',accepted);resolve();
+        };
+        window.addEventListener('eoffice:session-updated',accepted);accepted();
+    });
+    window.eofficeUser=window.eofficeSessionState.status === 'authenticated' ? window.eofficeSessionState.user : null;
     if (!window.EOFFICE_MOCK_SERVICES && window.eofficeUser?.permissions?.includes('email')) {
         const processNotifications = () => {
             if (document.visibilityState === 'visible') fetch('api/process_notifications.php', {
@@ -164,9 +232,7 @@ window.onload = async () => {
       display_style('group_menu_members','none');
       display_style('group_menu_groups','none');
       display_style('group_send_email','none');
-      display_style('group_send_email_div','none');
       display_style('send_email','none');
-      display_style('my_public_div','none');
       display_style('group_send_email','none');
     }
 
@@ -194,21 +260,27 @@ window.onload = async () => {
 
     var currentPage = localStorage.getItem("currentPage");
     applyPermissionMenus();
+    const loginView = takeLoginView();
+    const requestedView = requestedViewFromUrl();
     if (id && getCookie("User_Token")) {
         showView('received', "load", '1');
-    } else if (urlParams.get('view')) {
-        showView(urlParams.get('view'), "load");
-    } else if (MODULE_ROUTES[currentPage]) {
+    } else if (requestedView && requestedView !== 'public') {
+        showView(requestedView, "load");
+    } else if (loginView) {
+        showView(loginView, "load");
+    } else if (requestedView) {
+        showView(requestedView, "load");
+    } else if (Object.hasOwn(MODULE_ROUTES, currentPage)) {
         // An old saved module used to reopen inside the main page. Start at the document inbox instead.
         showView(window.eofficeUser ? 'received' : 'public', "load");
     } else if (currentPage) {
         // สั่งให้ UI แสดงผล Tab นั้นๆ
         showView(currentPage, "load");
     }else if (!User_Status) {
-      showView('public');
+      showView('public', 'load');
     }  else {
 
-      showView('received');
+      showView('received', 'load');
 
     }
 
@@ -221,10 +293,8 @@ window.onload = async () => {
         menu_received.style.display = "none";
 
         display_style('group_send_email','none');
-        display_style('group_send_email_div','none');
         display_style('send_email','none');
         display_style('system_management','none');
-        display_style('my_public_div','none');
         display_style('my_menu_public','none');
         display_style('group_menu_bookdocnumber','none');
         display_style('menu-bookdocnumber','none');
@@ -246,7 +316,7 @@ window.onload = async () => {
         //search_menu.style.display = "none";
         modal.classList.add("active"); // ค่อยๆ แสดง (Fade In)
 
-        showView('public');
+        showView('public', 'load');
     }
 
 
@@ -333,6 +403,7 @@ document.addEventListener('keydown', event => {
 setSidebarOpen(false);
 
 const toggleModal = (show) => {
+    if (!show && window.eofficeDiscardDocumentEdits?.() === false) return;
     const modal = document.getElementById("document-modal");
     modal.classList.toggle("hidden", !show);
     if (show) {
@@ -430,79 +501,33 @@ const formatDate = (dateInput) => {
     }
 };
 
-// ===== iframe auto-fit: ปรับความสูง iframe ให้เต็มพื้นที่จอที่เหลือ =====
-// (เหตุผล: ให้ scrollbar มีอยู่ที่เดียว - ใน iframe การ์ด ไม่ซ้อนกับ scrollbar หน้าแม่)
-function fit_iframe_height(iframe) {
-    try {
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        if (!doc || !doc.documentElement) return;
-        // หลักการ: ให้ iframe เติมพื้นที่จอที่เหลือพอดี -> scrollbar มีอยู่ที่เดียว (ใน iframe)
-        // 1) เดินขึ้นจาก card ไปหา main_div สะสม "พื้นที่ใต้การ์ด" ที่ถูก element อื่นใช้จริง
-        //    (padding ของ container, footer ฯลฯ) ไม่นับช่องว่างที่เหลือจาก flex stretch
-        // 2) พื้นที่ว่าง = ความสูงจอ - ตำแหน่งบนของ iframe - พื้นที่ใต้ iframe
-        const mainDiv = document.getElementById('main_div');
-        if (!mainDiv) return;
-        let el = iframe.parentElement; // การ์ดที่ครอบ iframe
-        let reserve = 0;
-        while (el && el !== mainDiv && el.parentElement && el.parentElement !== mainDiv) {
-            const rect = el.getBoundingClientRect();
-            const prect = el.parentElement.getBoundingClientRect();
-            reserve += prect.bottom - rect.bottom;
-            el = el.parentElement;
-        }
-        reserve += parseFloat(getComputedStyle(mainDiv).paddingBottom) || 0;
-        const top = iframe.getBoundingClientRect().top;
-        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        const avail = viewportHeight - top - reserve - 2; // -2 เผื่อ subpixel กัน scrollbar เกิน
-        iframe.style.height = Math.max(avail, 300) + 'px';
-    } catch (e) { /* cross-origin (ไม่ควรเกิด เนื่องจากเป็น same-origin ทั้งหมด): ข้ามไป */ }
-}
-function on_iframe_loaded(iframe) {
-    fit_iframe_height(iframe);
-    inject_thin_scrollbar(iframe);
-}
-// ฉีดสไตล์ scrollbar เล็กเข้า iframe (แต่ละหน้าเป็น document แยก ไม่ได้โหลด style_main.css)
-// เรียกทุกครั้งที่ iframe โหลดเสร็จ (รวมเมื่อ navigates ภายใน iframe เช่น หน้า new_room.html)
-function inject_thin_scrollbar(iframe) {
-    try {
-        const doc = iframe.contentDocument;
-        if (!doc || !doc.head) return;
-        if (doc.getElementById('thin-scrollbar-style')) return;
-        const style = doc.createElement('style');
-        style.id = 'thin-scrollbar-style';
-        style.textContent = '*{scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}*::-webkit-scrollbar{width:6px;height:6px}*::-webkit-scrollbar-track{background:transparent}*::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:9999px}*::-webkit-scrollbar-thumb:hover{background:#94a3b8}';
-        doc.head.appendChild(style);
-    } catch (e) { /* cross-origin (ไม่ควรเกิด เนื่องจากเป็น same-origin ทั้งหมด): ข้ามไป */ }
-}
-window.fit_iframe_height = fit_iframe_height;
-window.on_iframe_loaded = on_iframe_loaded;
 // Expose functions to the window scope for use in inline HTML event handlers (onclick)
 window.toggleSidebar = toggleSidebar;
 window.toggleModal = toggleModal;
 window.formatDate = formatDate;
 const urlParams = new URLSearchParams(window.location.search);
 var id = urlParams.get('id'); // ได้ค่า "123"
-// วางโค้ดนี้ลงใน main.js เพื่อคอยสลัดปรับขนาด iframe เมื่อหน้าแจ้งซ่อมส่งสัญญาณมา
-window.addEventListener('message', function(event) {
-    if (false) {
-        const iframe = document.getElementById('iframe_maintenance_requests');
-        if (iframe) {
-            // ปรับ iframe ให้สูงพอดีกับหน้าฟอร์มจริง (ความสูงแบบพิกเซลจะมาแทนที่ h-[70vh] ทันที)
-            iframe.style.height = event.data.height + 'px'; 
-        }
-    }
-});
 
 
 function showView(showViews, page , page_number) {
+    if (!Object.hasOwn(MODULE_ROUTES, showViews) && !DOCUMENT_VIEWS.includes(showViews)) {
+        showViews = window.eofficeUser ? 'received' : 'public';
+    }
+    if (Object.hasOwn(MODULE_ROUTES, showViews) && !window.eofficeUser) {
+        sessionStorage.setItem(LOGIN_VIEW_KEY, showViews);
+        showViews = 'public';
+    } else if (page !== 'load' && page !== 'history') {
+        sessionStorage.removeItem(LOGIN_VIEW_KEY);
+    }
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
 
-    const moduleRoute = MODULE_ROUTES[showViews];
+    const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;
     if (moduleRoute) {
         if (!window.eofficeUser || getCookie('User_Token') === null) {
             showViews = 'public';
         } else {
+            if (window.eofficeApproveDocumentLeaving?.() === false) return false;
             localStorage.setItem('currentPage', showViews);
             setSidebarOpen(false);
             window.location.assign(moduleRoute);
@@ -510,27 +535,13 @@ function showView(showViews, page , page_number) {
         }
     }
 
+invalidateDocumentRequests();
 document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
 components_pagination.style.display = 'block';
 search_menu.style.display = 'block';
-document.getElementById("content_room_booking").innerHTML = "";
-document.getElementById("content_edit_room_booking").innerHTML = "";
-content_edit_room_booking.style.display = 'none';
-display_style('content_room_booking','none');
-display_style('my_public_div','none');
-display_style('content_edit_room_booking','none');
-display_style('management_user','none');
-display_style('management_department','none');
-display_style('external_number_booking','none');
-display_style('group_send_email_div','none');
-display_style('maintenance_div','none');
-display_style('maintenance_admin_div','none');
 
-// หน้า iframe: ซ่อนการ์ดขาว (doc-list) ให้เต็มพื้นที่เนื้อหา ไม่ดูเป็นกล่องซ้อนกล่อง
-// (หน้าเอกสาร: received/send/public/send_table ยังแสดงการ์ดขาวตามเดิม)
-const IFRAME_VIEWS = ['members','groups','room_booking','room_booking2','edit_room_booking','book','send_email','my_public','maintenance','maintenance_admin'];
 const docListCard = document.getElementById('doc-list');
-if (docListCard) docListCard.style.display = IFRAME_VIEWS.includes(showViews) ? 'none' : 'block';
+if (docListCard) docListCard.style.display = 'block';
 
 if (! page_number) {
    page_number = parseInt(localStorage.getItem("page_number"))||1;
@@ -559,7 +570,7 @@ if (! page_number) {
     menu_bookingroom.className = className_default;
     menu_edit_room_booking.className = className_default;
     display_style('sub_head','block');
-    display_style('page_header','block'); // แสดงหัว title (หน้า iframe จะซ่อนเอง)
+    display_style('page_header','block');
     console.log("Page_name : " + showViews);
     if (showViews != "received") {
       document.getElementById('read_icon_show').style.display = 'none';
@@ -569,50 +580,7 @@ if (! page_number) {
     }
 
     display_style('doc_type_div','none');
-    if (showViews == "members") {
-                document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-
-        display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-        current_view_title.innerHTML = "จัดการสมาชิก";
-        display_style('sub_head','none');
-        menu_members.className = className_click;
-        content_received.style.display = "none";
-        add_doc_btn.style.display = "none";
-
-        display_style('management_user','block');
-        components_pagination.style.display = 'none';
-        search_menu.style.display = 'none';
-        const management_user = document.getElementById("management_user");
-        if (!management_user.querySelector('iframe')) {
-            management_user.innerHTML = `
-
-            `;
-        }
-        load_data.style.display = "none";
-
-    } else if (showViews == "groups") {
-        document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-        display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-        current_view_title.innerHTML = "จัดการกลุ่มงาน";
-        display_style('sub_head','none');
-        menu_groups.className = className_click;
-        content_received.style.display = "none";
-        add_doc_btn.style.display = "none";
-        load_data.style.display = "block";
-
-        display_style('management_department','block');
-        components_pagination.style.display = 'none';
-        search_menu.style.display = 'none';
-        const management_department = document.getElementById("management_department");
-        if (!management_department.querySelector('iframe')) {
-            management_department.innerHTML = `
-
-            `;
-        }
-        load_data.style.display = "none";
-
-
-    } else if (showViews == "received"  || id) {
+    if (showViews == "received"  || id) {
         document.getElementById('search_txt').value = '';
         if (getCookie("User_Token")){
 
@@ -668,195 +636,19 @@ if (! page_number) {
         add_doc_btn.style.display = "flex";
         load_data.style.display = "block";
         content_received.style.display = "block";
-    } else if (showViews == "room_booking" ) {
-        document.body.style.overflow = "auto"; // หน้าปฏิทินเต็มจอ ไม่ต้องล็อค scroll หน้าแม่
-      display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-      current_view_title.innerHTML = "จองห้องประชุม";
-      display_style('sub_head','none');
-
-    menu_bookingroom.className = className_click; // ไฮไลท์เมนู
-
-    // จัดการการแสดงผลของ Container
-    content_received.style.display = "none";
-    content_room_booking.style.display = "block"; // แสดง Container นี้
-    if(typeof content_edit_room_booking !== 'undefined') content_edit_room_booking.style.display = "none";
-
-    add_doc_btn.style.display = "none";
-    load_data.style.display = "none";
-    components_pagination.style.display = 'none';
-    search_menu.style.display = 'none';
-
-    // ตรวจสอบและโหลด iframe สำหรับ room_booking (ไฟล์ index.html)
-    // หน้า index เป็นแบบ full-screen -> ใช้ความสูงเต็มพื้นที่จอที่เหลือ
-    // (หน้า new_room.html ที่เปิดต่อจากใน iframe จะมี scroll ภายในของตัวเอง)
-    const containerBooking1 = document.getElementById("content_room_booking");
-    if (!containerBooking1.querySelector('iframe')) {
-        containerBooking1.innerHTML = `
-
-        `;
     }
-
-} else if (showViews == "room_booking2") {
-
-    menu_bookingroom.className = className_click; // ไฮไลท์เมนู
-
-    // จัดการการแสดงผลของ Container
-    content_received.style.display = "none";
-    content_room_booking.style.display = "none";
-    if(typeof content_edit_room_booking !== 'undefined') content_edit_room_booking.style.display = "none";
-
-    add_doc_btn.style.display = "none";
-    load_data.style.display = "none";
-    components_pagination.style.display = 'none';
-    search_menu.style.display = 'none';
-
-    // ตรวจสอบและโหลด iframe สำหรับ room_booking2 (ไฟล์ new_room.html)
-
-
-} else if (showViews == "edit_room_booking") {
-    document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-    display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-    current_view_title.innerHTML = "แก้ไขการจองห้องประชุม";
-    display_style('sub_head','none');
-    if(typeof menu_edit_room_booking !== 'undefined') menu_edit_room_booking.className = className_click;
-
-    // จัดการการแสดงผลของ Container
-    content_received.style.display = "none";
-    content_room_booking.style.display = "none";
-    if(typeof content_edit_room_booking !== 'undefined') content_edit_room_booking.style.display = "block"; // แสดง Container นี้
-
-    add_doc_btn.style.display = "none";
-    load_data.style.display = "none";
-    components_pagination.style.display = 'none';
-    search_menu.style.display = 'none';
-
-    // ตรวจสอบและโหลด iframe สำหรับ edit_room_booking (ไฟล์ edit_room_booking.html)
-    const containerEdit = document.getElementById("content_edit_room_booking");
-    if (containerEdit && !containerEdit.querySelector('iframe')) {
-        containerEdit.innerHTML = `
-
-        `;
-    }
-}else if (showViews == "book") {
-
-  display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-  current_view_title.innerHTML = "จองเลขคำสั่ง";
-  display_style('sub_head','none');
-  menu_bookdocnumber.className = className_click;
-  add_doc_btn.style.display = "none";
-  load_data.style.display = "none";
-  components_pagination.style.display = 'none';
-  search_menu.style.display = 'none';
-  content_received.style.display = "none";
-  content_room_booking.style.display = "none";
-  display_style('external_number_booking','block');
-  const external_number_booking = document.getElementById("external_number_booking");
-  if (external_number_booking && !external_number_booking.querySelector('iframe')) {
-      external_number_booking.innerHTML = `
-
-      `;
-  }
-
-}else if (showViews == "send_email") {
-        document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-
-  display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-  current_view_title.innerHTML = "ส่งอีเมลคำสั่ง";
-  display_style('sub_head','none');
-  send_email.className = className_click;
-  add_doc_btn.style.display = "none";
-  load_data.style.display = "none";
-  components_pagination.style.display = 'none';
-  search_menu.style.display = 'none';
-  content_received.style.display = "none";
-  content_room_booking.style.display = "none";
-  display_style('group_send_email_div','block');
-  display_style('external_number_booking','none');
-  const group_send_email_div = document.getElementById("group_send_email_div");
-  if (group_send_email_div && !group_send_email_div.querySelector('iframe')) {
-      group_send_email_div.innerHTML = `
-
-      `;
-  }
-
-}
-
-else if (showViews == "my_public") {
-  display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-  current_view_title.innerHTML = "คำสั่งของฉัน";
-  display_style('sub_head','none');
-
-  my_public.className = className_click;
-  add_doc_btn.style.display = "none";
-  load_data.style.display = "none";
-  components_pagination.style.display = 'none';
-  search_menu.style.display = 'none';
-  content_received.style.display = "none";
-  content_room_booking.style.display = "none";
-  display_style('my_public_div','block');
-  display_style('external_number_booking','none');
-  const my_public_div = document.getElementById("my_public_div");
-  // 🛡️ แก้บั๊ก: เดิมเช็คผิด container (group_send_email_div) ทำให้ iframe ถูกสร้างซ้ำทุกครั้ง
-  if (my_public_div && !my_public_div.querySelector('iframe')) {
-      my_public_div.innerHTML = `
-
-      `;
-  }
-
-}else if (showViews == "maintenance") {
-  display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-  current_view_title.innerHTML = "แจ้งซ่อม";
-  display_style('sub_head','none');
-document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-  menu_maintenance.className = className_click;
-  add_doc_btn.style.display = "none";
-  load_data.style.display = "none";
-  components_pagination.style.display = 'none';
-  search_menu.style.display = 'none';
-  content_received.style.display = "none";
-  content_room_booking.style.display = "none";
-  display_style('maintenance_div','block');
-
-  const maintenance_div = document.getElementById("maintenance_div");
-  // 🛡️ เพิ่ม guard (เหมือน branch อื่น) กันสร้าง iframe ใหม่ทุกครั้ง -> ฟอร์มไม่หายเมื่อกลับมาหน้าเดิม
-  if (maintenance_div && !maintenance_div.querySelector('iframe')) {
-      maintenance_div.innerHTML = `
-
-
-
-      `;
-  }
-
-} else if (showViews == "maintenance_admin") {
-  display_style('page_header','none'); // หน้า iframe มีหัวของตัวเอง -> ซ่อนหัว title หลัก
-  current_view_title.innerHTML = "แจ้งซ่อม (ฝ่ายงาน)";
-  display_style('sub_head','none');
-  document.body.style.overflow = "auto"; // ให้หน้าแม่เลื่อนได้ (iframe จะยืดตามเนื้อหา)
-  menu_maintenance_admin.className = className_click;
-  add_doc_btn.style.display = "none";
-  load_data.style.display = "none";
-  components_pagination.style.display = 'none';
-  search_menu.style.display = 'none';
-  content_received.style.display = "none";
-  content_room_booking.style.display = "none";
-  display_style('maintenance_admin_div','block');
-
-  const maintenance_admin_div = document.getElementById("maintenance_admin_div");
-  if (maintenance_admin_div && !maintenance_admin_div.querySelector('iframe')) {
-      maintenance_admin_div.innerHTML = `
-
-
-      `;
-  }
-
-}
-
-    // ปรับความสูง iframe ที่กำลังแสดงให้เต็มพื้นที่จอ (กัน scrollbar ซ้อน/พื้นที่ว่างด้านล่าง)
-    document.querySelectorAll('iframe[data-fit]').forEach(function (f) {
-        if (f.offsetParent !== null) fit_iframe_height(f);
-    });
 
     if (getCookie("User_Token") === null) load_data.style.display = "none";
+
+    // Keep refresh and links aligned with the document tab that is actually visible.
+    const viewUrl = new URL(window.location.href);
+    viewUrl.searchParams.set('view', showViews);
+    if (!id) viewUrl.searchParams.delete('id');
+    viewUrl.hash = '';
+    if (viewUrl.href !== window.location.href) {
+        if (page === 'load' || page === 'history') history.replaceState(null, '', viewUrl);
+        else history.pushState(null, '', viewUrl);
+    }
 
 }
 function view_doc_public(doc_id) {
@@ -1198,17 +990,26 @@ document.getElementById("registerForm").addEventListener("submit", async (e) => 
 
 
 const docForm = document.getElementById("document-form");
+let documentSavePending = false;
 docForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
+    if (documentSavePending) return;
+    const submittedOwner = window.eofficeFormOwner.capture();
+    if (!submittedOwner) return;
     var user_token = getCookie("User_Token");
     const formData = new FormData(docForm);
+    formData.set('_expected_owner', submittedOwner);
+    const submittedRevision = window.eofficeDocumentRevision?.();
+    const submittedGeneration = window.eofficeDocumentGeneration?.();
+    const submittedFiles = window.captureDocumentFileState?.(docForm);
     if (localStorage.getItem('doc_type') !== 'Stamp') {
         formData.set('replace_recipients', '1');
         formData.set('replace_files', '1');
     }
 
     try {
+      documentSavePending = true;
       document.getElementById('submit_add_doc').style.display='none';
       document.getElementById('loading_save').style.display = 'block';
         const response = await fetch("../api/create_document.php", {
@@ -1222,6 +1023,7 @@ docForm.addEventListener("submit", async (e) => {
         // แปลงผลลัพธ์ที่ได้จาก PHP ให้เป็น JSON object
         const result = await response.json();
 
+        if (response.status===401 || result.code==='form_owner_changed') window.dispatchEvent(new Event('eoffice:permissions-changed'));
         if (response.ok && result.status === "success") {
             // ตรวจสอบว่ามี Error ในส่วนของไฟล์แนบหรือไม่
             if (result.files && result.files.status === "error") {
@@ -1233,11 +1035,27 @@ docForm.addEventListener("submit", async (e) => {
                 // แนะนำ: ไม่ต้อง reload เพื่อให้ผู้ใช้เห็นว่าไฟล์ไหนผิดและแก้ไขได้ทันที
             } else {
                 // กรณีสำเร็จทั้งหมด
-                alert("✅ สำเร็จ: " + result.message);
-                document.getElementById("document-modal").classList.add("hidden");
-                var page_name = localStorage.getItem("currentPage");
-
-                showView(page_name, "load");
+                const applied = await window.eofficeFormOwner.applyVerified(submittedOwner, {
+                    target:docForm,cancelled:() => submittedGeneration !== window.eofficeDocumentGeneration?.()
+                }, () => {
+                    const hasLaterEdits = submittedRevision !== window.eofficeDocumentRevision?.();
+                    if (result.doc_id) {
+                        document.getElementById('doc_id').value = result.doc_id;
+                        document.getElementById('formtype').value = 'edit_document';
+                    }
+                    if (submittedFiles) window.reconcileDocumentFiles(docForm, submittedFiles, result);
+                    docForm.dispatchEvent(new CustomEvent('eoffice:form-saved', {bubbles:true, detail:{revision:submittedRevision}}));
+                    if (hasLaterEdits) {
+                        // A successful response covers only the submitted snapshot.
+                        alert('บันทึกข้อมูลที่ส่งไปแล้ว แต่มีการแก้ไขเพิ่มเติมที่ยังไม่ได้บันทึก');
+                        return;
+                    }
+                    alert("✅ สำเร็จ: " + result.message);
+                    document.getElementById("document-modal").classList.add("hidden");
+                    const page_name = localStorage.getItem("currentPage");
+                    showView(page_name, "load");
+                });
+                if (!applied) alert('บันทึกเอกสารที่ส่งไปแล้ว โดยไม่เปลี่ยนฟอร์มปัจจุบัน');
                 //form.reset();
                 //  location.reload();
             }
@@ -1248,7 +1066,11 @@ docForm.addEventListener("submit", async (e) => {
         }
     } catch (error) {
         console.error("Error:", error);
-        alert("ไม่สามารถเชื่อมต่อกับ API ได้ หรือระบบส่งข้อมูลกลับมาไม่ใช่ JSON");
+        alert("ไม่สามารถบันทึกหรือซิงก์ข้อมูลได้: " + error.message);
+    } finally {
+        documentSavePending = false;
+        document.getElementById('submit_add_doc').style.display = 'block';
+        document.getElementById('loading_save').style.display = 'none';
     }
 
 });

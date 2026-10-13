@@ -21,6 +21,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModalBtn = document.getElementById('closeModalBtn');
     const cancelModalBtn = document.getElementById('cancelModalBtn');
     const adminActionForm = document.getElementById('adminActionForm');
+    let formRevision = 0, formGeneration = 0, savePending = false;
+    const markFormDirty = () => adminActionForm.dispatchEvent(new Event('eoffice:form-dirty', {bubbles:true}));
+    const markFormClean = () => adminActionForm.dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
+    for (const type of ['input','change','eoffice:form-dirty']) adminActionForm.addEventListener(type, () => {formRevision++;});
     const addMaterialBtn = document.getElementById('addMaterialBtn');
     const modalMaterialsList = document.getElementById('modalMaterialsList');
 
@@ -88,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Dynamic Materials Action
-        addMaterialBtn.addEventListener('click', () => addMaterialRow('', ''));
+        addMaterialBtn.addEventListener('click', () => addMaterialRow('', '', true));
 
         // Form Submit
         adminActionForm.addEventListener('submit', handleFormSubmit);
@@ -452,6 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        formGeneration++;
+
         // Populate read-only text fields
         modalRequestId.innerText = req.id;
         formRequestId.value = req.id;
@@ -510,6 +516,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (modalMaterialsList.children.length === 0) {
             addMaterialRow('', '');
         }
+
+        markFormClean();
 
         // Show Modal
         editModal.classList.remove('hidden');
@@ -626,12 +634,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function closeModal() {
+        formGeneration++;
         editModal.classList.add('hidden');
         document.body.style.overflow = ''; // Restore scrolling
     }
 
     // Dynamic Materials Input Rows
-    function addMaterialRow(name = '', qty = '') {
+    function addMaterialRow(name = '', qty = '', userChange = false) {
         const row = document.createElement('div');
         row.className = 'material-row';
         row.innerHTML = `
@@ -645,14 +654,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // Setup Delete button event
         row.querySelector('.remove-row-btn').addEventListener('click', () => {
             row.remove();
+            markFormDirty();
         });
 
         modalMaterialsList.appendChild(row);
+        if (userChange) markFormDirty();
+    }
+
+    function formSnapshot() {
+        return JSON.stringify([formRequestId.value,
+            document.querySelector('input[name="considerationStatus"]:checked')?.value,
+            document.querySelector('input[name="actionResult"]:checked')?.value,
+            assignedToInput.value,reasonCannotProceedInput.value,reasonCannotFixInput.value,repairDetailsInput.value,
+            [...modalMaterialsList.querySelectorAll('.material-row')].map(row => [row.querySelector('.material-name').value,row.querySelector('.material-qty').value])]);
     }
 
     // Submit form logic to update API
     async function handleFormSubmit(e) {
         e.preventDefault();
+        if (savePending) return;
+        const submittedRevision = formRevision, submittedGeneration = formGeneration, submittedSnapshot = formSnapshot();
+        savePending = true;
 
         // Show loading spinner
         saveBtnText.classList.add('hidden');
@@ -695,9 +717,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
 
-            if (result.status === 'success') {
+            if (response.ok && result.status === 'success') {
                 showToast(result.message || 'บันทึกสถานะงานเรียบร้อยแล้ว!', 'success');
-                closeModal();
+                if (submittedGeneration === formGeneration && submittedRevision === formRevision && submittedSnapshot === formSnapshot()) {
+                    markFormClean();
+                    closeModal();
+                } else if (submittedGeneration === formGeneration) {
+                    markFormDirty();
+                    showToast('บันทึกข้อมูลที่ส่งไปแล้ว แต่มีการแก้ไขเพิ่มเติมที่ยังไม่ได้บันทึก', 'success');
+                }
                 // Re-fetch all requests to refresh Dashboard counters, graphs, and the data list
                 fetchRequests();
             } else {
@@ -707,6 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Update submit error:', error);
             showToast('เชื่อมต่อเซิร์ฟเวอร์ผิดพลาด กรุณาลองใหม่อีกครั้ง', 'error');
         } finally {
+            savePending = false;
             // Restore button state
             saveBtnText.classList.remove('hidden');
             saveLoader.classList.add('hidden');

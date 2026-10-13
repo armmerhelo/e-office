@@ -365,6 +365,7 @@
                 if (response.ok && result.status === 'success') {
                     // เปลี่ยน Select ปีกลับมาเป็นปีปัจจุบันถ้ามีการจอง
                     document.getElementById('yearFilter').value = year;
+                    document.getElementById('bookingForm').dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
 
                     Swal.fire({
                         icon: 'success',
@@ -522,6 +523,6 @@
             fetchBookings();
         });
     </script>
-    <script src="../assets/app-navigation.js?v=20261009-top-level" defer></script>
+    <script src="../assets/app-navigation.js?v=20261010-sidebar10" defer></script>
 </body>
 </html>

@@ -1,146 +1,119 @@
+/* Shared shell mirrors the main E-Office sidebar without an embedded document. */
+body.eoffice-module-page {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    background: #f1f5f9;
+}
+.eoffice-app-navigation, .eoffice-module-header, .eoffice-module-backdrop { box-sizing: border-box; }
 .eoffice-app-navigation {
     position: fixed;
-    inset: 0 0 auto;
-    z-index: 1000;
-    box-sizing: border-box;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    width: 16rem;
+    max-width: calc(100vw - 3rem);
+    height: 100dvh;
+    padding: 16px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    color: #e0e7ff;
+    background: #3730a3;
+    box-shadow: 3px 0 14px #0f172a20;
+    font: 400 16px/1.5 'Prompt', sans-serif;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform .2s, visibility .2s;
+}
+.eoffice-app-navigation[data-open="true"] { transform: none; visibility: visible; }
+.eoffice-app-navigation [hidden] { display: none !important; }
+.eoffice-app-navigation a { color: inherit; text-decoration: none; }
+.eoffice-app-navigation__identity { text-align: center; margin: 0 0 18px; }
+.eoffice-app-navigation__brand { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.eoffice-app-navigation__brand img { margin: 0 0 10px; }
+.eoffice-app-navigation__brand strong { font-size: 14px; line-height: 1.3; color: white; }
+.eoffice-app-navigation__brand > span { font-size: 12px; }
+.eoffice-app-navigation__user { margin: 10px 0; color: #a5b4fc; font-size: 12px; font-weight: 600; }
+.eoffice-app-navigation__group { padding: 18px 12px 8px; margin: 0; border-top: 1px solid #4338ca; color: #a5b4fc; font-size: 12px; font-weight: 600; }
+.eoffice-app-navigation .eoffice-app-navigation__link,
+.eoffice-app-navigation .eoffice-app-navigation__logout {
     display: flex;
     align-items: center;
-    gap: 14px;
-    min-height: 58px;
-    padding: 9px clamp(12px, 3vw, 32px);
-    color: #e0e7ff;
-    background: #312e81;
-    box-shadow: 0 2px 10px rgb(15 23 42 / 14%);
-    font: 500 14px/1.4 system-ui, sans-serif;
-}
-
-body {
-    padding-top: 58px;
-}
-
-.eoffice-app-navigation a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.eoffice-app-navigation a:hover,
-.eoffice-app-navigation a:focus-visible,
-.eoffice-app-navigation summary:hover,
-.eoffice-app-navigation summary:focus-visible {
-    color: #fff;
-    outline-color: #c7d2fe;
-}
-
-.eoffice-app-navigation__brand {
-    flex: 0 0 auto;
-    color: #fff !important;
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: .02em;
-}
-
-.eoffice-app-navigation__title {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    color: #c7d2fe;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.eoffice-app-navigation__home,
-.eoffice-app-navigation__logout,
-.eoffice-app-navigation__menu > summary {
-    flex: 0 0 auto;
-    padding: 8px 11px;
-    border: 1px solid rgb(199 210 254 / 32%);
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 48px;
+    padding: 12px;
+    border: 0;
     border-radius: 8px;
-    cursor: pointer;
-    list-style: none;
-}
-
-.eoffice-app-navigation__logout {
-    color: inherit;
+    color: #e0e7ff;
     background: transparent;
     font: inherit;
+    text-align: left;
+    cursor: pointer;
 }
-
-.eoffice-app-navigation__logout[hidden] {
-    display: none;
+.eoffice-app-navigation .eoffice-app-navigation__link:hover,
+.eoffice-app-navigation .eoffice-app-navigation__logout:hover { background: #4f46e5; color: white; }
+.eoffice-app-navigation .is-current { background: #4338ca; color: white; font-weight: 500; }
+.eoffice-app-navigation :is(a,button):focus-visible { outline: 3px solid #a5b4fc; outline-offset: -3px; }
+.eoffice-app-navigation__icon { flex: 0 0 20px; width: 20px; height: 20px; }
+.eoffice-app-navigation__footer { padding: 24px 8px 8px; white-space: pre-line; font-size: 11px; color: #a5b4fc; text-align: center; }
+.eoffice-module-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 64px;
+    padding: 8px 16px;
+    background: white;
+    box-shadow: 0 2px 6px #0f172a18;
+    font: 600 18px/1.4 'Prompt', sans-serif;
 }
-
-.eoffice-app-navigation__menu > summary::-webkit-details-marker {
-    display: none;
+.eoffice-module-header a { color: #4338ca; text-decoration: none; }
+.eoffice-module-header .eoffice-module-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #475569; font-size: 24px; cursor: pointer; }
+.eoffice-module-backdrop { position: fixed; inset: 0; z-index: 35; background: #0008; }
+.eoffice-module-backdrop[hidden] { display: none; }
+.eoffice-module-content { box-sizing: border-box; min-width: 0; padding: 16px; container-type: inline-size; container-name: eoffice-content; }
+.eoffice-module-view { min-width: 0; }
+.eoffice-module-view[data-page$="/management/user_manage.html"] { padding: 16px; }
+.eoffice-module-view[data-page$="/management/department_manage.html"] { padding: 15px; }
+.eoffice-module-view[data-page$="/email_send/my_dashboard.html"] { padding: 20px; }
+.eoffice-module-view[data-page$="/email_send/doc_send_email.html"],
+.eoffice-module-view[data-page$="/email_send/ai_settings.html"],
+.eoffice-module-view[data-page$="/maintenance_requests/admin.html"] { padding: 24px; }
+.eoffice-module-view[data-page$="/room_booking/edit_room_booking.html"] { padding: 16px; }
+.eoffice-draft-notice { margin: 0 0 16px; padding: 12px 16px; border-radius: 8px; background: #eef2ff; color: #3730a3; font: 400 14px/1.6 'Prompt', sans-serif; }
+.eoffice-draft-notice[hidden] { display: none; }
+.eoffice-calendar-view { display: flex; flex-direction: column; }
+@media (min-width: 768px) {
+    .eoffice-module-content { padding: 24px; }
+    .eoffice-calendar-view { flex-direction: row; height: max(450px, calc(100dvh - 112px)); }
+    .eoffice-module-view[data-page$="/room_booking/edit_room_booking.html"] { padding: 32px; }
 }
-
-.eoffice-app-navigation__menu > summary::after {
-    margin-left: 7px;
-    content: '▾';
+@media (max-width: 768px) { .eoffice-module-view[data-page$="/maintenance_requests/admin.html"] { padding: 16px; } }
+@media (max-width: 720px) {
+    .eoffice-module-view[data-page$="/email_send/doc_send_email.html"], .eoffice-module-view[data-page$="/email_send/ai_settings.html"] { padding: 12px; }
 }
-
-.eoffice-app-navigation__links {
-    position: absolute;
-    top: calc(100% - 2px);
-    right: clamp(12px, 3vw, 32px);
-    display: grid;
-    grid-template-columns: repeat(2, minmax(190px, 1fr));
-    gap: 3px;
-    width: min(520px, calc(100vw - 24px));
-    max-height: min(70vh, 520px);
-    padding: 8px;
-    overflow: auto;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 12px 28px rgb(15 23 42 / 18%);
-}
-
-.eoffice-app-navigation__links[hidden],
-.eoffice-app-navigation__links a[hidden] {
-    display: none;
-}
-
-.eoffice-app-navigation__links a {
-    padding: 10px 12px;
-    color: #334155;
-    border-radius: 7px;
-}
-
-.eoffice-app-navigation__links a:hover,
-.eoffice-app-navigation__links a:focus-visible,
-.eoffice-app-navigation__links a.is-current {
-    color: #3730a3;
-    background: #eef2ff;
-}
-
 @media (max-width: 600px) {
-    .eoffice-app-navigation {
-        gap: 8px;
-        min-height: 54px;
-        padding-inline: 10px;
-        font-size: 12px;
-    }
-
-    body {
-        padding-top: 54px;
-    }
-
-    .eoffice-app-navigation__brand {
-        font-size: 15px;
-    }
-
-    .eoffice-app-navigation__title {
-        display: none;
-    }
-
-    .eoffice-app-navigation__home,
-    .eoffice-app-navigation__logout,
-    .eoffice-app-navigation__menu > summary {
-        padding: 7px 8px;
-    }
-
-    .eoffice-app-navigation__links {
-        right: 10px;
-        grid-template-columns: minmax(0, 1fr);
-    }
+    .eoffice-module-view[data-page$="/management/user_manage.html"] { padding: 8px; }
+    .eoffice-module-view[data-page$="/email_send/my_dashboard.html"] { padding: 10px; }
 }
+@media (min-width: 64rem) {
+    .eoffice-app-navigation { max-width: none; transform: none; visibility: visible; }
+    .eoffice-module-header, .eoffice-module-backdrop { display: none; }
+    .eoffice-module-content { margin-left: 16rem; padding: 32px; }
+    .eoffice-calendar-view { height: max(450px, calc(100dvh - 64px)); }
+}
+@media (prefers-reduced-motion: reduce) { .eoffice-app-navigation { transition: none; } }
+@container eoffice-content (min-width: 768px) and (max-width: 1023px) { .eoffice-calendar-view > aside { width: 33.333333%; } }
+@container eoffice-content (max-width: 767px) {
+    .eoffice-calendar-view { flex-direction: column; height: auto; }
+    .eoffice-calendar-view > main { height: auto; min-height: 450px; order: 1; }
+    .eoffice-calendar-view > aside { width: 100%; height: auto; min-height: 350px; order: 2; }
+    .eoffice-calendar-view .calendar-grid { grid-auto-rows: minmax(55px,1fr); }
+}
+@media print { .eoffice-app-navigation, .eoffice-module-header, .eoffice-module-backdrop { display: none; } .eoffice-module-content { margin: 0; padding: 0; } }
