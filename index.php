@@ -166,6 +166,7 @@ window.addEventListener('load', function() {
   <!-- <link rel="stylesheet" href="assets/style.css?v=<?php echo time(); ?>"> -->
 
   <link rel="stylesheet" href="assets/style_main.css?v=<?php echo filemtime(__DIR__.'/assets/style_main.css'); ?>">
+  <link rel="stylesheet" href="assets/sidebar.css?v=<?php echo filemtime(__DIR__.'/assets/sidebar.css'); ?>">
 
 
   <style>
@@ -224,20 +225,19 @@ window.addEventListener('load', function() {
   <div id="app-layout" class="flex min-h-[calc(100dvh-4rem)] lg:min-h-screen">
 
     <nav id="sidebar" data-sidebar-open="false" aria-label="เมนูหลัก" class="bg-indigo-800 text-white shadow-2xl overflow-y-auto">
-      <div class="pt-4 pl-6 pr-6" align="center">
-        <a href="index.php"><img src="img/icon_app_xl.png" width="60px" alt="E-Office"></a>
-        <div align="center" class="mt-1">
-          <p class="text-sm font-semibold text-white leading-tight">ระบบหนังสือราชการ E-Office</p>
-          <p class="text-xs text-indigo-200 leading-tight">โรงเรียนศรียานุสรณ์</p>
-        </div>
-        <p id="user_nameDisplay" class="px-4 pt-2 pb-2 text-xs font-semibold  text-indigo-300  border-indigo-700 ">user name</p>
+      <div class="eoffice-app-navigation__identity">
+        <a href="index.php?view=received" class="eoffice-app-navigation__brand"><img src="img/icon_app_xl.png" width="60" height="60" alt="E-Office">
+          <strong>ระบบหนังสือราชการ E-Office</strong>
+          <span>โรงเรียนศรียานุสรณ์</span>
+        </a>
+        <p id="user_nameDisplay" class="eoffice-app-navigation__user"></p>
       </div>
 
 
 
 
 
-        <li id="system_management" class="px-4 pt-4 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">จัดการระบบ</li>
+        <li id="system_management" class="eoffice-app-navigation__group">จัดการระบบ</li>
         <li id="group_menu_members">
           <a href="management/user_manage.html" id="menu-members" onclick="showView('members','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -254,7 +254,7 @@ window.addEventListener('load', function() {
             จัดการกลุ่มงาน
           </a>
         </li>
-        <li class="px-4 pt-6 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">ทะเบียนเอกสาร</li>
+        <li class="eoffice-app-navigation__group">ทะเบียนเอกสาร</li>
         <li id="group_menu_bookdocnumber">
           <a href="external_number_booking/external_number_booking.html" id="menu-bookdocnumber" onclick="showView('book','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -318,7 +318,7 @@ window.addEventListener('load', function() {
         </li>
 
 
-          <li id="other_menu_group" class="px-4 pt-4 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">อื่นๆ</li>
+          <li id="other_menu_group" class="eoffice-app-navigation__group">อื่น ๆ</li>
 
           <li id="group_menu_bookingroom">
             <a href="room_booking/index.html" id="menu-bookingroom" onclick="showView('room_booking','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
@@ -328,12 +328,19 @@ window.addEventListener('load', function() {
               จองห้องประชุม
             </a>
           </li>
+          <li id="group_menu_request_room">
+            <a href="room_booking/new_room.html" id="menu-request-room" onclick="showView('room_booking2','','1'); return false;" class="menu-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+              ขอใช้สถานที่
+            </a>
+          </li>
+
           <li id="group_menu_edit_room_booking" >
             <a href="room_booking/edit_room_booking.html" id="menu-edit-room-booking" onclick="showView('edit_room_booking','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
               <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
               </svg>
-              แก้ไขการจองห้อง
+              รายการจองห้องของฉัน
             </a>
           </li>
           <li id="group_maintenance" >
@@ -352,7 +359,13 @@ window.addEventListener('load', function() {
               แจ้งซ่อม (ฝ่ายงาน)
             </a>
           </li>
-        <li class="px-4 pt-6 pb-2 text-xs font-semibold uppercase text-indigo-300 border-t border-indigo-700">ผู้ใช้งาน</li>
+        <li id="group_ai_settings" style="display:none">
+          <a href="email_send/ai_settings.html" id="menu-ai-settings" class="menu-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2"></path></svg>
+            ตั้งค่า AI และอีเมล
+          </a>
+        </li>
+        <li class="eoffice-app-navigation__group">ผู้ใช้งาน</li>
         <li id="group_menu_logout" >
           <a href="#" id="menu-logout" onclick="logOut();" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150 " style="display:none">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -375,11 +388,11 @@ window.addEventListener('load', function() {
 
 
 
-      <div class="absolute pb-7 left-0 w-full px-4 text-center text-xs text-indigo-400">
-        <span id="user-info" class="block truncate">
+      <div class="eoffice-app-navigation__footer">
+        <span id="user-info">
           <p>พบปัญหาติดต่อ ครูภูธเนศ</p>
 
-          <p>E-OFFICE ศรียานุสรณ์. All Rights Reserved</p>
+          <p>E-OFFICE ศรียานุสรณ์</p>
 
 
       </span>

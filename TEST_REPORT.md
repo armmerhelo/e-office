@@ -1,5 +1,14 @@
 # ผลการแก้ไขและทดสอบ E-Office
 
+## รวมดีไซน์ sidebar หน้าหลักและโมดูล — 14 ตุลาคม 2026
+
+- เพิ่ม `assets/sidebar.css` เป็นกติกาดีไซน์กลางของ sidebar ทั้งสองแบบ และนำกติกาที่ซ้ำออกจาก `app-navigation.css`
+- ใช้ Prompt, ความกว้าง 256px, padding 16px/12px, แถวเมนู 48px, สี active และ scrollbar เดียวกัน พร้อมจัด identity/group/footer ให้ตำแหน่งตรงกัน
+- ปรับ SVG ของโมดูลให้ตรงกับหน้าหลัก รวมไอคอน login/logout และเพิ่มเมนูขอใช้สถานที่/ตั้งค่า AI บนหน้าหลักให้สอดคล้องกับโมดูล โดยคงการตรวจสิทธิ์ Admin สำหรับ AI
+- ตรวจผ่าน Chrome แยกสำหรับ QA: 11 หน้าโมดูลเทียบหน้าหลักที่ 1440px และ 390px รวม **22 กรณีผ่าน** โดย assert computed styles/geometry ของ sidebar, identity, group headings, ลำดับ/ชื่อ/ไอคอน/ขนาดเมนูตรงกัน พร้อมตรวจ Escape และ content inert ของ drawer บนมือถือ
+- ตรวจบัญชี QA owner บนหน้าหลัก/จองเลขคำสั่ง/แจ้งซ่อม/หน้า AI ว่า typography และ scrollbar ตรงกัน; การตรวจ 22 กรณีใช้บัญชี QA Admin
+- `npm.cmd run test:modules` และ `npm.cmd run test:syntax` ผ่าน; ไม่แก้ API และไม่ deploy production ในรอบนี้
+
 ## ตรวจซ้ำก่อน commit — 13 ตุลาคม 2026
 
 - รีวิวแพตช์ dirty lifecycle ล่าสุด ไม่พบข้อบกพร่องที่ยืนยันได้เพิ่มเติมในขอบเขตที่ตรวจ

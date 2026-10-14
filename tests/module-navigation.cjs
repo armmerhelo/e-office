@@ -98,6 +98,33 @@ assert.doesNotMatch(fs.readFileSync('assets/member-management.js', 'utf8'), /win
 
 console.log(`PASS ${Object.keys(routes).length} module routes and ${pages.length} top-level pages use shared navigation`);
 
+// Main and module markup must use the same sidebar contract and menu icons.
+function sidebarParityChecks() {
+    const navigation=fs.readFileSync('assets/app-navigation.js','utf8');
+    assert.match(index,/assets\/sidebar\.css/);
+    assert.ok(navigation.includes("'sidebar.css'"));
+    const modules=vm.runInNewContext(navigation.match(/const modules = (\[[\s\S]*?\n    \]);/)[1]);
+    const icons=vm.runInNewContext('('+navigation.match(/const iconPaths = (\{[\s\S]*?\n    \});/)[1]+')');
+    for (const item of modules) {
+        const anchor=index.match(new RegExp(`<a\\b(?=[^>]*\\bid=)[^>]*href="${item.path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}"[^>]*>([\\s\\S]*?)</a>`));
+        assert.ok(anchor,`${item.path} must be accessible from both sidebars`);
+        const label=anchor[1].replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]*>/g,'').trim();
+        assert.equal(label,item.label,`${item.path}: sidebar labels must match`);
+        assert.equal(anchor[1].match(/\bd="([^"]+)"/)[1],icons[item.icon],`${item.path}: sidebar icons must match`);
+    }
+    const nodes=new Map(),el=id=>{if(!nodes.has(id))nodes.set(id,{style:{},tagName:'LI'});return nodes.get(id);};
+    const runtime={window:{},document:{getElementById:el},display_style:(id,display)=>{el(id).style.display=display;}};
+    vm.createContext(runtime);
+    vm.runInContext(main.slice(main.indexOf('function eofficeCan('),main.indexOf('let permissionRefreshSequence')),runtime);
+    for(const user of [null,{status:'User',permissions:[]},{status:'User',permissions:['email']},{status:'Admin',permissions:['email','members','departments','maintenance']}]) {
+        runtime.window.eofficeUser=user;runtime.applyPermissionMenus();
+        assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
+        assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
+    }
+    console.log('PASS shared sidebar stylesheet, all menu labels/icons and Admin-only AI/request-room visibility');
+}
+sidebarParityChecks();
+
 // Execute the real router without the rest of the document UI or network requests.
 const router = main.slice(main.indexOf('function showView('), main.indexOf('function view_doc_public('));
 const elements = new Map();
