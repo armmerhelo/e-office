@@ -9,6 +9,7 @@ class Node extends EventTarget {
         const classes=new Set();this.classList={add:(...names)=>names.forEach(name=>classes.add(name)),remove:(...names)=>names.forEach(name=>classes.delete(name)),contains:name=>classes.has(name)};
     }
     set innerHTML(html) {
+        this.html=html;
         this.children=[];this.parts.clear();
         for (const name of ['material-name','material-qty']) {
             const match=html.match(new RegExp(`class="${name}"[^>]*value="([^"]*)"`));
@@ -20,10 +21,13 @@ class Node extends EventTarget {
     appendChild(node){node.parent=this;this.children.push(node);return node;}
     remove(){if(this.parent)this.parent.children.splice(this.parent.children.indexOf(this),1);}
     getContext(){return {};}
+    setAttribute(name,value){(this.attributes ||= {})[name]=value;}
 }
 
-async function setup() {
+async function setup(recordCount=2) {
     const nodes=new Map(),el=id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);};
+    for(const id of ['filterStatus','filterResult','filterType'])el(id).value='all';
+    el('sortOrder').value='newest';
     const radios=new Map(['considerationStatus','actionResult'].map(name=>[name,['pending','can_proceed','cannot_proceed','fixed','cannot_fix'].map(value=>Object.assign(new Node(),{value}))]));
     const document=new EventTarget();Object.assign(document,{getElementById:el,body:{style:{},appendChild(){}},createElement:()=>new Node(),
         querySelectorAll:selector=>radios.get(selector.match(/name="([^"]+)"/)?.[1])||[],
@@ -31,7 +35,7 @@ async function setup() {
     const form=el('adminActionForm');let dirty=false;
     for(const type of ['input','change','eoffice:form-dirty'])form.addEventListener(type,()=>{dirty=true;});
     form.addEventListener('eoffice:form-saved',()=>{dirty=false;});
-    const records=[1,2].map(id=>({id,requester_name:'QA',request_date:'2026-10-13',repair_types:'ไฟฟ้า',consideration_status:'can_proceed',action_result:'pending',materials:[{name:'Saved material',qty:'1'}]}));
+    const records=Array.from({length:recordCount},(_,i)=>({id:i+1,requester_name:'QA',request_date:'2026-10-13',repair_types:'ไฟฟ้า',consideration_status:'can_proceed',action_result:'pending',materials:[{name:'Saved material',qty:'1'}]}));
     const requests=[],window={};
     vm.runInNewContext(fs.readFileSync('maintenance_requests/admin.js','utf8'),{document,window,Event,Date,console,
         escapeHTML:value=>String(value??''),escapeRecord:value=>value,Chart:class{destroy(){}},setTimeout(){},requestAnimationFrame:fn=>fn(),
@@ -45,6 +49,20 @@ async function setup() {
 }
 
 async function run() {
+    const list=await setup(45);
+    assert.equal((list.el('requestsTableBody').html.match(/<tr data-id=/g)||[]).length,20,'large lists are paginated');
+    assert.ok(list.el('requestsTableBody').html.includes('data-id="45"'),'newest request first');
+    list.el('nextPageBtn').dispatchEvent(new Event('click'));
+    assert.ok(list.el('requestsTableBody').html.includes('data-id="25"'),'next page advances the slice');
+    list.el('searchInput').value='#31';list.el('searchInput').dispatchEvent(new Event('input'));
+    assert.equal(list.el('requests-count').innerText,'1 รายการ','request ID is searchable');
+    assert.equal(list.el('prevPageBtn').disabled,true,'filtering resets pagination');
+    list.el('searchInput').value='missing';list.el('searchInput').dispatchEvent(new Event('input'));
+    assert.ok(list.el('requestsTableBody').html.includes('ไม่พบรายการ'),'empty search gives recovery guidance');
+    list.el('resetFiltersBtn').dispatchEvent(new Event('click'));
+    assert.equal(list.el('requests-count').innerText,'45 รายการ','reset restores all records');
+    list.el('sortOrder').value='oldest';list.el('sortOrder').dispatchEvent(new Event('change'));
+    assert.ok(list.el('requestsTableBody').html.indexOf('data-id="1"')<list.el('requestsTableBody').html.indexOf('data-id="2"'),'oldest order works');
     const page=await setup();page.open(1);assert.equal(page.dirty(),false,'snapshot initialization stays clean');
     page.el('modalMaterialsList').children[0].querySelector('.remove-row-btn').dispatchEvent(new Event('click'));
     assert.equal(page.dirty(),true,'removing an existing material must notify the navigation guard');

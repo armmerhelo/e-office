@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let requestsRevision=0;
     let statusChartInstance = null;
     let categoryChartInstance = null;
+    let currentPage = 1, queueFilter = 'all', lastModalFocus = null, savedBodyOverflow = '';
+    const pageSize = 20;
+    const refreshBtn = document.getElementById('refreshRequestsBtn');
+    const dataStatus = document.getElementById('dataStatus');
+    const sortOrder = document.getElementById('sortOrder');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const queueButtons = document.querySelectorAll('[data-queue]');
 
     // DOM Elements
     const requestsTableBody = document.getElementById('requestsTableBody');
@@ -71,6 +79,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listeners Setup
     function setupEventListeners() {
+        refreshBtn.addEventListener('click', fetchRequests);
+        document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+            searchInput.value = '';
+            filterStatus.value = filterResult.value = filterType.value = 'all';
+            queueFilter = 'all';
+            applyFilters();
+        });
+        queueButtons.forEach(button => button.addEventListener('click', () => {
+            queueFilter = button.dataset.queue;
+            filterStatus.value = filterResult.value = 'all';
+            applyFilters();
+        }));
+        sortOrder.addEventListener('change', applyFilters);
+        prevPageBtn.addEventListener('click', () => changePage(-1));
+        nextPageBtn.addEventListener('click', () => changePage(1));
+        editModal.addEventListener('keydown', event => {
+            if (event.key === 'Escape') { event.preventDefault(); closeModal(); }
+            if (event.key !== 'Tab') return;
+            const controls = [...editModal.querySelectorAll('button, input, select, textarea, a[href]')].filter(node => !node.disabled && node.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        });
         // Real-time filters
         searchInput.addEventListener('input', applyFilters);
         filterStatus.addEventListener('change', applyFilters);
@@ -103,19 +134,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch maintenance list from API
     async function fetchRequests() {
         const revision=++requestsRevision;
+        refreshBtn.disabled = true;
+        dataStatus.textContent = 'กำลังโหลดข้อมูลใบแจ้งซ่อม…';
         try {
             // ดึงข้อมูลรายการแจ้งซ่อมทั้งหมดโดยระบุ limit 1000 รายการ
             const response = await fetch('api/get_maintenance.php?limit=1000');
             const result = await response.json();
             if(revision!==requestsRevision)return;
 
-            if (result.status === 'success' && Array.isArray(result.data)) {
+            if (response.ok && result.status === 'success' && Array.isArray(result.data)) {
                 allRequests = result.data;
                 
                 // คำนวณแดชบอร์ดและวาดตาราง
                 updateDashboardStats(allRequests);
                 renderCharts(allRequests);
                 applyFilters();
+                dataStatus.textContent = `อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})} • ${allRequests.length} รายการ` + (Number(result.total) > allRequests.length ? ` จากทั้งหมด ${result.total} รายการ (แสดงล่าสุด 1,000 รายการ)` : '');
             } else {
                 showErrorPlaceholder(result.message || 'ไม่สามารถดึงข้อมูลรายการแจ้งซ่อมได้');
             }
@@ -123,14 +157,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if(revision!==requestsRevision)return;
             console.error('Fetch error:', error);
             showErrorPlaceholder('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+        } finally {
+            if (revision === requestsRevision) refreshBtn.disabled = false;
         }
     }
 
     // Error rendering inside table
     function showErrorPlaceholder(message) {
-        const errorHtml = `<tr><td colspan="8" class="loading-placeholder text-red-600">${message}</td></tr>`;
+        dataStatus.textContent = 'โหลดข้อมูลไม่สำเร็จ กรุณากดรีเฟรชข้อมูลเพื่อลองอีกครั้ง';
+        requestsCount.innerText = 'โหลดไม่สำเร็จ';
+        prevPageBtn.disabled = nextPageBtn.disabled = true;
+        document.getElementById('pageSummary').textContent = '';
+        const errorHtml = `<tr><td colspan="8" class="loading-placeholder error-placeholder">${escapeHTML(message)}</td></tr>`;
         requestsTableBody.innerHTML = errorHtml;
-        requestsMobileList.innerHTML = `<div class="loading-placeholder text-red-600">${message}</div>`;
+        requestsMobileList.innerHTML = `<div class="loading-placeholder error-placeholder">${escapeHTML(message)}</div>`;
     }
 
     // Update Dashboard Stats Counters
@@ -171,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render / Update Charts (Chart.js)
     function renderCharts(requests) {
+        if (typeof Chart === 'undefined') return;
         // 1. Status breakdown
         let pending = 0, active = 0, success = 0, failed = 0;
         requests.forEach(raw => {
@@ -266,6 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }]
             },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
@@ -275,12 +317,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     y: {
                         beginAtZero: true,
                         ticks: {
-                            stepSize: 1,
                             font: { family: 'Prompt' }
                         }
                     },
                     x: {
-                        ticks: { font: { family: 'Prompt', size: 10 } }
+                        beginAtZero: true,
+                        ticks: { precision: 0, font: { family: 'Prompt', size: 10 } }
                     }
                 }
             }
@@ -289,12 +331,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render request entries in Table & Mobile Layout
     function renderRequestsList(requests) {
-        requests = requests.map(escapeRecord);
         requestsCount.innerText = `${requests.length} รายการ`;
+        const total = requests.length;
+        const pages = Math.max(1, Math.ceil(total / pageSize));
+        currentPage = Math.min(currentPage, pages);
+        const start = (currentPage - 1) * pageSize;
+        document.getElementById('pageSummary').textContent = total ? `แสดง ${start + 1}–${Math.min(start + pageSize, total)} จาก ${total} รายการ • หน้า ${currentPage}/${pages}` : 'ไม่มีรายการที่จะแสดง';
+        prevPageBtn.disabled = currentPage === 1;
+        nextPageBtn.disabled = currentPage === pages;
+        requests = requests.slice(start, start + pageSize).map(escapeRecord);
 
         if (requests.length === 0) {
-            requestsTableBody.innerHTML = `<tr><td colspan="8" class="loading-placeholder">ไม่พบรายการแจ้งซ่อมที่ตรงกับเงื่อนไขการค้นหา</td></tr>`;
-            requestsMobileList.innerHTML = `<div class="loading-placeholder">ไม่พบรายการแจ้งซ่อมที่ตรงกับเงื่อนไขการค้นหา</div>`;
+            const message = allRequests.length ? 'ไม่พบรายการที่ตรงกับตัวกรอง ลองเปลี่ยนคำค้นหาหรือกด “ล้างตัวกรอง”' : 'ยังไม่มีใบแจ้งซ่อมในระบบ';
+            requestsTableBody.innerHTML = `<tr><td colspan="8" class="loading-placeholder">${message}</td></tr>`;
+            requestsMobileList.innerHTML = `<div class="loading-placeholder">${message}</div>`;
             return;
         }
 
@@ -321,8 +371,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${condBadge}</td>
                     <td>${resBadge}</td>
                     <td>
-                        <button class="manage-btn" style="background-color: #10b981; margin-bottom: 4px;" onclick="printRequest(${req.id})">พิมพ์</button>
-                        <button class="manage-btn" onclick="openManageModal(${req.id})">จัดการ</button>
+                        <button class="manage-btn print-btn" onclick="printRequest(${Number(req.id)})">พิมพ์</button>
+                        <button class="manage-btn" onclick="openManageModal(${Number(req.id)})">จัดการ</button>
                     </td>
                 </tr>
             `;
@@ -352,8 +402,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div>${resBadge}</div>
                     </div>
                     <div class="card-actions">
-                        <button class="manage-btn" style="background-color: #10b981; margin-bottom: 4px;" onclick="printRequest(${req.id})">พิมพ์รายงาน</button>
-                        <button class="manage-btn" onclick="openManageModal(${req.id})">จัดการสถานะงาน</button>
+                        <button class="manage-btn print-btn" onclick="printRequest(${Number(req.id)})">พิมพ์รายงาน</button>
+                        <button class="manage-btn" onclick="openManageModal(${Number(req.id)})">จัดการสถานะงาน</button>
                     </div>
                 </div>
             `;
@@ -362,7 +412,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Apply Filter & Search Inputs
+    function changePage(delta) {
+        currentPage += delta;
+        renderRequestsList(filteredRequests);
+        document.querySelector('.requests-card')?.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
     function applyFilters() {
+        currentPage = 1;
+        queueButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.queue === queueFilter)));
         const query = searchInput.value.toLowerCase().trim();
         const stat = filterStatus.value;
         const res = filterResult.value;
@@ -370,8 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         filteredRequests = allRequests.filter(req => {
             // Search Input Match
-            const matchesSearch = !query || 
-                req.requester_name.toLowerCase().includes(query) ||
+            const matchesSearch = !query || String(req.id).includes(query.replace(/^#/, '')) ||
+                String(req.requester_name || '').toLowerCase().includes(query) ||
                 (req.position && req.position.toLowerCase().includes(query)) ||
                 (req.department && req.department.toLowerCase().includes(query)) ||
                 (req.building && req.building.toLowerCase().includes(query)) ||
@@ -388,8 +446,10 @@ document.addEventListener('DOMContentLoaded', () => {
             // Type Filter Match
             const matchesType = type === 'all' || (req.repair_types && req.repair_types.includes(type));
 
-            return matchesSearch && matchesStatus && matchesResult && matchesType;
+            const queue = req.consideration_status === 'pending' ? 'pending' : req.consideration_status === 'cannot_proceed' || req.action_result === 'cannot_fix' ? 'failed' : req.action_result === 'fixed' ? 'success' : 'active';
+            return matchesSearch && matchesStatus && matchesResult && matchesType && (queueFilter === 'all' || queue === queueFilter);
         });
+        filteredRequests.sort((a, b) => sortOrder.value === 'oldest' ? Number(a.id) - Number(b.id) : Number(b.id) - Number(a.id));
 
         renderRequestsList(filteredRequests);
     }
@@ -524,8 +584,11 @@ document.addEventListener('DOMContentLoaded', () => {
         markFormClean();
 
         // Show Modal
+        lastModalFocus = document.activeElement;
+        savedBodyOverflow = document.body.style.overflow;
         editModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden'; // Lock background scrolling
+        closeModalBtn.focus?.();
     }
 
     // Expose printRequest globally
@@ -628,6 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
 
         const printWindow = window.open('', '_blank');
+        if (!printWindow) { showToast('กรุณาอนุญาตหน้าต่างป๊อปอัปเพื่อพิมพ์ใบแจ้งซ่อม', 'error'); return; }
         printWindow.document.write(html);
         printWindow.document.close();
     }
@@ -640,7 +704,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function closeModal() {
         formGeneration++;
         editModal.classList.add('hidden');
-        document.body.style.overflow = ''; // Restore scrolling
+        document.body.style.overflow = savedBodyOverflow;
+        markFormClean();
+        lastModalFocus?.focus?.();
     }
 
     // Dynamic Materials Input Rows
@@ -648,8 +714,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('div');
         row.className = 'material-row';
         row.innerHTML = `
-            <input type="text" class="material-name" placeholder="ชื่อวัสดุ" value="${escapeHTML(name)}">
-            <input type="text" class="material-qty" placeholder="จำนวน" style="max-width: 90px;" value="${escapeHTML(qty)}">
+            <input type="text" class="material-name" aria-label="ชื่อวัสดุ" placeholder="ชื่อวัสดุ" value="${escapeHTML(name)}">
+            <input type="text" class="material-qty" aria-label="จำนวนวัสดุ" placeholder="จำนวน" style="max-width: 90px;" value="${escapeHTML(qty)}">
             <button type="button" class="remove-row-btn" title="ลบรายการนี้">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
             </button>
@@ -756,6 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toast = document.createElement('div');
         toast.className = 'toast-notification';
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
         const icon = type === 'success' 
             ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
@@ -763,7 +830,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toast.innerHTML = `
             <span class="toast-icon ${type}">${icon}</span>
-            <span class="toast-message">${message}</span>
+            <span class="toast-message">${escapeHTML(message)}</span>
         `;
 
         document.body.appendChild(toast);
