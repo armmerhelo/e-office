@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
-    <link rel="stylesheet" href="number-booking.css?v=20261015">
+    <link rel="stylesheet" href="number-booking.css?v=20261015-modal">
 </head>
 <body class="eoffice-module-page">
     <div class="eoffice-module-content"><div class="eoffice-module-view number-booking" data-page="/external_number_booking/external_number_booking.html">
@@ -23,33 +23,15 @@
 
     <main id="mainApp" class="booking-page">
         <header class="booking-page-heading">
-            <p class="booking-eyebrow">ทะเบียนเอกสาร</p>
-            <h1>จองเลขคำสั่ง</h1>
-            <p>จองเลขสำหรับจัดทำคำสั่ง และค้นหารายการที่เคยจองไว้</p>
-        </header>
-
-        <section class="booking-create" aria-labelledby="createHeading">
-            <div class="booking-create-intro">
-                <h2 id="createHeading">จองเลขใหม่</h2>
-                <p>ระบุชื่อเรื่องตามคำสั่งที่ต้องการจัดทำ<br> ระบบจะออกเลขให้เมื่อบันทึกสำเร็จ</p>
+            <div class="booking-heading-copy">
+                <h1>จองเลขคำสั่ง</h1>
+                <p>จองเลขและค้นหารายการคำสั่ง</p>
             </div>
-            <form id="bookingForm">
-                <div class="booking-label-row">
-                    <label for="docDetail">เรื่องคำสั่ง <span class="booking-required">*</span></label>
-                    <span id="detailCount" class="booking-counter">0 / 300</span>
-                </div>
-                <textarea id="docDetail" name="docDetail" rows="2" maxlength="300" required aria-describedby="detailHint bookingError" placeholder="เช่น แต่งตั้งคณะกรรมการดำเนินงานวันวิชาการ"></textarea>
-                <p id="detailHint" class="booking-field-hint">ใช้ชื่อเรื่องให้ตรงกับเอกสาร เพื่อให้ค้นหาอ้างอิงได้ง่าย</p>
-                <p id="bookingError" class="booking-error" role="alert" hidden></p>
-                <div class="booking-form-footer">
-                    <div class="booking-year-note">จองในปี พ.ศ. <strong id="bookingYearLabel"></strong><input type="number" id="docYear" name="docYear" readonly hidden></div>
-                    <button id="reserveButton" type="submit" class="booking-button booking-button--primary">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
-                        <span>จองเลขคำสั่ง</span>
-                    </button>
-                </div>
-            </form>
-        </section>
+            <button id="openBooking" type="button" class="booking-button booking-button--primary" aria-haspopup="dialog" aria-controls="bookingModal">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>
+                <span>จองเลขคำสั่ง</span>
+            </button>
+        </header>
 
         <section id="bookingResult" class="booking-result" aria-labelledby="resultHeading" hidden>
             <div class="booking-result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -110,6 +92,27 @@
         <p id="copyStatus" class="booking-copy-status" role="status" aria-live="polite"></p>
     </main>
 
+    <dialog id="bookingModal" class="booking-dialog" aria-labelledby="createHeading" aria-describedby="createHint">
+        <form id="bookingForm">
+            <div class="booking-dialog-heading">
+                <h2 id="createHeading">จองเลขคำสั่งใหม่</h2>
+                <button id="closeBooking" type="button" class="booking-close" aria-label="ปิดหน้าต่างจองเลขคำสั่ง">×</button>
+            </div>
+            <p id="createHint" class="booking-field-hint">ระบุเรื่องคำสั่ง ระบบจะออกเลขให้เมื่อบันทึกสำเร็จ</p>
+            <div class="booking-label-row">
+                <label for="docDetail">เรื่องคำสั่ง <span class="booking-required">*</span></label>
+                <span id="detailCount" class="booking-counter">0 / 300</span>
+            </div>
+            <textarea id="docDetail" name="docDetail" rows="4" maxlength="300" required aria-describedby="detailHint bookingError" placeholder="เช่น แต่งตั้งคณะกรรมการดำเนินงานวันวิชาการ"></textarea>
+            <p id="detailHint" class="booking-field-hint">ใช้ชื่อเรื่องให้ตรงกับเอกสาร เพื่อให้ค้นหาอ้างอิงได้ง่าย</p>
+            <p id="bookingError" class="booking-error" role="alert" hidden></p>
+            <div class="booking-year-note">จองในปี พ.ศ. <strong id="bookingYearLabel"></strong><input type="number" id="docYear" name="docYear" readonly hidden></div>
+            <div class="booking-dialog-footer">
+                <button id="cancelBooking" type="button" class="booking-button">ยกเลิก</button>
+                <button id="reserveButton" type="submit" class="booking-button booking-button--primary"><span>จองเลขคำสั่ง</span></button>
+            </div>
+        </form>
+    </dialog>
     <dialog id="editModal" class="booking-dialog" aria-labelledby="editHeading">
         <form id="editForm">
             <div class="booking-dialog-heading">
@@ -128,7 +131,7 @@
             </div>
         </form>
     </dialog>
-    <script src="number-booking.js?v=20261015-review4"></script>
+    <script src="number-booking.js?v=20261015-modal"></script>
     </div></div>
 </body>
 </html>

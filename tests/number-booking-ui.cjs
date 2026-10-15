@@ -65,6 +65,30 @@ function setup() {
 
 async function run() {
     assert.equal(html.match(/<h1\b[^>]*>(.*?)<\/h1>/s)?.[1], 'จองเลขคำสั่ง', 'router must see the real page heading first');
+    assert.match(html, /<dialog id="bookingModal"[^>]*>[\s\S]*?<form id="bookingForm">/, 'creation form lives inside the modal');
+    {
+        const s = setup();
+        assert.equal(s.el('bookingModal').open, false);
+        s.el('openBooking').click();
+        assert.equal(s.el('bookingModal').open, true);
+        s.el('docDetail').value = 'ร่างคำสั่ง';
+        s.el('cancelBooking').click();
+        assert.equal(s.el('bookingModal').open, false);
+        assert.equal(s.retainedChanges(), true, 'closed booking draft is still protected by the navigation guard');
+        s.el('openBooking').click();
+        assert.equal(s.el('docDetail').value, 'ร่างคำสั่ง', 'reopening retains the draft');
+        s.book();
+        const cancel = new Event('cancel', {cancelable: true});
+        s.el('bookingModal').dispatchEvent(cancel);
+        assert.equal(cancel.defaultPrevented, true);
+        assert.equal(s.el('bookingModal').open, true, 'Escape cannot dismiss a pending reservation');
+        assert.equal(s.el('closeBooking').disabled, true);
+        s.requests[0].reject(new TypeError('QA offline')); await tick();
+        assert.equal(s.el('bookingModal').open, true, 'failure keeps the form and error available');
+        assert.equal(s.el('closeBooking').disabled, false);
+        s.el('closeBooking').click();
+        assert.equal(s.el('bookingModal').open, false);
+    }
     {
         const s = setup();
         const failed = s.refresh(); s.requests[0].resolve(response(401)); await failed;
@@ -232,17 +256,21 @@ async function run() {
         assert.equal(s.retainedChanges(), false, 'cancel releases the retained-edit guard');
     }
     {
-        const s = setup(); s.book(); s.requests[0].resolve(response(401)); await tick();
+        const s = setup(); s.el('openBooking').click(); s.book(); s.requests[0].resolve(response(401)); await tick();
+        assert.equal(s.el('bookingModal').open, false, 'expired session closes the booking modal');
         assert.equal(s.leaving(), true, 'hidden booking subject must warn before closing the tab');
         assert.equal(s.retainedChanges(), true, 'central guard must count a hidden booking subject');
+        const recovered = s.refresh(); s.requests[1].resolve(response()); await recovered;
+        assert.equal(s.el('bookingModal').open, true, 'authentication recovery restores the booking draft');
         s.el('docDetail').value = '';
         assert.equal(s.leaving(), false, 'no draft means no extra exit warning');
         assert.equal(s.retainedChanges(), false);
     }
     {
-        const s = setup(); s.book();
+        const s = setup(); s.el('openBooking').click(); s.book();
         s.requests[0].resolve(response(200, record)); await tick();
         s.requests[1].resolve(response(200, [record])); await tick();
+        assert.equal(s.el('bookingModal').open, false, 'successful reservation closes the booking modal');
         s.el('yearFilter').value = '2568';
         const otherYear = s.refresh(); s.requests[2].resolve(response()); await otherYear;
         assert.equal(s.el('bookingResult').hidden, false, 'another year cannot invalidate the latest reservation');

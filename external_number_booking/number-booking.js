@@ -9,6 +9,7 @@
     let apiSequence = 0, authenticationRequest = 0, authenticated = true;
     let isAdmin = false, bookingBusy = false, editBusy = false, loading = false, loadFailed = false;
     let copyNoticeTimer;
+    let suspendedBooking = false;
     let resultId = '', resultNumber = '', editTrigger = null, suspendedEdit = false, initialEditDetail = '';
     const deleting = new Set();
     const copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4" stroke-linejoin="round"/></svg>';
@@ -30,6 +31,10 @@
     function showUnauthorizedScreen() {
         el('unauthorizedScreen').hidden = false;
         el('mainApp').hidden = true;
+        if (el('bookingModal').open) {
+            suspendedBooking = true;
+            el('bookingModal').close();
+        }
         if (el('editModal').open) {
             suspendedEdit = true;
             el('editModal').close();
@@ -37,6 +42,10 @@
     }
 
     function resumeEdit() {
+        if (authenticated && !document.hidden && suspendedBooking) {
+            suspendedBooking = false;
+            if (!el('bookingModal').open) el('bookingModal').showModal();
+        }
         if (!authenticated || document.hidden || !suspendedEdit || !el('editId').value) return;
         suspendedEdit = false;
         if (!el('editModal').open) el('editModal').showModal();
@@ -267,6 +276,28 @@
         message('bookingError');
     }
 
+    function openBookingModal() {
+        if (!authenticated || bookingBusy) return;
+        suspendedBooking = false;
+        el('bookingModal').showModal();
+        el('docDetail').focus();
+    }
+
+    function closeBookingModal() {
+        if (bookingBusy) return;
+        suspendedBooking = false;
+        el('bookingModal').close();
+        el('openBooking').focus();
+    }
+
+    el('openBooking').addEventListener('click', openBookingModal);
+    el('closeBooking').addEventListener('click', closeBookingModal);
+    el('cancelBooking').addEventListener('click', closeBookingModal);
+    el('bookingModal').addEventListener('cancel', event => {
+        event.preventDefault();
+        closeBookingModal();
+    });
+
     el('bookingForm').addEventListener('submit', async event => {
         event.preventDefault();
         if (bookingBusy) return;
@@ -279,6 +310,7 @@
         bookingBusy = true;
         message('bookingError');
         el('docDetail').readOnly = true;
+        for (const id of ['closeBooking', 'cancelBooking']) el(id).disabled = true;
         el('reserveButton').disabled = true;
         el('reserveButton').setAttribute('aria-busy', 'true');
         el('reserveButton').querySelector('span').textContent = 'กำลังจองเลข…';
@@ -292,6 +324,8 @@
             el('bookingResult').hidden = false;
             el('docDetail').value = '';
             updateDetailCount();
+            suspendedBooking = false;
+            el('bookingModal').close();
             el('bookingForm').dispatchEvent(new Event('eoffice:form-saved', {bubbles: true}));
             el('yearFilter').value = currentYear;
             el('tableSearch').value = '';
@@ -304,6 +338,7 @@
         } finally {
             bookingBusy = false;
             el('docDetail').readOnly = false;
+            for (const id of ['closeBooking', 'cancelBooking']) el(id).disabled = false;
             el('reserveButton').disabled = false;
             el('reserveButton').setAttribute('aria-busy', 'false');
             el('reserveButton').querySelector('span').textContent = 'จองเลขคำสั่ง';
@@ -405,10 +440,11 @@
     el('closeEdit').addEventListener('click', closeEditModal);
     el('cancelEdit').addEventListener('click', closeEditModal);
     window.eofficeRegisterModuleSuspend?.(() => {
+        if (el('bookingModal').open) suspendedBooking = true;
         if (el('editModal').open) suspendedEdit = true;
     });
     window.eofficeRegisterModuleResume?.(resumeEdit);
-    const hasRetainedChanges = () => Boolean((!authenticated && el('docDetail').value.trim()) ||
+    const hasRetainedChanges = () => Boolean(el('docDetail').value.trim() ||
         (suspendedEdit && el('editDocDetail').value !== initialEditDetail));
     window.eofficeRegisterModuleChanges?.(hasRetainedChanges);
     window.addEventListener?.('beforeunload', event => {

@@ -207,8 +207,9 @@ async function run() {
     });
     await check('number booking still submits once after repeated cached visits',async()=>{
         await moduleView('book');await moduleView('maintenance');await moduleView('book');
-        await evaluate(`(()=>{const s=${root};s.getElementById('docDetail').value='QA SPA number '+Date.now();s.getElementById('docDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('bookingForm').requestSubmit();})()`);
+        await evaluate(`(()=>{const s=${root};s.getElementById('openBooking').click();s.getElementById('docDetail').value='QA SPA number '+Date.now();s.getElementById('docDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('bookingForm').requestSubmit();})()`);
         await until("window.__qaWrites.some(url=>url.includes('external_number_booking.php'))");await sleep(300);
+        assert.equal(await evaluate(root+".getElementById('bookingModal').open"),false,'saved booking closes its modal');
         assert.equal(await evaluate("window.__qaWrites.filter(url=>url.includes('external_number_booking.php')).length"),1);
         assert.equal(await evaluate("document.getElementById('document-form').querySelector('[name=doc_name]').value"),'');
     });
@@ -218,7 +219,7 @@ async function run() {
         await evaluate(`window.__qaNumberGuardTransport=window.fetch;window.__qaNumberGuardExpired=false;window.__qaNumberGuardLogoutCalls=0;window.fetch=(url,options={})=>{const path=new URL(String(url),location.href).pathname;if(path==='/api/logout.php'){window.__qaNumberGuardLogoutCalls++;return Promise.resolve(new Response(JSON.stringify({status:'error',message:'QA must not log out'})));}if(path!=='/external_number_booking/external_number_booking.php')return window.__qaNumberGuardTransport(url,options);const expired=window.__qaNumberGuardExpired;return Promise.resolve(new Response(JSON.stringify({status:expired?'error':'success',isAdmin:true,data:[{id:77777,External_Number:'777/2569',Doc_Year:2569,Doc_Detail:'QA guard original',User_Name:'QA'}]}),{status:expired?401:200,headers:{'Content-Type':'application/json'}}));};${root}.getElementById('refreshBookings').click();`);
         await until(root+".getElementById('registerContent').getAttribute('aria-busy')==='false'");
         for(const kind of ['edit','booking']) {
-            await evaluate(`(()=>{const s=${root};window.__qaNumberGuardExpired=true;if(${JSON.stringify(kind)}==='edit'){s.querySelector('.booking-text-button').click();s.getElementById('editDocDetail').value='QA retained number edit';s.getElementById('editDocDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('editForm').requestSubmit();}else{s.getElementById('docDetail').value='QA retained number booking';s.getElementById('docDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('bookingForm').requestSubmit();}})()`);
+            await evaluate(`(()=>{const s=${root};window.__qaNumberGuardExpired=true;if(${JSON.stringify(kind)}==='edit'){s.querySelector('.booking-text-button').click();s.getElementById('editDocDetail').value='QA retained number edit';s.getElementById('editDocDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('editForm').requestSubmit();}else{s.getElementById('openBooking').click();s.getElementById('docDetail').value='QA retained number booking';s.getElementById('docDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('bookingForm').requestSubmit();}})()`);
             await until(root+".getElementById('mainApp').hidden && !"+root+".getElementById('saveEdit').disabled && !"+root+".getElementById('reserveButton').disabled");
             assert.equal(await evaluate('window.eofficeModuleHasChanges()'),true,kind+': central guard retains hidden drafts');
             const logout=await evaluate(`(async()=>{const original=window.confirm;let confirmations=0;window.confirm=()=>{confirmations++;return false;};try{window.eofficeCancelDocumentLeaving();await logOut();return {confirmations,calls:window.__qaNumberGuardLogoutCalls};}finally{window.confirm=original;}})()`);
@@ -231,8 +232,9 @@ async function run() {
                 assert.equal(await evaluate(root+".getElementById('editDocDetail').value"),'QA retained number edit');
                 await evaluate(root+".getElementById('cancelEdit').click()");
             } else {
+                assert.equal(await evaluate(root+".getElementById('bookingModal').open"),true);
                 assert.equal(await evaluate(root+".getElementById('docDetail').value"),'QA retained number booking');
-                await evaluate(root+".getElementById('bookingForm').reset()");
+                await evaluate(`${root}.getElementById('bookingForm').reset();${root}.getElementById('cancelBooking').click()`);
             }
             assert.equal(await evaluate('window.eofficeModuleHasChanges()'),false,'cancel/reset releases the central guard');
         }
@@ -335,7 +337,10 @@ async function run() {
         await evaluate('window.fetch=window.__qaSessionTransport');
         await moduleView('book');
         assert.equal(await evaluate("document.querySelector('.eoffice-module-host:not([hidden])').inert"),false);
-        assert.equal(await evaluate(`(()=>{const n=${root}.getElementById('docDetail');n.focus();return n===${root}.activeElement;})()`),true);
+        assert.equal(await evaluate(`(()=>{const s=${root};s.getElementById('openBooking').click();const n=s.getElementById('docDetail');return n===s.activeElement;})()`),true);
+        await moduleView('maintenance');await moduleView('book');
+        assert.equal(await evaluate(root+".getElementById('bookingModal').open"),true,'cached navigation restores the open booking modal');
+        await evaluate(root+".getElementById('cancelBooking').click()");
     });
     await check('cached calendar, booking history and repair dashboard fetch fresh records on return',async()=>{
         await evaluate(`window.__qaReadTransport=window.fetch;window.__qaReadCalls={};window.fetch=async(url,opts)=>{const response=await window.__qaReadTransport(url,opts);const p=new URL(String(url),location.href).pathname;if(!['/room_booking/api/get_bookings.php','/room_booking/api/my_bookings.php','/maintenance_requests/api/get_maintenance.php'].includes(p)||!response.ok)return response;window.__qaReadCalls[p]=(window.__qaReadCalls[p]||0)+1;const data=await response.json();const date=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'});const record=p.includes('maintenance')?{id:99999992,requester_name:'QA refresh marker',request_date:date,repair_types:'ไฟฟ้า',building:'QA',room:'1',damage_details:'QA refresh',consideration_status:'pending',action_result:'pending',materials:[],images:[]}:{id:99999991,User_Id:window.eofficeUser.id,room_name:'QA refresh',topic:'QA refresh marker',requester_name:'QA',department:'QA',attendees:3,start_datetime:date+' 09:00:00',end_datetime:date+' 10:00:00',created_at:date,status:'pending'};data.data.push(record);return new Response(JSON.stringify(data),{status:response.status,headers:{'Content-Type':'application/json'}});};`);
