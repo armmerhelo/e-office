@@ -9,17 +9,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
-    <link rel="stylesheet" href="my-dashboard.css?v=20261015-orders">
+    <link rel="stylesheet" href="my-dashboard.css?v=20261015-no-heading">
 </head>
 <body class="my-orders-page eoffice-module-page">
     <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/email_send/my_dashboard.html">
     <script src="../assets/app-navigation.js?v=20261014-spa"></script>
     <main class="my-orders" aria-labelledby="orders-title">
-        <header class="orders-heading">
-            <h1 id="orders-title">คำสั่งของฉัน</h1>
-            <p>คำสั่งที่ระบบส่งถึงอีเมลของคุณ</p>
-            <p id="userInfo" class="account-info">กำลังโหลดข้อมูลผู้ใช้…</p>
-        </header>
+        <h1 id="orders-title" class="list-status">คำสั่งของฉัน</h1>
 
         <section class="orders-panel" aria-labelledby="list-title">
             <form id="filters" class="filters" role="search" aria-label="ค้นหาคำสั่งของฉัน">
@@ -60,7 +56,7 @@
             </nav>
         </section>
     </main>
-    <script src="my-dashboard.js?v=20261015-loading-state"></script>
+    <script src="my-dashboard.js?v=20261015-no-heading"></script>
     </div></div>
 </body>
 </html>

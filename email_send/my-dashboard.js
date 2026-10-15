@@ -3,6 +3,8 @@
     const number = value => Number(value).toLocaleString('th-TH');
     const itemsPerPage = 10;
     let currentPage = 1, totalItems = 0, documentsRequest = 0, loading = false, hasResult = false;
+    // Refresh follows the latest navigation intent, even before it has rendered.
+    let requestedPage = 1;
     let filters = {year: 'all', search: ''};
     let displayedFilters = null;
     const paths = {
@@ -137,7 +139,8 @@
         });
         el('yearSelect').value = selected;
     }
-    async function load(page = currentPage, background = false) {
+    async function load(page = requestedPage, background = false) {
+        requestedPage = page;
         const request = ++documentsRequest, submitted = {...filters};
         const retain = background && hasResult && sameFilters() && page === currentPage;
         loading = true; updateControls();
@@ -157,7 +160,6 @@
             if (page > pages) return load(pages);
             currentPage = page; totalItems = total;
             displayedFilters = submitted; hasResult = true;
-            el('userInfo').textContent = result.user_email ? `อีเมลผู้รับ: ${result.user_email}` : result.user_name || '';
             syncYears(result.years);
             el('resultCount').textContent = `${number(totalItems)} รายการ${filtered() ? ' · ตามตัวกรอง' : ''}`;
             if (result.data.length) { renderDocuments(result.data); renderPagination(pages); }
@@ -170,11 +172,10 @@
             const sessionExpired = error.status === 401, denied = error.status === 403;
             if (sessionExpired || denied) {
                 hasResult = false; el('resultCount').textContent = '—'; el('lastUpdated').textContent = '';
-                if (sessionExpired) el('userInfo').textContent = 'กรุณาเข้าสู่ระบบอีกครั้ง';
                 state(sessionExpired ? 'กรุณาเข้าสู่ระบบอีกครั้ง' : 'ไม่สามารถเข้าถึงรายการได้', sessionExpired ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบเพื่อดูคำสั่งของคุณ' : 'บัญชีนี้ไม่มีสิทธิ์เข้าถึงรายการ กรุณาตรวจสอบบัญชีที่ใช้งาน', () => window.location.reload(), 'โหลดหน้าใหม่');
             } else if (retain) {
                 const feedback = el('listFeedback');
-                feedback.replaceChildren(node('span', 'อัปเดตไม่สำเร็จ กำลังแสดงข้อมูลจากครั้งก่อน'), button('ลองอีกครั้ง', () => load(currentPage, true), 'button-text'));
+                feedback.replaceChildren(node('span', 'อัปเดตไม่สำเร็จ กำลังแสดงข้อมูลจากครั้งก่อน'), button('ลองอีกครั้ง', () => load(requestedPage, true), 'button-text'));
                 feedback.hidden = false;
             } else {
                 hasResult = false; el('resultCount').textContent = '—';
@@ -197,8 +198,8 @@
     el('yearSelect').addEventListener('change', applyFilters);
     el('orderSearch').addEventListener('input', updateControls);
     el('resetFilters').addEventListener('click', resetFilters);
-    el('refreshOrders').addEventListener('click', () => load(currentPage, true));
-    if (window.eofficeRegisterModuleRefresh) window.eofficeRegisterModuleRefresh(() => load(currentPage, true));
+    el('refreshOrders').addEventListener('click', () => load(requestedPage, true));
+    if (window.eofficeRegisterModuleRefresh) window.eofficeRegisterModuleRefresh(() => load(requestedPage, true));
     else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => load());
     else load();
 })();

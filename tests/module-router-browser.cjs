@@ -307,28 +307,30 @@ async function run() {
         await until("window.eofficeSessionState.status==='authenticated'");
         await evaluate(`${root}.getElementById('add-recipient').dispatchEvent(new Event('eoffice:form-saved',{bubbles:true}))`);
     });
-    await check('older failed personal-order refresh cannot overwrite the latest user identity',async()=>{
+    await check('older failed personal-order refresh cannot overwrite the latest result',async()=>{
         await moduleView('my_public');
         await evaluate(`window.__qaIdentityTransport=window.fetch;window.__qaIdentityReads=[];window.fetch=(url,opts)=>new URL(String(url),location.href).pathname==='/email_send/api_get_my_docs.php'?new Promise((resolve,reject)=>window.__qaIdentityReads.push({resolve,reject})):window.__qaIdentityTransport(url,opts);${root}.querySelector('.header-actions button').click();${root}.querySelector('.header-actions button').click();`);
         await until('window.__qaIdentityReads.length===2');
-        await evaluate(`window.__qaIdentityReads[1].resolve(new Response(JSON.stringify({status:'success',user_name:'QA latest identity',user_email:'qa-latest@example.test',years:[],data:[]}),{headers:{'Content-Type':'application/json'}}))`);
-        await until(root+".getElementById('userInfo').textContent.includes('qa-latest@example.test')");
+        await evaluate(`window.__qaIdentityReads[1].resolve(new Response(JSON.stringify({status:'success',years:[],data:[{doc_id:99100,doc_year:'2569',external_number:100,doc_name:'QA latest order',files:[]}]}),{headers:{'Content-Type':'application/json'}}))`);
+        await until(root+".getElementById('myDocTableBody').textContent.includes('QA latest order')");
         await evaluate("window.__qaIdentityReads[0].reject(new Error('QA obsolete failure'))");
         await sleep(100);
-        assert.equal(await evaluate(root+".getElementById('userInfo').textContent.includes('qa-latest@example.test')"),true);
+        assert.equal(await evaluate(root+".getElementById('myDocTableBody').textContent.includes('QA latest order')"),true);
         assert.equal(await evaluate(root+".getElementById('myDocTableBody').textContent.includes('QA obsolete failure')"),false);
         await evaluate('window.fetch=window.__qaIdentityTransport');
     });
     await check('personal orders search, files, pagination, retained filters and mobile layout',async()=>{
         await moduleView('my_public');
-        await evaluate(`window.__qaOrdersTransport=window.fetch;window.__qaOrdersCalls=[];window.__qaOrdersFail=false;
+        await evaluate(`window.__qaOrdersTransport=window.fetch;window.__qaOrdersCalls=[];window.__qaOrdersFail=false;window.__qaOrdersHold=false;window.__qaOrdersDeferred=[];
             window.fetch=(url,opts)=>{const u=new URL(String(url),location.href);if(u.pathname!=='/email_send/api_get_my_docs.php')return window.__qaOrdersTransport(url,opts);
             window.__qaOrdersCalls.push(Object.fromEntries(u.searchParams));if(window.__qaOrdersFail)return Promise.reject(Error('QA offline'));
             const page=Number(u.searchParams.get('page')||1),search=u.searchParams.get('search')||'';
             const data=search==='missing'?[]:[{doc_id:99101,external_number:125,doc_year:'2569',doc_name:'แต่งตั้งคณะกรรมการ <img src=x onerror=alert(1)>',files:['คำสั่งฉบับหลัก.pdf','เอกสารแนบท้ายชื่อยาวสำหรับทดสอบการตัดบรรทัด.pdf']},
                 {doc_id:99102,external_number:118,doc_year:'2569',doc_name:'มอบหมายหน้าที่ปฏิบัติงาน',files:['test & # 1.pdf']},
                 {doc_id:99103,external_number:117,doc_year:'2569',doc_name:'ไฟล์เดิมไม่พร้อม',files:[]}];
-            return Promise.resolve(new Response(JSON.stringify({status:'success',user_email:'qa-orders@example.test',years:['2569','2568'],data,pagination:{total_items:search==='missing'?0:24,current_page:page}}),{headers:{'Content-Type':'application/json'}}));};
+            data.forEach(row=>{row.doc_id+=(page-1)*10;row.doc_name+=' · หน้า '+page;});
+            const reply=()=>new Response(JSON.stringify({status:'success',user_email:'qa-orders@example.test',years:['2569','2568'],data,pagination:{total_items:search==='missing'?0:24,current_page:page}}),{headers:{'Content-Type':'application/json'}});
+            return window.__qaOrdersHold?new Promise((resolve,reject)=>window.__qaOrdersDeferred.push({resolve:()=>resolve(reply()),reject,query:Object.fromEntries(u.searchParams)})):Promise.resolve(reply());};
             ${root}.getElementById('refreshOrders').click();`);
         try {
             await until(root+".getElementById('resultCount').textContent==='24 รายการ'");
@@ -342,8 +344,34 @@ async function run() {
             await evaluate(`${root}.getElementById('orderSearch').value='แต่งตั้ง';${root}.getElementById('yearSelect').value='2569';${root}.getElementById('filters').requestSubmit()`);
             await until("window.__qaOrdersCalls.at(-1).search==='แต่งตั้ง' && "+root+".getElementById('listContent').getAttribute('aria-busy')==='false'");
             assert.equal(await evaluate('window.__qaOrdersCalls.at(-1).year'),'2569');
-            await evaluate(`${root}.querySelectorAll('.btn-page')[2].click()`);
+            await evaluate(`window.__qaOrdersHold=true;${root}.querySelectorAll('.btn-page')[2].click();${root}.getElementById('refreshOrders').click()`);
+            await until('window.__qaOrdersDeferred.length===2');
+            assert.deepEqual(await evaluate('window.__qaOrdersDeferred.map(read=>read.query.page)'),['2','2'],'refresh must follow the page selected before the previous request completed');
+            await evaluate('window.__qaOrdersDeferred[1].resolve()');
             await until("window.__qaOrdersCalls.at(-1).page==='2' && "+root+".getElementById('pageInfo').textContent.includes('11–20')");
+            assert.equal(await evaluate(root+".querySelector('.doc-name').textContent.endsWith(' · หน้า 2')"),true);
+            assert.equal(await evaluate(`new URL(${root}.querySelector('.file-link').href).searchParams.get('Doc_Id')`),'99111');
+            await evaluate("window.__qaOrdersDeferred[0].reject(Error('obsolete pagination failure'));window.__qaOrdersHold=false");
+            await sleep(100);
+            assert.equal(await evaluate(root+".getElementById('listFeedback').hidden"),true);
+            // A new search from page 3 must stay on page 1 when refreshed mid-load.
+            await evaluate(`${root}.querySelector('[aria-label="หน้าถัดไป"]').click()`);
+            await until(root+".getElementById('pageInfo').textContent.includes('21–24')");
+            await evaluate(`window.__qaOrdersDeferred=[];window.__qaOrdersHold=true;${root}.getElementById('orderSearch').value='คำค้นใหม่';${root}.getElementById('filters').requestSubmit();${root}.getElementById('refreshOrders').click()`);
+            await until('window.__qaOrdersDeferred.length===2');
+            assert.deepEqual(await evaluate('window.__qaOrdersDeferred.map(read=>({page:read.query.page,search:read.query.search,year:read.query.year}))'),[
+                {page:'1',search:'คำค้นใหม่',year:'2569'},{page:'1',search:'คำค้นใหม่',year:'2569'}
+            ]);
+            await evaluate('window.__qaOrdersDeferred[1].resolve()');
+            await until(root+".getElementById('pageInfo').textContent.includes('1–10') && "+root+".getElementById('listContent').getAttribute('aria-busy')==='false'");
+            await evaluate('window.__qaOrdersDeferred[0].resolve();window.__qaOrdersHold=false');
+            await sleep(100);
+            assert.equal(await evaluate(root+".querySelector('.doc-name').textContent.endsWith(' · หน้า 1')"),true);
+            assert.equal(await evaluate(`new URL(${root}.querySelector('.file-link').href).searchParams.get('Doc_Id')`),'99101');
+            await evaluate(`${root}.getElementById('orderSearch').value='แต่งตั้ง';${root}.getElementById('filters').requestSubmit()`);
+            await until(root+".getElementById('listContent').getAttribute('aria-busy')==='false'");
+            await evaluate(`${root}.querySelector('[aria-label="หน้าถัดไป"]').click()`);
+            await until(root+".getElementById('pageInfo').textContent.includes('11–20')");
             await evaluate(`${root}.getElementById('orderSearch').value='unfinished draft'`);
             await moduleView('book');await moduleView('my_public');
             assert.equal(await evaluate(root+".getElementById('orderSearch').value"),'unfinished draft');
@@ -368,7 +396,6 @@ async function run() {
             assert.equal(await evaluate(root+".getElementById('ordersTableHead').hidden"),true);
             await evaluate(`window.__qaOrdersFail=true;${root}.getElementById('resetFilters').click()`);
             await until(root+".getElementById('myDocTableBody').textContent.includes('โหลดรายการไม่สำเร็จ')");
-            assert.equal(await evaluate(root+".getElementById('userInfo').textContent.includes('qa-orders@example.test')"),true,'network failure does not misreport user identity');
         } finally {
             await evaluate('window.fetch=window.__qaOrdersTransport');
             await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});

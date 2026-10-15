@@ -84,9 +84,9 @@ async function run() {
         assert.equal(get('listContent').attributes['aria-busy'],'false');
         const pending=[];transport=()=>new Promise((resolve,reject)=>pending.push({resolve,reject}));
         const older=refresh(),newer=refresh();
-        pending[1].resolve(response({...result,user_email:'latest@example.test'}));await newer;
+        pending[1].resolve(response({...result,pagination:{total_items:2}}));await newer;
         pending[0].reject(new Error('obsolete failure'));await older;
-        assert.ok(get('userInfo').textContent.includes('latest@example.test'));
+        assert.equal(get('resultCount').textContent,'2 รายการ');
         assert.equal(get('listFeedback').hidden,true);
         const failed=refresh();pending[2].reject(new Error('current failure'));await failed;
         assert.equal(get('listFeedback').hidden,false);
@@ -94,16 +94,62 @@ async function run() {
         assert.equal(get('listContent').attributes['aria-busy'],'false');
         transport=async()=>response({...result,pagination:{total_items:21,total_pages:3}});
         await refresh();
-        const pageReads=[];transport=()=>new Promise((resolve,reject)=>pageReads.push({resolve,reject}));
+        const pageReads=[];transport=url=>new Promise((resolve,reject)=>pageReads.push({resolve,reject,url}));
         get('paginationBtns').querySelectorAll('button').find(button=>button.textContent==='ถัดไป').click();
         assert.ok(get('myDocTableBody').children.some(row=>row.className==='skeleton-row'));
         const refreshDuringPageLoad=refresh();
+        assert.equal(new URL(pageReads[1].url,'https://example.test').searchParams.get('page'),'2','module refresh must target the pending page rather than the last rendered page');
         pageReads[1].reject(new Error('refresh during pagination failed'));await refreshDuringPageLoad;
         pageReads[0].reject(new Error('obsolete page failed'));await new Promise(resolve=>setImmediate(resolve));
         assert.equal(get('myDocTableBody').children.some(row=>row.className==='skeleton-row'),false,'failed refresh must not retain a loading skeleton as previous results');
         assert.ok(get('myDocTableBody').textContent.includes('โหลดรายการไม่สำเร็จ'));
         assert.equal(get('listContent').attributes['aria-busy'],'false');
+
+        const settle=()=>new Promise(resolve=>setImmediate(resolve));
+        const pageResult=url=>{
+            const query=new URL(url,'https://example.test').searchParams,page=Number(query.get('page'));
+            return {...result,data:[{...result.data[0],doc_id:page,doc_name:`${query.get('search')||'all'} page ${page}`}],pagination:{total_items:30}};
+        };
+        for(const refreshKind of ['button','module']) {
+            // Restore page 1, then delay both the navigation and its refresh.
+            transport=async url=>response(pageResult(url));
+            get('orderSearch').value='';get('yearSelect').value='all';
+            get('filters').dispatchEvent(new Event('submit',{cancelable:true}));await settle();
+            const reads=[];transport=url=>new Promise((resolve,reject)=>reads.push({resolve,reject,url}));
+            get('paginationBtns').querySelectorAll('button').find(control=>control.textContent==='ถัดไป').click();
+            if(refreshKind==='button')get('refreshOrders').click();else refresh();
+            assert.deepEqual(reads.map(read=>new URL(read.url,'https://example.test').searchParams.get('page')),['2','2'],refreshKind+': refresh must preserve pending navigation');
+            // An older success must not finish loading or replace the latest request.
+            reads[0].resolve(response(pageResult(reads[0].url)));await settle();
+            assert.equal(get('listContent').attributes['aria-busy'],'true');
+            reads[1].resolve(response(pageResult(reads[1].url)));await settle();
+            assert.ok(get('pageInfo').textContent.includes('11–20'));
+            assert.ok(get('myDocTableBody').textContent.includes('all page 2'));
+            assert.equal(get('listContent').attributes['aria-busy'],'false');
+
+            // On page 3, a submitted search must keep its reset to page 1.
+            transport=async url=>response(pageResult(url));
+            get('paginationBtns').querySelectorAll('button').find(control=>control.textContent==='ถัดไป').click();await settle();
+            assert.ok(get('pageInfo').textContent.includes('21–30'));
+            const searchReads=[];transport=url=>new Promise((resolve,reject)=>searchReads.push({resolve,reject,url}));
+            get('orderSearch').value='แต่งตั้ง';get('yearSelect').value='2569';
+            get('filters').dispatchEvent(new Event('submit',{cancelable:true}));
+            if(refreshKind==='button')get('refreshOrders').click();else refresh();
+            for(const read of searchReads) {
+                const query=new URL(read.url,'https://example.test').searchParams;
+                assert.equal(query.get('page'),'1',refreshKind+': search reset must survive refresh');
+                assert.equal(query.get('search'),'แต่งตั้ง');assert.equal(query.get('year'),'2569');
+            }
+            assert.equal(searchReads.length,2);
+            searchReads[1].resolve(response(pageResult(searchReads[1].url)));await settle();
+            searchReads[0].reject(new Error('obsolete search failed'));await settle();
+            assert.ok(get('pageInfo').textContent.includes('1–10'));
+            assert.ok(get('myDocTableBody').textContent.includes('แต่งตั้ง page 1'));
+            assert.equal(get('listFeedback').hidden,true);
+            assert.equal(get('listContent').attributes['aria-busy'],'false');
+        }
     }
     console.log('PASS current personal-order script: PDF URLs at root/subdirectory, encoded filenames, stale failure isolation and retained results');
+    console.log('PASS personal-order pending pages: button/module refresh, search reset from page 3, distinct rows and out-of-order responses');
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});
