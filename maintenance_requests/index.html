@@ -8,56 +8,63 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261010-reset">
+    <link rel="stylesheet" href="style.css?v=20261015-form-ux-2">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
 <body class="eoffice-module-page">
     <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/maintenance_requests/index.html">
     <script src="../assets/app-navigation.js?v=20261014-spa"></script>
-    <div class="form-container">
+    <div class="form-container maintenance-form">
         <div class="form-header">
             <h1>ใบแจ้งซ่อม</h1>
             <p>กลุ่มบริหารทั่วไป โรงเรียนศรียานุสรณ์</p>
+            <p class="form-intro">แจ้งปัญหาอุปกรณ์หรือสถานที่ เพื่อให้เจ้าหน้าที่เข้าตรวจสอบและซ่อมแซม</p>
         </div>
 
         <form id="maintenanceForm" data-eoffice-requires-draft="true">
             <fieldset disabled data-eoffice-bootstrap style="border:0;margin:0;padding:0;min-width:0">
+            <p class="required-note">กรุณากรอกช่องที่มี <span class="required-mark">*</span> ให้ครบถ้วน</p>
             <!-- ส่วนของผู้แจ้ง -->
-            <section class="form-section">
-                <div class="section-title">ส่วนที่ 1: ข้อมูลผู้แจ้งซ่อม</div>
+            <section class="form-section" aria-labelledby="requesterHeading">
+                <h2 class="section-title" id="requesterHeading"><span class="section-number" aria-hidden="true">1</span>ข้อมูลผู้แจ้ง</h2>
                 
                 <div class="form-row">
                     <div class="form-group flex-2">
-                        <label for="requesterName">ชื่อ - นามสกุล (นาย/นาง/นางสาว)</label>
-                        <input type="text" id="requesterName" name="requesterName" placeholder="กรอกชื่อ-นามสกุล" required>
+                        <label for="requesterName">ชื่อ–นามสกุล <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input type="text" id="requesterName" name="requesterName" autocomplete="name" placeholder="กรอกชื่อ–นามสกุล" required>
                     </div>
                     <div class="form-group flex-1">
-                        <label for="position">ตำแหน่ง</label>
+                        <label for="position">ตำแหน่ง <span class="required-mark" aria-hidden="true">*</span></label>
                         <input type="text" id="position" name="position" placeholder="กรอกตำแหน่ง" required>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="department">กลุ่มสาระการเรียนรู้ / งาน / ฝ่าย</label>
+                        <label for="department">กลุ่มสาระการเรียนรู้ / งาน / ฝ่าย <span class="required-mark" aria-hidden="true">*</span></label>
                         <input type="text" id="department" name="department" placeholder="กรอกกลุ่มสาระฯ/งาน/ฝ่าย" required>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="requestDate">วันที่แจ้ง</label>
-                        <input type="date" id="requestDate" name="requestDate" required>
+                        <label for="requestDate">วันที่แจ้ง <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input type="date" id="requestDate" name="requestDate" aria-describedby="requestDateHint" required>
+                        <p class="field-hint" id="requestDateHint"></p>
                     </div>
                     <div class="form-group">
-                        <label for="phone">เบอร์โทรศัพท์ติดต่อ</label>
-                        <input type="text" id="phone" name="phone" placeholder="กรอกเบอร์โทรศัพท์" required>
+                        <label for="phone">เบอร์โทรศัพท์ติดต่อ <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input type="text" id="phone" name="phone" inputmode="tel" autocomplete="tel" placeholder="เบอร์ที่เจ้าหน้าที่ติดต่อกลับได้" required>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>มีความประสงค์จะขอแจ้งซ่อม/ปรับปรุง (เลือกได้มากกว่า 1 ข้อ)</label>
+            </section>
+            <section class="form-section" aria-labelledby="repairHeading">
+                <h2 class="section-title" id="repairHeading"><span class="section-number" aria-hidden="true">2</span>รายละเอียดและสถานที่</h2>
+                <fieldset class="repair-types" aria-describedby="repairTypeHint repairTypeError">
+                    <legend>ประเภทงานซ่อม <span class="required-mark" aria-hidden="true">*</span></legend>
+                    <p class="field-hint" id="repairTypeHint">เลือกได้มากกว่า 1 ประเภท</p>
                     <div class="checkbox-grid">
                         <label class="checkbox-container">ไฟฟ้า
                             <input type="checkbox" name="repairType" value="ไฟฟ้า">
@@ -88,45 +95,51 @@
                             <span class="checkmark"></span>
                         </label>
                     </div>
+                    <p class="field-error hidden" id="repairTypeError" role="alert"></p>
                     <div class="form-group hidden" id="otherTypeContainer">
+                        <label for="otherTypeDetail">ระบุประเภทงานอื่น ๆ <span class="required-mark" aria-hidden="true">*</span></label>
                         <input type="text" id="otherTypeDetail" name="otherTypeDetail" data-draft-clear-when="otherTypeCheckbox" placeholder="โปรดระบุรายละเอียดอื่นๆ">
                     </div>
-                </div>
+                </fieldset>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="building">อาคาร</label>
-                        <input type="text" id="building" name="building" placeholder="ระบุอาคาร" required>
+                        <label for="building">อาคาร / พื้นที่ <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input type="text" id="building" name="building" placeholder="เช่น อาคาร 2 หรือสนามกีฬา" required>
                     </div>
                     <div class="form-group">
-                        <label for="room">ห้อง</label>
-                        <input type="text" id="room" name="room" placeholder="ระบุห้อง" required>
+                        <label for="room">ห้อง / จุดที่พบปัญหา <span class="required-mark" aria-hidden="true">*</span></label>
+                        <input type="text" id="room" name="room" placeholder="เช่น ห้อง 201 หรือข้างประตูสนาม" required>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="damageDetails">ลักษณะการชำรุด / รายละเอียดการชำรุด / สถานที่ / บริเวณที่ขอซ่อม</label>
-                    <textarea id="damageDetails" name="damageDetails" rows="4" placeholder="อธิบายรายละเอียดการชำรุด หรือระบุจุดที่ชัดเจน" required></textarea>
+                    <label for="damageDetails">รายละเอียดปัญหา <span class="required-mark" aria-hidden="true">*</span></label>
+                    <textarea id="damageDetails" name="damageDetails" rows="4" aria-describedby="damageHint" placeholder="เช่น หลอดไฟหน้าห้อง 201 ไม่ติด จำนวน 2 ดวง" required></textarea>
+                    <p class="field-hint" id="damageHint">ระบุอุปกรณ์ที่ชำรุด อาการ และตำแหน่งให้ชัดเจน เพื่อช่วยให้เจ้าหน้าที่เตรียมงานได้ตรงจุด</p>
                 </div>
-
+            </section>
+            <section class="form-section" aria-labelledby="imagesHeading">
+                <h2 class="section-title" id="imagesHeading"><span class="section-number" aria-hidden="true">3</span>ภาพประกอบ <span class="optional-label">ไม่บังคับ</span></h2>
                 <div class="form-group">
-                    <label>ภาพประกอบการแจ้งซ่อม (ถ้ามี - เลือกได้หลายรูป)</label>
                     <div class="file-upload-wrapper">
-                        <label for="imageFiles" class="file-upload-label">
+                        <button type="button" id="addImagesBtn" class="file-upload-label" aria-describedby="imageHint">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                            <span>คลิกที่นี่เพื่อเลือกรูปภาพ</span>
-                        </label>
-                        <input type="file" id="imageFiles" name="imageFiles[]" accept="image/*" multiple style="display: none;">
+                            <span>เพิ่มรูปภาพ</span>
+                        </button>
+                        <input type="file" id="imageFiles" name="imageFiles[]" aria-label="เลือกรูปภาพประกอบ" accept="image/jpeg,image/png" multiple hidden>
                     </div>
+                    <p class="field-hint" id="imageHint">รองรับ JPG และ PNG สูงสุด 5 รูป รูปละไม่เกิน 5 MB และ 16 ล้านพิกเซล</p>
+                    <p class="field-hint" id="imageStatus" role="status" aria-live="polite"></p>
                     <div class="image-preview-container" id="imagePreviewContainer"></div>
                 </div>
             </section>
             <div class="form-actions">
-                <button type="reset" class="reset-btn">ล้างฟอร์มเพื่อเริ่มคำขอใหม่</button>
                 <button type="submit" class="submit-btn" id="submitBtn" disabled>
                     <span class="btn-text">ส่งใบแจ้งซ่อม</span>
                     <div class="loader hidden"></div>
                 </button>
+                <button type="reset" class="reset-btn">ล้างข้อมูล</button>
             </div>
             </fieldset>
         </form>
@@ -136,7 +149,7 @@
     <script src="../assets/draft-commits.js?v=20261010-5"></script>
     <script src="../assets/create-form-lifecycle.js?v=20261010-10"></script>
     <script src="../assets/form-dates.js?v=20261013-bounds"></script>
-    <script src="script.js?v=20261012-date-reset"></script>
+    <script src="script.js?v=20261015-form-ux"></script>
     </div></div>
     <script src="../assets/module-drafts.js?v=20261014-spa" defer></script>
 </body>

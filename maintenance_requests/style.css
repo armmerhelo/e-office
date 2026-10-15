@@ -541,3 +541,86 @@ textarea:focus {
 .remove-preview-btn:hover {
     background: rgba(220, 38, 38, 0.9);
 }
+
+/* Request form: scoped because the department dashboard shares this stylesheet. */
+.maintenance-form {
+    max-width: 1120px;
+    margin-inline: auto;
+    padding: 32px;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+}
+.maintenance-form .form-header { text-align: left; margin-bottom: 16px; padding-bottom: 20px; }
+.maintenance-form .form-header h1 { margin-bottom: 4px; }
+.maintenance-form .form-header p { font-size: 14px; }
+.maintenance-form .form-header .form-intro { margin-top: 8px; color: var(--text-main); }
+.maintenance-form .required-note { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+.maintenance-form .required-mark { color: #b91c1c; }
+.maintenance-form .form-section { margin-bottom: 16px; }
+.maintenance-form .form-section + .form-section { border-top: 1px solid #e2e8f0; padding-top: 18px; }
+.maintenance-form .section-title { gap: 10px; margin-bottom: 18px; font-size: 18px; font-weight: 600; }
+.maintenance-form .section-title::before { display: none; }
+.maintenance-form .section-number {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; flex-shrink: 0;
+    border-radius: 9px; background: #eff6ff; color: #1d4ed8; font-size: 14px;
+}
+.maintenance-form .optional-label { font-size: 13px; font-weight: 400; color: var(--text-muted); }
+.maintenance-form .form-row { margin-bottom: 0; gap: 16px; }
+.maintenance-form .form-group { min-width: 0; margin-bottom: 14px; }
+.maintenance-form input:not([type="checkbox"]):not([type="file"]) { min-height: 48px; }
+.maintenance-form textarea { min-height: 112px; resize: vertical; }
+.maintenance-form .field-hint { font-size: 12px; color: #52637a; margin-top: 6px; line-height: 1.6; }
+.maintenance-form .field-hint:empty { display: none; }
+.maintenance-form .field-error { font-size: 13px; color: #b91c1c; margin-top: 6px; }
+.maintenance-form [aria-invalid="true"] { border-color: #b91c1c; }
+.maintenance-form .repair-types { border: 0; padding: 0; margin: 0 0 18px; min-width: 0; }
+.maintenance-form .repair-types legend { font-size: 14px; font-weight: 500; }
+.maintenance-form .checkbox-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.maintenance-form .checkbox-container {
+    min-height: 48px; margin: 0; padding: 10px 12px 10px 42px;
+    border: 1px solid var(--border-color); border-radius: 8px; line-height: 1.5;
+    background: #fff; transition: border-color .2s, background .2s;
+}
+.maintenance-form .checkbox-container .checkmark { left: 12px; }
+.maintenance-form .checkbox-container:hover { border-color: var(--primary-color); background: #f8fafc; }
+.maintenance-form .checkbox-container:has(input:checked) { border-color: var(--primary-color); background: #eff6ff; color: #1d4ed8; }
+.maintenance-form .checkbox-container:has(input:focus-visible) { outline: 3px solid var(--input-focus); outline-offset: 2px; }
+.maintenance-form #otherTypeContainer { margin-top: 14px; margin-bottom: 0; }
+.maintenance-form .file-upload-label { width: 100%; min-height: 88px; padding: 16px; margin: 0; font: inherit; }
+.maintenance-form .file-upload-label span { color: #1d4ed8; }
+.maintenance-form button:focus-visible { outline: 3px solid var(--primary-color); outline-offset: 3px; }
+.maintenance-form .image-preview-container { grid-template-columns: repeat(auto-fill, minmax(100px, 128px)); }
+.maintenance-form .image-preview-container:empty { display: none; }
+.maintenance-form .remove-preview-btn { width: 44px; height: 44px; font-size: 24px; }
+.maintenance-form .form-actions { display: flex; flex-direction: column; align-items: center; gap: 4px; border-top: 1px solid #e2e8f0; margin-top: 0; padding-top: 24px; }
+.maintenance-form .submit-btn { min-height: 50px; }
+.maintenance-form .reset-btn { background: transparent; border: 0; margin: 0; min-height: 44px; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; }
+.maintenance-form .reset-btn:hover { color: #b91c1c; }
+.maintenance-form button:disabled { opacity: .6; cursor: wait; transform: none; }
+@media (max-width: 900px) {
+    .maintenance-form .checkbox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+    .maintenance-form { padding: 20px 16px; }
+    .maintenance-form .form-header { padding-bottom: 16px; }
+    .maintenance-form .form-header h1 { font-size: 22px; }
+    .maintenance-form .form-header p { font-size: 13px; }
+    .maintenance-form .form-row { gap: 0; }
+    .maintenance-form .section-title { font-size: 17px; margin-bottom: 16px; }
+    .maintenance-form .required-note { margin-bottom: 16px; }
+    .maintenance-form label { margin-bottom: 6px; }
+    .maintenance-form .form-group { margin-bottom: 12px; }
+    .maintenance-form .form-section { margin-bottom: 12px; }
+    .maintenance-form .form-section + .form-section { padding-top: 16px; }
+    .maintenance-form input[type="text"],
+    .maintenance-form input[type="date"], .maintenance-form textarea { font-size: 16px; padding: 11px 12px; }
+    .maintenance-form .checkbox-grid { gap: 8px; }
+    .maintenance-form .checkbox-container { font-size: 13px; padding-right: 8px; padding-left: 36px; }
+    .maintenance-form .checkbox-container .checkmark { left: 8px; }
+    .maintenance-form .form-actions { flex-direction: column; gap: 4px; padding-top: 20px; }
+    .maintenance-form .submit-btn { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .maintenance-form *, .toast-notification { transition: none; animation: none; }
+}

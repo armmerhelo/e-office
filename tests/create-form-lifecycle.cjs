@@ -13,6 +13,7 @@ class Node extends EventTarget {
     set innerHTML(value){this.html=value;this.children=[];}
     get innerHTML(){return this.html||'';}
     querySelector(selector){this.parts ||= new Map();if(!this.parts.has(selector))this.parts.set(selector,new Node());return this.parts.get(selector);}
+    querySelectorAll(selector){return this.children.filter(node=>selector==='button'?node.tagName==='BUTTON':selector==='.field-error'?node.classList.contains('field-error'):false);}
     setAttribute(name,value){this.attributes[name]=value;}
     removeAttribute(name){delete this.attributes[name];}
     focus(){}
@@ -60,6 +61,8 @@ function setup(kind,{store=new Map(),drafts=false,owner=7,preselectedFiles=[],st
     return {form,text,window,nodes,el,requests,readers,context,submitForm,finish,store};
 }
 async function run() {
+    const maintenanceHtml=fs.readFileSync('maintenance_requests/index.html','utf8');
+    assert.match(maintenanceHtml,/<input type="text" id="phone"[^>]*inputmode="tel"/,'phone keyboard changes must preserve the field type used by existing saved drafts');
     for(const html of ['maintenance_requests/index.html','room_booking/new_room.html']) assert.match(fs.readFileSync(html,'utf8'),/<fieldset disabled data-eoffice-bootstrap/,'controls must not be editable before the first lifecycle script is installed');
     for(const kind of ['maintenance','booking'])for(const outcome of ['success','new-edit','silent-edit','reset','failure','new-owner','owner-return']) {
         const page=setup(kind);const previouslyDisabled=page.el('department');previouslyDisabled.disabled=true;
@@ -301,6 +304,16 @@ async function run() {
     preselected.submitForm();assert.equal(preselected.requests.length,0);preselected.readers[0].onload({target:{result:'data:image/png;base64,QA'}});
     preselected.submitForm();assert.equal(preselected.requests[0].body.images[0].filename,'early.png');await preselected.finish(false);
     const resetDate=setup('maintenance');resetDate.form.reset();await tick();assert.equal(resetDate.el('requestDate').value,resetDate.window.eofficeDates.today());
+    const capped=setup('maintenance');
+    capped.el('imageFiles').files=Array.from({length:7},(_,i)=>({name:`photo-${i}.png`,type:'image/png',size:7}));
+    capped.el('imageFiles').dispatchEvent(new Event('change'));
+    assert.equal(capped.readers.length,5,'pending reads must count toward the five-image limit');
+    capped.readers.forEach(reader=>reader.onload({target:{result:'data:image/png;base64,QA'}}));
+    capped.submitForm();assert.equal(capped.requests[0].body.images.length,5);await capped.finish(false);
+    capped.el('imageFiles').files=[{name:'extra.jpg',type:'image/jpeg',size:7}];capped.el('imageFiles').dispatchEvent(new Event('change'));
+    assert.equal(capped.readers.length,5,'completed images must also count toward the limit');
+    const unsupported=setup('maintenance');unsupported.el('imageFiles').files=[{name:'animation.gif',type:'image/gif',size:7}];
+    unsupported.el('imageFiles').dispatchEvent(new Event('change'));assert.equal(unsupported.readers.length,0,'reject image formats the API cannot accept');
     console.log('PASS real maintenance/booking lifecycle: save races, image decoding, persistent commit suppression on reload, fresh/newer drafts and cross-account isolation');
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

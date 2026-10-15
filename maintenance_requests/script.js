@@ -29,6 +29,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const otherContainer = document.getElementById('otherTypeContainer');
     const otherDetailInput = document.getElementById('otherTypeDetail');
 
+    // Keep native validation and show persistent guidance beside the affected field.
+    form.addEventListener('invalid', event => {
+        const field = event.target;
+        if (!field.id || !field.closest('.form-group')) return;
+        let error = document.getElementById(`${field.id}Error`);
+        if (!error) {
+            error = document.createElement('p');
+            error.id = `${field.id}Error`;
+            error.className = 'field-error';
+            field.closest('.form-group').appendChild(error);
+            field.setAttribute('aria-describedby', [field.getAttribute('aria-describedby'), error.id].filter(Boolean).join(' '));
+        }
+        error.textContent = field.validity.valueMissing ? 'กรุณากรอกข้อมูลช่องนี้' : 'กรุณาตรวจสอบข้อมูลช่องนี้ให้ถูกต้อง';
+        error.classList.remove('hidden');
+        field.setAttribute('aria-invalid', 'true');
+    }, true);
+    form.addEventListener('input', event => {
+        const field = event.target;
+        if (field.validity?.valid) {
+            field.removeAttribute('aria-invalid');
+            const error = document.getElementById(`${field.id}Error`);
+            if (error) {error.textContent = '';error.classList.add('hidden');}
+        }
+    });
+    const repairTypeError = document.getElementById('repairTypeError');
+    form.addEventListener('change', event => {
+        if (event.target.name === 'repairType' && document.querySelectorAll('input[name="repairType"]:checked').length) {
+            repairTypeError.textContent = '';
+            repairTypeError.classList.add('hidden');
+        }
+    });
+    const dateHint = document.getElementById('requestDateHint');
+    const updateDateHint = () => {
+        const date = dateInput.valueAsDate;
+        dateHint.textContent = date && !Number.isNaN(date.getTime())
+            ? new Intl.DateTimeFormat('th-TH', {day:'numeric', month:'long', year:'numeric', timeZone:'UTC'}).format(date) : '';
+    };
+    dateInput.addEventListener('input', updateDateHint);
+    dateInput.addEventListener('change', updateDateHint);
+    form.addEventListener('eoffice:draft-restored', updateDateHint);
+    updateDateHint();
+
     if (otherCheckbox && otherContainer) {
         otherCheckbox.addEventListener('change', function(event) {
             if (this.checked) {
@@ -39,6 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 otherContainer.classList.add('hidden');
                 otherDetailInput.removeAttribute('required');
                 otherDetailInput.value = '';
+                otherDetailInput.removeAttribute('aria-invalid');
+                const error = document.getElementById('otherTypeDetailError');
+                if (error) {error.textContent = '';error.classList.add('hidden');}
             }
         });
     }
@@ -49,6 +94,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedImages = []; // เก็บออบเจกต์ภาพ { filename, mimeType, base64Data }
     const pendingImages = new Set();
     let imageGeneration = 0, imageReadFailed = false;
+    const imageStatus = document.getElementById('imageStatus');
+    const updateImageStatus = () => {
+        imageStatus.textContent = pendingImages.size
+            ? `กำลังอ่านรูปภาพ ${pendingImages.size} รูป…`
+            : selectedImages.length ? `แนบแล้ว ${selectedImages.length} / 5 รูป` : '';
+    };
+    document.getElementById('addImagesBtn').addEventListener('click', () => {
+        if (!lifecycle.busy(form)) imageFilesInput.click();
+    });
 
     if (imageFilesInput && imagePreviewContainer) {
         imageFilesInput.addEventListener('change', function(e) {
@@ -57,8 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
             let acceptedRetry=false;
             
             files.forEach(file => {
-                if (!file.type.startsWith('image/')) {
-                    showToast('กรุณาเลือกไฟล์ภาพเท่านั้น', 'error');
+                if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                    showToast('กรุณาเลือกภาพ JPG หรือ PNG เท่านั้น', 'error');
                     return;
                 }
                 
@@ -66,11 +120,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     showToast(`ไฟล์ ${file.name} มีขนาดใหญ่เกินไป (ไม่เกิน 5MB)`, 'error');
                     return;
                 }
+                if (selectedImages.length + pendingImages.size >= 5) {
+                    showToast('แนบรูปได้สูงสุด 5 รูป กรุณาลบรูปเดิมก่อนเพิ่มรูปใหม่', 'error');
+                    return;
+                }
 
                 if (!acceptedRetry) {imageReadFailed=false;acceptedRetry=true;}
                 const reader = new FileReader();
                 const generation = imageGeneration;
                 pendingImages.add(reader);
+                updateImageStatus();
                 reader.onload = function(evt) {
                     if (!pendingImages.delete(reader) || generation !== imageGeneration) return;
                     const base64Data = evt.target.result;
@@ -87,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 reader.onerror = reader.onabort = () => {
                     if (!pendingImages.delete(reader) || generation !== imageGeneration) return;
                     imageReadFailed = true;showToast('อ่านรูปภาพไม่สำเร็จ กรุณาเลือกใหม่', 'error');
+                    updateImageStatus();
                 };
                 try {reader.readAsDataURL(file);} catch {reader.onerror();}
             });
@@ -97,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderImagePreviews() {
         imagePreviewContainer.innerHTML = '';
+        updateImageStatus();
         selectedImages.forEach((img, index) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'preview-image-wrapper';
@@ -104,15 +165,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const image = document.createElement('img');
             image.className = 'preview-image';
             image.src = img.base64Data;
+            image.alt = img.filename;
             
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'remove-preview-btn';
             removeBtn.innerHTML = '&times;';
+            removeBtn.setAttribute('aria-label', `ลบรูป ${img.filename}`);
             removeBtn.addEventListener('click', () => {
                 if (lifecycle.busy(form)) return;
                 selectedImages.splice(index, 1);
                 renderImagePreviews();
+                const remainingButtons = imagePreviewContainer.querySelectorAll('button');
+                (remainingButtons[Math.min(index, remainingButtons.length - 1)] || document.getElementById('addImagesBtn')).focus();
                 markEdited();
             });
             
@@ -129,6 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (form) {
         form.addEventListener('reset', () => {
+            form.querySelectorAll('.field-error').forEach(error => {
+                error.classList.add('hidden');
+                error.textContent = '';
+            });
+            form.querySelectorAll('[aria-invalid]').forEach(field => field.removeAttribute('aria-invalid'));
             imageGeneration++;selectedImages=[];imageReadFailed=false;
             const readers = [...pendingImages];pendingImages.clear();
             for (const reader of readers) if (reader.readyState === 1) reader.abort();
@@ -138,6 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const generation=imageGeneration;
             queueMicrotask(()=>{
                 if (generation===imageGeneration && !lifecycle.busy(form) && dateInput && !dateInput.value) dateInput.value=window.eofficeDates.today();
+                updateDateHint();
             });
         });
         form.addEventListener('submit', async function(e) {
@@ -155,7 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // ตรวจสอบว่าเลือกประเภทการซ่อมอย่างน้อย 1 อย่าง
             const repairCheckboxes = document.querySelectorAll('input[name="repairType"]:checked');
             if (repairCheckboxes.length === 0) {
-                showToast('กรุณาเลือกประเภทการแจ้งซ่อมอย่างน้อย 1 ข้อ', 'error');
+                repairTypeError.textContent = 'กรุณาเลือกประเภทงานซ่อมอย่างน้อย 1 ประเภท';
+                repairTypeError.classList.remove('hidden');
+                document.querySelector('input[name="repairType"]').focus();
                 return;
             }
 
@@ -264,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const toast = document.createElement('div');
         toast.className = 'toast-notification';
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
         
         // เลือกไอคอนตามประเภท
         const icon = type === 'success' 
