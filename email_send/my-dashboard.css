@@ -1,0 +1,105 @@
+/* Local to personal orders, including the isolated module-router view. */
+.my-orders-page { font-family: 'Prompt', 'Leelawadee UI', system-ui, sans-serif; color: #243046; font-size: 15px; font-weight: 400; line-height: 1.65; }
+.my-orders-page .eoffice-module-view[data-page$="/email_send/my_dashboard.html"] { padding: 0; }
+.my-orders { --orders-primary: #4338ca; --orders-muted: #667085; --orders-border: #e3e7ed; max-width: 1180px; margin: 0 auto; padding: 8px 0 32px; }
+.my-orders, .my-orders * { box-sizing: border-box; }
+.my-orders [hidden] { display: none !important; }
+.my-orders :is(h1, h2, p) { margin: 0; }
+.my-orders .orders-heading { margin-bottom: 26px; }
+.my-orders h1 { font-size: 26px; line-height: 1.45; font-weight: 600; letter-spacing: -.02em; color: #1d2939; }
+.my-orders .orders-heading > p { margin-top: 6px; color: #475467; font-size: 14px; }
+.my-orders .orders-heading .account-info { margin-top: 3px; font-size: 12px; color: var(--orders-muted); overflow-wrap: anywhere; }
+.my-orders .orders-panel { background: #fff; border: 1px solid var(--orders-border); border-radius: 10px; overflow: hidden; }
+.my-orders .filters { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; padding: 22px 24px; border-bottom: 1px solid var(--orders-border); }
+.my-orders label { display: flex; flex-direction: column; gap: 7px; min-width: 0; color: #475467; font-size: 12px; font-weight: 500; }
+.my-orders .search-field { flex: 1 1 280px; max-width: 520px; }
+.my-orders .search-input { display: flex; position: relative; }
+.my-orders .search-input > svg { position: absolute; left: 13px; top: 12px; width: 20px; height: 20px; color: #7d8797; pointer-events: none; }
+.my-orders :is(input, select, button, summary, a) { font-family: inherit; }
+.my-orders :is(input, select) { height: 44px; min-width: 0; border: 1px solid #cdd3dd; border-radius: 7px; background: #fff; color: #344054; font-size: 14px; font-weight: 400; padding: 10px 12px; }
+.my-orders input { width: 100%; padding-left: 41px; }
+.my-orders input::placeholder { color: #7d8797; }
+.my-orders select { width: 150px; cursor: pointer; }
+.my-orders button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 9px 16px; border: 1px solid transparent; border-radius: 7px; font-size: 13px; font-weight: 500; line-height: 1.5; cursor: pointer; transition: background .15s, border-color .15s; }
+.my-orders button svg { width: 17px; height: 17px; }
+.my-orders .button-primary { background: var(--orders-primary); color: white; border-color: var(--orders-primary); }
+.my-orders .button-primary:hover { background: #3730a3; }
+.my-orders .button-secondary { background: #fff; color: #475467; border-color: #d0d5dd; }
+.my-orders .button-secondary:hover:not(:disabled) { background: #f8fafc; border-color: #a8b0bf; }
+.my-orders .button-text { color: #596579; background: transparent; padding-inline: 8px; }
+.my-orders .button-text:hover { color: var(--orders-primary); background: #f5f5fb; }
+.my-orders button:disabled { opacity: .45; cursor: not-allowed; }
+.my-orders :is(button, input, select, a, summary):focus-visible { outline: 3px solid #a5b4fc; outline-offset: 3px; }
+.my-orders .list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 17px 24px; }
+.my-orders .list-title, .my-orders .header-actions { display: flex; align-items: center; gap: 12px; }
+.my-orders h2 { font-size: 15px; font-weight: 500; color: #344054; }
+.my-orders #resultCount { font-size: 12px; color: var(--orders-muted); }
+.my-orders .last-updated { font-size: 11px; color: var(--orders-muted); }
+.my-orders .header-actions button { min-height: 36px; padding: 6px 11px; font-size: 12px; }
+.my-orders .list-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.my-orders .list-feedback { margin: 0 24px 16px; padding: 12px 14px; border: 1px solid #f1d7af; border-radius: 7px; background: #fffbf3; color: #854d0e; font-size: 13px; }
+.my-orders .list-feedback button { margin-left: 8px; min-height: 36px; padding: 5px 9px; color: inherit; background: transparent; text-decoration: underline; }
+.my-orders table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.my-orders th, .my-orders td { padding: 19px 24px; text-align: left; vertical-align: top; border-bottom: 1px solid #edf0f3; overflow-wrap: anywhere; }
+.my-orders th { padding-block: 12px; border-top: 1px solid var(--orders-border); background: #fafbfc; color: #667085; font-size: 12px; font-weight: 400; }
+.my-orders th:nth-child(1) { width: 18%; }
+.my-orders th:nth-child(2) { width: 58%; }
+.my-orders th:nth-child(3) { width: 24%; }
+.my-orders th:last-child { text-align: right; }
+.my-orders tbody tr:last-child td { border-bottom: 0; }
+.my-orders .document-row:hover { background: #fcfcfe; }
+.my-orders .doc-number { font-weight: 500; font-size: 14px; color: #475467; font-variant-numeric: tabular-nums; }
+.my-orders .doc-name { color: #1d2939; font-size: 14px; font-weight: 500; line-height: 1.85; }
+.my-orders .doc-meta { margin-top: 5px; font-size: 12px; color: var(--orders-muted); }
+.my-orders .file-cell { text-align: right; }
+.my-orders .file-link { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; min-height: 44px; color: var(--orders-primary); font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 5px; }
+.my-orders .file-link:hover { text-decoration: underline; }
+.my-orders .file-link svg { flex: 0 0 15px; width: 15px; height: 15px; }
+.my-orders .file-list summary { display: flex; align-items: center; justify-content: flex-end; gap: 7px; min-height: 44px; font-size: 13px; font-weight: 500; color: var(--orders-primary); cursor: pointer; list-style: none; border-radius: 5px; }
+.my-orders .file-list summary::-webkit-details-marker { display: none; }
+.my-orders .file-list summary svg { width: 14px; height: 14px; flex-shrink: 0; transition: transform .15s; }
+.my-orders .file-list[open] summary svg { transform: rotate(180deg); }
+.my-orders .file-list ul { margin: 4px 0 0; padding: 8px 0 0; list-style: none; border-top: 1px solid var(--orders-border); }
+.my-orders .file-list .file-link { font-size: 12px; font-weight: 400; text-align: left; }
+.my-orders .file-unavailable { display: block; padding-block: 10px; font-size: 12px; color: var(--orders-muted); }
+.my-orders .state-row td { padding: 0; }
+.my-orders .empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 260px; padding: 42px 24px 50px; text-align: center; }
+.my-orders .empty-icon { width: 35px; height: 35px; margin-bottom: 7px; color: #98a2b3; }
+.my-orders .empty-state strong { font-weight: 500; color: #344054; font-size: 16px; }
+.my-orders .empty-state p { max-width: 360px; color: var(--orders-muted); font-size: 13px; line-height: 1.85; }
+.my-orders .empty-state button { margin-top: 10px; }
+.my-orders .pagination-container { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 18px 24px; border-top: 1px solid var(--orders-border); }
+.my-orders .pagination-info { font-size: 12px; color: var(--orders-muted); }
+.my-orders .pagination-buttons { display: flex; gap: 5px; flex-wrap: wrap; }
+.my-orders .btn-page { min-width: 40px; min-height: 40px; padding: 7px 10px; background: #fff; color: #596579; border-color: #e3e7ed; font-size: 12px; }
+.my-orders .btn-page:hover:not(:disabled) { background: #f5f5fb; }
+.my-orders .btn-page[aria-current="page"] { background: #eeedfc; color: #3730a3; border-color: #d8d5f7; }
+.my-orders .skeleton-line { display: block; height: 12px; max-width: 85%; margin: 9px 0; border-radius: 3px; background: #edf0f4; }
+.my-orders .skeleton-line.short { width: 55%; }
+@container eoffice-content (max-width: 680px) {
+    .my-orders { padding-top: 4px; }
+    .my-orders h1 { font-size: 23px; }
+    .my-orders .orders-heading { margin-bottom: 20px; }
+    .my-orders .filters { padding: 18px 16px; gap: 12px; }
+    .my-orders .search-field { flex-basis: 100%; max-width: none; }
+    .my-orders .filters > label:not(.search-field) { flex: 1 1 130px; }
+    .my-orders select { width: 100%; }
+    .my-orders .filters > .button-primary { min-width: 84px; }
+    .my-orders .filters > .button-text { flex-basis: 100%; justify-content: flex-start; padding-left: 0; }
+    .my-orders .list-heading { padding: 14px 16px; }
+    .my-orders .last-updated { display: none; }
+    .my-orders .list-feedback { margin-inline: 16px; }
+    .my-orders .orders-table, .my-orders tbody { display: block; }
+    .my-orders thead { display: none; }
+    .my-orders .document-row, .my-orders .skeleton-row { display: block; padding: 16px; border-top: 1px solid var(--orders-border); }
+    .my-orders .document-row td, .my-orders .skeleton-row td { display: block; width: 100%; padding: 0; border: 0; }
+    .my-orders .document-row td + td { margin-top: 7px; }
+    .my-orders .document-row .file-cell { text-align: left; margin-top: 10px; }
+    .my-orders .file-list summary, .my-orders .file-link { justify-content: flex-start; }
+    .my-orders .doc-name { font-size: 15px; }
+    .my-orders .state-row, .my-orders .state-row td { display: block; }
+    .my-orders .empty-state { min-height: 280px; padding-inline: 18px; }
+    .my-orders .pagination-container { padding: 16px; flex-direction: column; align-items: flex-start; }
+    .my-orders .btn-page { min-width: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) { .my-orders button, .my-orders .file-list summary svg { transition: none; } }

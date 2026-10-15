@@ -7,7 +7,7 @@
     <title>จัดการข้อมูลการจองห้องประชุม</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="../assets/booking-icons.js?v=20261014-svg" defer></script>
     <style>
         body {
             font-family: 'Prompt', sans-serif;
@@ -29,8 +29,12 @@
             background: #94a3b8;
         }
     </style>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
-<body class="text-gray-800 p-4 md:p-8">
+<body class="text-gray-800 p-4 md:p-8 eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/room_booking/edit_room_booking.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
     <div class=" mx-auto">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -171,7 +175,7 @@
 
             <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
                 <button type="button" onclick="closeModal()" class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">ยกเลิก</button>
-                <button type="button" onclick="saveChanges()" class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                <button id="save-booking-changes" type="button" onclick="saveChanges()" class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
                     <i class="ph ph-floppy-disk text-lg"></i> บันทึกข้อมูล
                 </button>
             </div>
@@ -311,10 +315,10 @@
                     </td>
                     <td class="px-2 py-4 text-center w-[110px]">
                         <div class="flex items-center justify-center gap-1.5">
-                            <button onclick="openEditModal('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-colors" title="แก้ไข">
+                            <button onclick="openEditModal('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-colors" title="แก้ไข" aria-label="แก้ไขการจอง">
                                 <i class="ph ph-pencil-simple text-lg"></i>
                             </button>
-                            <button onclick="printSlip('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors" title="พิมพ์ใบจอง">
+                            <button onclick="printSlip('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors" title="พิมพ์ใบจอง" aria-label="พิมพ์ใบจอง">
                                 <i class="ph ph-printer text-lg"></i>
                             </button>
                         </div>
@@ -376,6 +380,11 @@
 
         const modal = document.getElementById('editModal');
         const modalContent = modal.querySelector('.bg-white');
+        let editGeneration = 0, editRevision = 0, editSaving = false;
+        const editForm = document.getElementById('editForm');
+        const editSnapshot = () => JSON.stringify([...editForm.elements].map(node =>
+            [node.id, node.type === 'checkbox' ? node.checked : node.value]));
+        for (const type of ['input', 'change']) editForm.addEventListener(type, () => { editRevision++; });
 
         function formatDatetimeForInput(dtString) {
             if(!dtString) return '';
@@ -424,6 +433,8 @@
                 return;
             }
 
+            editGeneration++; editRevision = 0;
+            editForm.dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
             document.getElementById('edit_id').value = booking.id;
 
             const roomSelect = document.getElementById('edit_room_name');
@@ -459,7 +470,9 @@
             document.getElementById('edit_eq_other').value = otherText;
 
             modal.classList.remove('hidden');
+            const generation = editGeneration;
             setTimeout(() => {
+                if (generation !== editGeneration) return;
                 modal.classList.remove('opacity-0');
                 modalContent.classList.remove('scale-95');
                 modalContent.classList.add('scale-100');
@@ -467,17 +480,20 @@
         }
 
         function closeModal() {
+            const generation = ++editGeneration;
             modal.classList.add('opacity-0');
             modalContent.classList.remove('scale-100');
             modalContent.classList.add('scale-95');
 
             setTimeout(() => {
+                if (generation !== editGeneration) return;
                 modal.classList.add('hidden');
                 document.getElementById('editForm').reset();
             }, 300);
         }
 
         async function saveChanges() {
+            if (editSaving) return;
             const id = document.getElementById('edit_id').value;
             const room_name = document.getElementById('edit_room_name').value;
             const topic = document.getElementById('edit_topic').value;
@@ -512,6 +528,9 @@
                 attendees: parseInt(attendees) || 0
             };
 
+            const submitted = {generation:editGeneration, revision:editRevision, snapshot:editSnapshot()};
+            editSaving = true;
+            document.getElementById('save-booking-changes').disabled = true;
             try {
                 const response = await fetch('api/update_booking.php', {
                     method: 'POST',
@@ -523,20 +542,27 @@
 
                 const result = await response.json();
 
-                if (result.status === 'success') {
-                    const index = bookings.findIndex(b => b.id === payload.id);
+                if (response.ok && result.status === 'success') {
+                    const index = bookings.findIndex(b => String(b.id) === String(payload.id));
                     if(index !== -1) {
                         bookings[index] = { ...bookings[index], ...payload };
                     }
-                    renderTable();
-                    closeModal();
-                    showToast(result.message || 'บันทึกข้อมูลสำเร็จ', 'success');
+                    filterBookings();
+                    const current = submitted.generation === editGeneration && submitted.revision === editRevision && submitted.snapshot === editSnapshot();
+                    if (current) {
+                        editForm.dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
+                        closeModal();
+                    }
+                    showToast(current ? (result.message || 'บันทึกข้อมูลสำเร็จ') : 'บันทึกข้อมูลที่ส่งไปแล้ว โดยเก็บฟอร์มปัจจุบันไว้ กรุณาบันทึกการแก้ไขเพิ่มเติม', 'success');
                 } else {
                     showToast(result.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
                 }
             } catch (error) {
                 console.error('Error updating data:', error);
                 showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกข้อมูลได้', 'error');
+            } finally {
+                editSaving = false;
+                document.getElementById('save-booking-changes').disabled = false;
             }
         }
 
@@ -626,16 +652,19 @@
             }, 3000);
         }
 
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const keyword = e.target.value.toLowerCase();
+        function filterBookings() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
             const filteredData = bookings.filter(b =>
                 (b.topic && b.topic.toLowerCase().includes(keyword)) ||
                 (b.room_name && b.room_name.toLowerCase().includes(keyword))
             );
             renderTable(filteredData);
-        });
+        }
+        document.getElementById('searchInput').addEventListener('input', filterBookings);
 
+        let bookingRequest=0;
         async function fetchBookings() {
+            const request=++bookingRequest;
             await window.sessionReady;
             const currentUserId = getCookie('User_Id')|| '';
             const currentUserDisplay = escapeHTML(getCookie('User_DisplayName') || 'ผู้ใช้งานระบบ');
@@ -648,7 +677,7 @@
             try {
                 const response = await fetch(`api/my_bookings.php`);
                 const result = await response.json();
-
+                if(request!==bookingRequest)return;
                 if (result.status === 'success' && Array.isArray(result.data)) {
                     canManageBookings = !!result.is_admin;
                     document.querySelector('h1').lastChild.textContent = result.is_admin ? ' จัดการรายการจองห้องประชุม' : ' รายการจองห้องประชุมของฉัน';
@@ -658,17 +687,19 @@
                     showToast(result.message || 'ไม่พบข้อมูลการจองของท่าน', 'error');
                 }
             } catch (error) {
+                if(request!==bookingRequest)return;
                 console.error('Error fetching bookings:', error);
                 showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงข้อมูลได้', 'error');
             } finally {
-                renderTable();
+                if(request===bookingRequest)filterBookings();
             }
         }
 
         window.onload = () => {
-            fetchBookings();
+            if(!window.eofficeRegisterModuleRefresh)fetchBookings();
         };
+        window.eofficeRegisterModuleRefresh?.(fetchBookings);
     </script>
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
+    </div></div>
 </body>
 </html>

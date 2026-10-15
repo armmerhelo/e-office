@@ -172,5 +172,6 @@
     el('settings-form').addEventListener('eoffice:form-dirty',revokeLeaving);
     window.addEventListener('pageshow', () => { leavingConfirmed = false; });
     window.addEventListener('beforeunload', event => { if (!leavingConfirmed && dirty()) { event.preventDefault(); event.returnValue = ''; } });
-    load();
+    if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(()=>{if(!busy&&!dirty())return load();});
+    else load();
 })();

@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global State
     let allRequests = [];
     let filteredRequests = [];
+    let requestsRevision=0;
     let statusChartInstance = null;
     let categoryChartInstance = null;
 
@@ -63,7 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     function init() {
-        fetchRequests();
+        if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(fetchRequests);
+        else fetchRequests();
         setupEventListeners();
     }
 
@@ -100,23 +102,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Fetch maintenance list from API
     async function fetchRequests() {
+        const revision=++requestsRevision;
         try {
             // ดึงข้อมูลรายการแจ้งซ่อมทั้งหมดโดยระบุ limit 1000 รายการ
             const response = await fetch('api/get_maintenance.php?limit=1000');
             const result = await response.json();
+            if(revision!==requestsRevision)return;
 
             if (result.status === 'success' && Array.isArray(result.data)) {
                 allRequests = result.data;
-                filteredRequests = [...allRequests];
                 
                 // คำนวณแดชบอร์ดและวาดตาราง
                 updateDashboardStats(allRequests);
                 renderCharts(allRequests);
-                renderRequestsList(filteredRequests);
+                applyFilters();
             } else {
                 showErrorPlaceholder(result.message || 'ไม่สามารถดึงข้อมูลรายการแจ้งซ่อมได้');
             }
         } catch (error) {
+            if(revision!==requestsRevision)return;
             console.error('Fetch error:', error);
             showErrorPlaceholder('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
         }

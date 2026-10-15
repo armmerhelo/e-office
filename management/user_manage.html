@@ -64,10 +64,15 @@
         .permission-option strong { display: block; font-size: 14px; }
         @media (max-width: 600px) { body { padding: 8px; } .toolbar { padding: 16px; } .filters, .filters input, .filters select { width: 100%; } .form-grid, .permission-grid { grid-template-columns: 1fr; } .dialog-body { padding: 16px; } .dialog-foot .btn { flex: 1; } }
     </style>
-    <script src="../assets/member-management.js?v=20261009-form-state" defer></script>
-    <script src="../assets/sign-routing-management.js?v=20261009-form-state" defer></script>
+    <script src="../assets/member-management.js?v=20261014-lifecycle" defer></script>
+    <script src="../assets/sign-routing-management.js?v=20261014-lifecycle" defer></script>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/management/user_manage.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
     <main>
         <header class="card toolbar">
             <div><h1>จัดการสมาชิกและสิทธิ์</h1><p class="muted">กำหนดสิทธิ์รายบุคคล สมาชิกหนึ่งคนดูแลงานได้หลายอย่าง</p></div>
@@ -173,6 +178,6 @@
             <footer class="dialog-foot actions"><button class="btn" type="button" data-close="modal_status">ยกเลิก</button><button id="save-status" class="btn primary" type="submit" form="form_status" disabled>บันทึกระดับผู้ใช้</button></footer>
         </section>
     </div>
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
+    </div></div>
 </body>
 </html>

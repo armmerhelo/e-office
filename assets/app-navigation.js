@@ -3,6 +3,20 @@
     if (!scriptUrl || document.querySelector('.eoffice-app-navigation')) return;
     const appRoot = new URL('../', scriptUrl);
     const route = path => new URL(path, appRoot).href;
+    // Direct/bookmarked module URLs join the persistent application shell.
+    // The module host fetches this HTML without executing this bootstrap.
+    const entryViews={
+        'management/user_manage.html':'members','management/department_manage.html':'groups',
+        'external_number_booking/external_number_booking.html':'book','email_send/my_dashboard.html':'my_public',
+        'email_send/doc_send_email.html':'send_email','email_send/ai_settings.html':'ai_settings',
+        'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
+        'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
+        'maintenance_requests/admin.html':'maintenance_admin'
+    };
+    const entry=Object.keys(entryViews).find(path=>new URL(path,appRoot).pathname===location.pathname);
+    if(entry && typeof location.replace==='function') {
+        location.replace(route(`index.php?view=${entryViews[entry]}`));return;
+    }
     const modules = [
         {label:'จัดการสมาชิก', path:'management/user_manage.html', permission:'members', group:'จัดการระบบ', icon:'♙'},
         {label:'จัดการกลุ่มงาน', path:'management/department_manage.html', permission:'departments', group:'จัดการระบบ', icon:'▣'},
@@ -93,16 +107,22 @@
     toggle.setAttribute('aria-label','เปิดเมนู'); toggle.setAttribute('aria-controls',nav.id);toggle.setAttribute('aria-expanded','false');
     header.append(mobileBrand, toggle);
     const overlay = make('div', 'eoffice-module-backdrop'); overlay.hidden = true;
-    const content = make('div', 'eoffice-module-content');
-    const view = make('div', 'eoffice-module-view');
+    const preparedContent = document.querySelector('.eoffice-module-content');
+    const content = preparedContent || make('div', 'eoffice-module-content');
+    const view = document.querySelector('.eoffice-module-view') || make('div', 'eoffice-module-view');
     view.dataset.page = location.pathname;
     if (location.pathname.endsWith('/room_booking/index.html')) view.classList.add('eoffice-calendar-view');
-    while (document.body.firstChild) view.append(document.body.firstChild);
-    content.append(view);
+    // New pages reserve their final layout in HTML. Keep the existing subtree
+    // in place; older pages can still use the dynamic-wrapper fallback.
+    if (!preparedContent) {
+        while (document.body.firstChild) view.append(document.body.firstChild);
+        content.append(view);
+    }
     document.body.append(header, nav, overlay, content);
     document.body.classList.add('eoffice-module-page');
     for (const file of ['app-navigation.css','sidebar.css']) {
-        const stylesheet = make('link');stylesheet.rel='stylesheet';stylesheet.href=new URL(`${file}?v=20261014-sidebar`,scriptUrl).href;document.head.append(stylesheet);
+        if (document.querySelector(`link[rel="stylesheet"][href*="/${file}"]`)) continue;
+        const stylesheet = make('link');stylesheet.rel='stylesheet';stylesheet.href=new URL(`${file}?v=20261014-shell`,scriptUrl).href;document.head.append(stylesheet);
     }
     if (!document.querySelector('link[href*="family=Prompt"]')) {
         const font=make('link');font.rel='stylesheet';font.href='https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap';document.head.append(font);
@@ -131,6 +151,7 @@
     }
     toggle.addEventListener('click',()=>setOpen(!open));overlay.addEventListener('click',()=>setOpen(false));
     desktop.addEventListener('change',()=>setOpen(false));setOpen(false,false);
+    document.body.classList.add('eoffice-shell-ready');
     document.addEventListener('keydown',event=>{
         if (!open) return;
         if (event.key==='Escape') {event.preventDefault();setOpen(false);}

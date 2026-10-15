@@ -8,6 +8,11 @@ body.eoffice-module-page {
     overflow: auto;
     background: #f1f5f9;
 }
+/* Reserve the header/sidebar even while the parser is waiting for shell JS. */
+body.eoffice-module-page:not(.eoffice-shell-ready)::before { content: ''; display: block; height: 64px; background: white; }
+@media (min-width: 64rem) {
+    body.eoffice-module-page:not(.eoffice-shell-ready)::before { position: fixed; inset: 0 auto 0 0; width: 16rem; height: 100dvh; background: #3730a3; }
+}
 .eoffice-app-navigation, .eoffice-module-header, .eoffice-module-backdrop { box-sizing: border-box; }
 .eoffice-app-navigation {
     position: fixed;

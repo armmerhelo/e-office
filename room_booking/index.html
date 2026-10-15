@@ -52,9 +52,13 @@
             max-height: calc(100% - 28px);
         }
     </style>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
 
-<body class="bg-gray-50 text-gray-800 flex flex-col md:flex-row h-auto min-h-screen md:h-screen overflow-y-auto md:overflow-hidden">
+<body class="bg-gray-50 text-gray-800 flex flex-col md:flex-row h-auto min-h-screen md:h-screen overflow-y-auto md:overflow-hidden eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view eoffice-calendar-view" data-page="/room_booking/index.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
     <main class="flex-1 flex flex-col bg-gray-50 p-3 md:p-6 min-w-0 order-1 md:order-2 border-b md:border-b-0 border-gray-200 min-h-[450px] md:h-full">
 
@@ -194,13 +198,16 @@
             }
         ];
 
+        let bookingRequest=0;
         async function fetchBookings() {
+            const request=++bookingRequest;
             try {
                 const monthToFetch = currentDate.getMonth() + 1;
                 const yearToFetch = currentDate.getFullYear();
 
                 const response = await fetch(`api/get_bookings.php?month=${monthToFetch}&year=${yearToFetch}`);
                 const result = await response.json();
+                if(request!==bookingRequest)return;
 
                 if (result.status === 'success' && Array.isArray(result.data)) {
                     processBookingsData(result.data);
@@ -209,6 +216,7 @@
                     document.getElementById('calendar-body').textContent = 'โหลดปฏิทินไม่สำเร็จ กรุณาลองใหม่';
                 }
             } catch (error) {
+                if(request!==bookingRequest)return;
                 console.warn("ไม่พบโฟลเดอร์ API / หรือมีข้อผิดพลาดเครือข่าย, กำลังใช้ข้อมูลชุดทดสอบแทน...");
                 document.getElementById('calendar-body').textContent = 'ไม่สามารถติดต่อเซิร์ฟเวอร์ กรุณาลองใหม่';
             }
@@ -425,8 +433,9 @@
             }, 3000);
         }
 
-        init();
+        if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(fetchBookings);
+        else init();
     </script>
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
+    </div></div>
 </body>
 </html>

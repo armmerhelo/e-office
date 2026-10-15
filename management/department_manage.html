@@ -19,8 +19,12 @@
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
-<body class="text-gray-800">
+<body class="text-gray-800 eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/management/department_manage.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
 <div class="w-full" id="main-content">
 
@@ -127,7 +131,9 @@ let currentPage = 1;
 const perPage = 20;
 let totalDepts = 0;
 
+let departmentsRequest=0;
 function loadDepartments(searchQuery = '') {
+    const request=++departmentsRequest;
     const tbody = document.getElementById('deptTableBody');
     const token = getCookie("User_Token");
 
@@ -136,11 +142,12 @@ function loadDepartments(searchQuery = '') {
         return;
     }
 
-    fetch(`get_departments_api.php?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&limit=${perPage}`, {
+    return fetch(`get_departments_api.php?search=${encodeURIComponent(searchQuery)}&page=${currentPage}&limit=${perPage}`, {
         headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(res => res.json())
     .then(res => {
+        if(request!==departmentsRequest)return;
         if (res.status === 'error') {
             tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 font-medium">${res.message}</td></tr>`;
             renderPagination();
@@ -177,6 +184,7 @@ function loadDepartments(searchQuery = '') {
         });
         renderPagination();
     }).catch(() => {
+        if(request!==departmentsRequest)return;
         tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-red-500 font-medium">เกิดข้อผิดพลาดในการเชื่อมต่อ</td></tr>`;
         renderPagination();
     });
@@ -309,9 +317,10 @@ function submit_delete() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => loadDepartments());
+if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(()=>loadDepartments(document.getElementById('search_txt_dept').value));
+else document.addEventListener('DOMContentLoaded', () => loadDepartments());
 </script>
 
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
+    </div></div>
 </body>
 </html>

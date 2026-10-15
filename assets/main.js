@@ -20,6 +20,10 @@ function applyPermissionMenus() {
     if (aiSettings) aiSettings.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
+    for (const [id,visible] of [['menu-logout',!!window.eofficeUser],['openModal',!window.eofficeUser]]) {
+        const node=document.getElementById(id);if(node)node.style.display=visible?'flex':'none';
+    }
+    const userName=document.getElementById('user_nameDisplay');if(userName)userName.textContent=window.eofficeUser?.name || '';
 }
 
 let permissionRefreshSequence = 0;
@@ -76,7 +80,8 @@ const MODULE_ROUTES = Object.freeze({
     send_email: 'email_send/doc_send_email.html',
     my_public: 'email_send/my_dashboard.html',
     maintenance: 'maintenance_requests/index.html',
-    maintenance_admin: 'maintenance_requests/admin.html'
+    maintenance_admin: 'maintenance_requests/admin.html',
+    ai_settings: 'email_send/ai_settings.html'
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
@@ -131,7 +136,6 @@ function updateDataSavePublic(newData) {
     data_save_public = newData;
 }
 const COLLECTION_PATH = "documents"; // Dummy path
-const current_view_title = document.getElementById("current-view-title");
 const sub_head = document.getElementById("sub_head");
 const menu_members = document.getElementById("menu-members");
 const menu_edit_room_booking = document.getElementById("menu-edit-room-booking");
@@ -525,12 +529,19 @@ function showView(showViews, page , page_number) {
     }
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
+    if (showViews === 'ai_settings' && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
 
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;
     if (moduleRoute) {
         if (!window.eofficeUser || getCookie('User_Token') === null) {
             showViews = 'public';
         } else {
+            if (window.eofficeModuleRouter) {
+                id = null;
+                invalidateDocumentRequests();
+                window.eofficeModuleRouter.open(showViews,{page});
+                return false;
+            }
             if (window.eofficeApproveDocumentLeaving?.() === false) return false;
             localStorage.setItem('currentPage', showViews);
             setSidebarOpen(false);
@@ -539,6 +550,8 @@ function showView(showViews, page , page_number) {
         }
     }
 
+if (window.eofficeModuleRouter?.leave() === false) return false;
+window.eofficeCloseDocumentOverlays?.();
 invalidateDocumentRequests();
 document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
 components_pagination.style.display = 'block';
@@ -574,7 +587,6 @@ if (! page_number) {
     menu_bookingroom.className = className_default;
     menu_edit_room_booking.className = className_default;
     display_style('sub_head','block');
-    display_style('page_header','block');
     console.log("Page_name : " + showViews);
     if (showViews != "received") {
       document.getElementById('read_icon_show').style.display = 'none';
@@ -601,7 +613,6 @@ if (! page_number) {
           }
 
         }
-        current_view_title.innerHTML = "หนังสือส่งถึง";
         sub_head.innerHTML = "ทั้งหมด";
         menu_received.className = className_click;
         content_received.style.display = "block";
@@ -613,7 +624,6 @@ if (! page_number) {
         display_style('btn_report','block');
         document.getElementById('search_txt').value = '';
         if (getCookie("User_Token")) get_data_api_send(page_number);
-        current_view_title.innerHTML = "ทะเบียนหนังสือรับ";
         menu_send.className = className_click;
         sub_head.innerHTML = "";
         add_doc_btn.style.display = "flex";
@@ -623,7 +633,6 @@ if (! page_number) {
       display_style('sub_head','none');
       display_style('btn_report','block');
       get_data_api_public();
-      current_view_title.innerHTML = "คำสั่ง";
       sub_head.innerHTML = "คำสั่ง";
       menu_public.className = className_click;
       content_received.style.display = "block";
@@ -635,14 +644,13 @@ if (! page_number) {
         display_style('btn_report','block');
         document.getElementById('search_txt').value = '';
         if (getCookie("User_Token")) get_data_api_send_table(page_number);
-        current_view_title.innerHTML = "ทะเบียนหนังสือรับ";
         sub_head.innerHTML = "";
         add_doc_btn.style.display = "flex";
         load_data.style.display = "block";
         content_received.style.display = "block";
     }
 
-    if (getCookie("User_Token") === null) load_data.style.display = "none";
+    if (getCookie("User_Token") === null && showViews !== 'public') load_data.style.display = "none";
 
     // Keep refresh and links aligned with the document tab that is actually visible.
     const viewUrl = new URL(window.location.href);
@@ -910,10 +918,16 @@ openModal.addEventListener("click", () => {
 });
 
 // ฟังก์ชันปิด
+function closeDocumentOverlays() {
+    const report=document.getElementById('exportModal');
+    if(report){report.classList.add('hidden');report.classList.remove('flex');}
+    document.getElementById('doc_detail')?.classList.remove('active');
+}
+window.eofficeCloseDocumentOverlays=closeDocumentOverlays;
 const closeModal = () => {
     modal.classList.remove("active"); // ค่อยๆ จางหาย
     document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
-    document.getElementById("doc_detail").classList.remove("active"); // ค่อยๆ จางหาย
+    closeDocumentOverlays();
 };
 
 closeIcon.addEventListener("click", closeModal);

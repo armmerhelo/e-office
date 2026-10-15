@@ -300,6 +300,7 @@
             else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
         }
     });
-    window.sessionReady.then(loadUsers);
+    if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(loadUsers);
+    else window.sessionReady.then(loadUsers);
     window.addEventListener('eoffice-sign-routes-changed', loadUsers);
 })();

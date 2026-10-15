@@ -15,8 +15,12 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Prompt', sans-serif; }
         .hidden { display: none !important; }
     </style>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
-<body class="text-gray-800 antialiased min-h-screen flex flex-col justify-between">
+<body class="text-gray-800 antialiased min-h-screen flex flex-col justify-between eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/external_number_booking/external_number_booking.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
     <!-- หน้าจอแจ้งเตือนกรณีไม่มีสิทธิ์เข้าใช้งาน (Unauthorized Lock Screen) -->
     <div id="unauthorizedScreen" class="hidden fixed inset-0 z-50 bg-slate-100 flex items-center justify-center p-4">
@@ -217,7 +221,9 @@
         }
 
         // โหลดข้อมูลจริงจาก API ฝั่งเซิร์ฟเวอร์
+        let bookingsRequest=0;
         async function fetchBookings() {
+            const request=++bookingsRequest;
             const token = getToken();
             if (!token) {
                 showUnauthorizedScreen();
@@ -250,18 +256,21 @@
                     headers: { 'Authorization': 'Bearer ' + token }
                 });
 
+                if(request!==bookingsRequest)return;
                 if (response.status === 401) {
                     showUnauthorizedScreen();
                     return;
                 }
 
                 const data = await response.json();
+                if(request!==bookingsRequest)return;
 
                 if (response.ok && data.status === 'success') {
                     isAdmin = data.isAdmin;
 
                     cachedBookings = data.data; // เก็บข้อมูลลงแคชสำหรับฟังก์ชันค้นหา
-                    renderTable(cachedBookings);
+                    if(document.getElementById('tableSearch').value)filterTable();
+                    else renderTable(cachedBookings);
                 } else {
                     Swal.fire({
                         icon: 'error',
@@ -270,6 +279,7 @@
                     });
                 }
             } catch (error) {
+                if(request!==bookingsRequest)return;
                 console.error("Fetch Error:", error);
                 Swal.fire({
                     icon: 'error',
@@ -520,9 +530,10 @@
 
         // เริ่มทำการโหลดข้อมูลการจองทันทีเมื่อ DOM พร้อมทำงาน
         document.addEventListener('DOMContentLoaded', () => {
-            fetchBookings();
+            if(!window.eofficeRegisterModuleRefresh)fetchBookings();
         });
+        window.eofficeRegisterModuleRefresh?.(fetchBookings);
     </script>
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
+    </div></div>
 </body>
 </html>

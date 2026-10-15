@@ -1,5 +1,98 @@
 # ผลการแก้ไขและทดสอบ E-Office
 
+## วนรีวิวและแก้จนรอบตรวจสะอาด — 15 ตุลาคม 2026
+
+- แก้ `tests/booking-edit-ui.cjs` ที่ยังตัด inline script/เรียก `fetchMyDocuments()` จาก HTML เก่า ให้รัน `email_send/my-dashboard.js` ปัจจุบันทั้งไฟล์ผ่าน public refresh hook และตรวจ DOM ที่ renderer สร้างจริง
+- คง coverage ลิงก์ PDF ที่ root/`/eoffice/`, ชื่อไฟล์ที่ต้อง encode พร้อมตรวจ latest response, stale network failure และการรักษารายการเดิมเมื่อ background refresh ล้มเหลว
+- พบและยืนยัน failing regression เพิ่ม: กดหน้าถัดไปแล้วอัปเดตระหว่างรอ เมื่อ refresh ล้มเหลว state เดิมนับ skeleton เป็นผลลัพธ์ที่เก็บไว้ จึงค้าง loading rows ทั้งที่ aria-busy จบแล้ว
+- แก้ให้ยกเลิก `hasResult` เมื่อเปลี่ยนเนื้อหาเป็น skeleton; error/retry จึงแทนที่ loading rows อย่างถูกต้อง อัปเดต cache version สคริปต์แล้ว
+- หลังแก้ Browser QA ผ่าน **41 กรณี** และ `npm.cmd test` ผ่านครบ รวม integration **44**, document/session races **12**, order HTTP **26**, syntax PHP **140**, JS/CJS **67**, inline **24**; ใช้ฐาน QA และ mock services
+- รีวิวซ้ำหลังแก้ไม่พบบั๊กเพิ่มเติมในขอบเขตที่ตรวจ จบลูปตามคำสั่ง งานยังอยู่ใน working tree และเปิด QA server 8198 ไว้สำหรับทดลอง
+
+## แก้ late booking save และลิงก์ PDF ใต้ subdirectory — 15 ตุลาคม 2026
+
+- เปิดเว็บทดลอง `http://localhost:8198/` ด้วยฐาน `eoffice_module_qa_20261009_test` และ mock services
+- หน้าแก้ไขการจองจับ generation/revision/field snapshot ก่อนส่ง ปิดและล้างเฉพาะฟอร์มชุดที่บันทึกจริง จึงรักษาค่าที่แก้เพิ่มหรือฟอร์มรายการอื่นที่เปิดระหว่างรอ; ป้องกัน submit ซ้ำ ตรวจ HTTP success และรักษาตัวกรองตารางหลังบันทึก
+- ป้องกัน timer ปิด modal เก่า reset ฟอร์มที่เปิดใหม่ และแจ้ง shared form guard เมื่อเปิด snapshot ใหม่หรือบันทึกสำเร็จ
+- ลิงก์ PDF ที่สร้างในหน้าประวัติคำสั่งใช้ `new URL(..., document.baseURI)` จึงอ้างอิง URL ของโมดูลได้ทั้ง standalone และ same-document host รวม installation ใต้ subdirectory
+- เพิ่ม `tests/booking-edit-ui.cjs` ใน `npm test`/`test:modules`: success, rejected/HTTP-failed responses, duplicate submit, later/silent/same-text edits, reopened form, stale close timer และ renderer PDF จริงที่ root/`/eoffice/` พร้อมชื่อไฟล์ที่ต้อง encode
+- Browser QA ผ่าน **40 กรณี** รวม late edit success ขณะซ่อนโมดูลและกลับมาแก้ต่อ; `npm.cmd test` ผ่านครบ รวม integration **44**, races **12**, syntax PHP **140**, JS/CJS **66**, inline **25**
+
+## วนรีวิว → แก้ → ตรวจซ้ำก่อนปิดเครื่อง — 15 ตุลาคม 2026
+
+- รีวิวชุด same-document navigation, loading, modal lifecycle และ recipient save รวมการ refresh ของโมดูลรายการ
+- พบเพิ่ม 1 จุดใน `email_send/my_dashboard.html`: catch ของคำขอเก่าเปลี่ยนข้อความชื่อผู้ใช้ก่อนตรวจ request sequence ทำให้ network failure เก่าทับ identity จากคำขอใหม่ที่สำเร็จแล้ว
+- เพิ่ม browser regression ที่ปล่อยคำขอใหม่สำเร็จก่อน reject คำขอเก่า ยืนยัน fail ก่อนแก้ แล้วเลื่อน sequence guard ให้อยู่ก่อนการเปลี่ยน UI ทุกจุดใน catch
+- หลังแก้ Browser QA ผ่าน **39 กรณี** และ `npm.cmd test` ผ่านทุกชุด รวม integration **44**, document/session races **12**, syntax PHP **140**, JS/CJS **65**, inline **25**; ใช้ฐาน QA เดิมและ mock services
+- รีวิวหลังแก้ไม่พบบั๊กเพิ่มเติมในขอบเขตที่ตรวจ งานบันทึกอยู่ใน working tree ยังไม่ได้ commit/push หรือ deploy production
+
+## แก้ overlay, ผู้รับอีเมล และ guest loading — 15 ตุลาคม 2026
+
+- ปิด export overlay และรายละเอียดเอกสารผ่าน cleanup กลางเมื่อเปลี่ยน view รวม Back กลับเข้าโมดูล จึงไม่ค้างทับพื้นที่งานใหม่
+- รายละเอียดอีเมลที่ถูกพักใช้ค่าจาก input ใน cached DOM แทนสำเนาอีเมลก่อนพัก; successful save ล้างเฉพาะ snapshot ที่ generation/revision/value ยังตรงกับตอนส่ง จึงไม่คืนค่าที่บันทึกแล้วหรือทับค่าที่แก้เพิ่ม
+- Guest ในแท็บคำสั่งสาธารณะยังเห็น table skeleton ระหว่างรอ API แทนการซ่อน loading เพราะไม่มี User_Token
+- Browser QA ผ่าน **38 กรณี** รวม export overlay หลัง Back, guest API ที่หน่วง response และ pending recipient POST ระหว่างสลับหน้า ทั้งสำเร็จ ล้มเหลว และสำเร็จหลังแก้ค่าเพิ่ม โดยตรวจ dirty state ของค่าที่ยังค้างด้วย
+- `npm.cmd test` ผ่านครบทุกชุด รวม integration **44**, document/session race regressions **12**, syntax PHP **140**, JS/CJS **65**, inline scripts **25**; ใช้ฐาน `eoffice_module_qa_20261009_test`, mock services และ signing port 8211 แยกจากเว็บ QA 8198
+- อัปเดต cache version ของ `order-dashboard.js`; การทดสอบใช้ local QA ไม่ได้ deploy production
+
+## แก้ไอคอนและตำแหน่งห้องประชุม — 14 ตุลาคม 2026
+
+- เพิ่ม failing browser assertion ยืนยันว่าปุ่มแก้ไข/พิมพ์ในรายการจองเป็นปุ่มสีที่ไม่มี glyph แสดง ก่อนแก้
+- เปลี่ยน icon fonts ของสองหน้าจองห้องเป็น SVG ใน `assets/booking-icons.js` ภายในโมดูล จึงไม่พึ่ง CSS/ฟอนต์ Phosphor หรือ Font Awesome ที่ไม่ข้าม Shadow DOM; รองรับทั้ง markup เดิม แถวตารางใหม่ และการเปลี่ยนไอคอน toast ขณะใช้งาน
+- เพิ่ม aria-label ให้ปุ่มแก้ไขและพิมพ์ และ disconnect icon observer เมื่อ dispose context
+- ปรับ preview ห้องสารภี/กันเกราเป็น **อาคาร 3** และห้องโสตทัศนศึกษาเป็น **อาคาร 5**
+- Browser QA ผ่าน **36 กรณี** รวมขนาด SVG ของปุ่มจัดการ การเปิด modal แก้ไข ไอคอนหัวข้อ/preview การเปลี่ยน toast และตำแหน่งอาคารครบ 3 ห้อง พร้อมตรวจ screenshot จริง
+- `test:modules`, `test:syntax` และ `git diff --check` ผ่าน; syntax PHP **140**, JS/CJS **65**, inline **25**; ไม่เปลี่ยน API หรือข้อมูล booking ใน production
+
+## เพิ่ม skeleton loading ตอนเปลี่ยนหน้า — 14 ตุลาคม 2026
+
+- เพิ่ม `assets/page-loading.js` และ CSS shimmer กลางสำหรับพื้นที่เนื้อหาโมดูล/รายการเอกสาร โดย sidebar และ document เดิมคงอยู่
+- แสดง skeleton ระหว่างโหลด HTML/scripts และ refresh ของ cached module; เตรียมข้อมูลขณะที่ DOM เดิมยังซ่อนอยู่ แล้วค่อย activate/resume modal หลังข้อมูลพร้อม เพื่อไม่ทับฟอร์มหรือแสดงรายการเก่าระหว่างรอ
+- Document APIs ทั้ง 4 เส้นทางใช้ table skeleton และ aria-busy; ซ่อนตาราง/เลขหน้าเดิมชั่วคราว และจบ loading เฉพาะ response sequence ปัจจุบัน
+- เพิ่มการตรวจ browser แบบหน่วง HTML/API: cold navigation, cached refresh, สลับหน้าเร็วพร้อม late response, document table loading, error/retry, mobile overflow และ prefers-reduced-motion
+- `npm.cmd run test:spa` ผ่าน **35 กรณี**, `test:modules`, `test:syntax` และ `git diff --check` ผ่าน; syntax PHP **140**, JS/CJS **64**, inline **25** พร้อมตรวจ screenshot skeleton จริง
+- ไม่มี delay ขั้นต่ำเพื่อบังคับให้ผู้ใช้รอ: หน้าที่ข้อมูลพร้อมทันทีอาจไม่เห็น animation ขณะหน้าที่ยังโหลดจะแสดง skeleton จนพร้อม
+
+## แก้ controls งานเอกสารค้างเหนือโมดูล — 14 ตุลาคม 2026
+
+- เพิ่ม failing browser assertion ยืนยันว่าเข้าหน้าจัดการสมาชิกหลังทะเบียนหนังสือรับแล้ว `main-content-area` และ `doc_type_div` ยังแสดงอยู่
+- เมื่อเข้าโมดูล ซ่อนและตั้ง inert ทั้งกรอบ `main-content-area` พร้อม content mode ของ main_div และ CSS guard จึงครอบคลุมแถบหนังสือ/คำสั่ง/ประทับตรา สถานะอ่าน ค้นหา รายงาน และส่วนควบคุมเอกสารทั้งหมด
+- เมื่อกลับแท็บเอกสาร คืนกรอบและการรับ input แล้วให้ document renderer เดิมเลือก controls ตาม view; ยืนยันว่าทะเบียนแสดงแถบประเภท แต่คำสั่งสาธารณะ/หนังสือส่งถึงไม่แสดงแถบดังกล่าว
+- Browser QA เริ่มจากทะเบียนที่เปิดแถบประเภทอยู่แล้ว ตรวจทั้ง 11 โมดูลว่าไม่มี document-only UI ปรากฏ รวมอยู่ในชุด **32 กรณีผ่าน**; modules/syntax และ `git diff --check` ผ่าน
+
+## แก้ lifecycle ตามผลรีวิว same-document router — 14 ตุลาคม 2026
+
+- เพิ่ม browser regression ของทั้ง 4 ประเด็น และยืนยัน failing case ของ cache ที่ยัง inert หลังสลับหน้าระหว่าง session pending ก่อนแก้
+- `activate()` ปลด inert หลังตรวจบัญชี/สิทธิ์ล่าสุด จึงกลับมา focus/input/click หน้าเดิมได้แม้พักหน้าระหว่างตรวจ session
+- เพิ่ม refresh hooks ในโมดูลรายการ โดยโหลดครั้งแรก/กลับหน้าและเมื่อมี write สำเร็จจากอีกโมดูล รักษาฟอร์ม/ตัวกรองเดิม เพิ่ม request revision guards ป้องกันผลอ่านเก่าย้อนทับผลใหม่
+- ตรวจ fingerprint ของบัญชี/ระดับ/สิทธิ์: cache ของหน้าที่ขึ้นกับสิทธิ์จะไม่กลับมาแสดงข้อมูลแบบผู้ดูแลเดิมหลังลดสิทธิ์; สร้าง context ใหม่ตามสิทธิ์ปัจจุบัน และให้ยืนยันก่อนทิ้งฟอร์มค้าง ส่วน create drafts ที่ไม่ขึ้นกับสิทธิ์ดูแลงานยังเป็น DOM/ข้อมูลชุดเดิม
+- ปิด native dialogs ก่อนพัก/ซ่อน/ระงับโมดูล รวม popup ที่โมดูลเป็นเจ้าของ; เก็บ dirty ของฟอร์มที่ถูกพัก และ resume รายละเอียดอีเมลพร้อมอีเมลผู้รับที่ยังไม่ส่ง โดย explicit close ยังทิ้ง warning ได้ตามปกติ
+- `npm.cmd run test:spa` ผ่าน **32 กรณี** รวม late-save refresh ของ dashboard ที่เปิดอยู่, modal Back/pending/resume, ยกเลิก/ยืนยัน reload หลังลดสิทธิ์ และร่างที่คงอยู่ กรณี role/read fixtures ใช้ response จำลองใน browser ส่วนการสร้างข้อมูล workflow หลักใช้ local QA APIs
+- `npm.cmd test` ผ่านครบทุกชุด รวม integration **44**, race regressions **12**, PHP syntax **140**, JS/CJS **63**, inline scripts **25**; ใช้ฐาน QA และ mock services พร้อม signing ports 8211 แยกจากเว็บ QA 8198
+
+## เปลี่ยนโมดูลเป็น same-document navigation — 14 ตุลาคม 2026
+
+- เพิ่ม `assets/module-router.js` และเชื่อม `showView()` ให้โหลดโมดูลในพื้นที่กลางของ index โดยไม่เปลี่ยน document/sidebar และไม่สร้าง iframe
+- แยก CSS/IDs ด้วย Shadow DOM และรันสคริปต์ใน module closure/window/document facade; resolve fetch/assets ตาม URL โมดูลเดิม รองรับ DOMContentLoaded/load และ inline handlers ของเนื้อหาที่สร้างทีหลัง
+- เก็บ module DOM/context ไว้เมื่อสลับหน้า จึงรักษาฟอร์ม/ไฟล์และไม่ติดตั้ง handlers ซ้ำ; interval หยุดทำงานเมื่อไม่ active, failed mount cleanup และ retry โหลดหน้าได้
+- รวม dirty guards ของ cached forms สำหรับก่อน reload/logout; ระหว่าง session pending รักษา geometry ของโมดูลไว้แต่ตั้ง inert, หากตรวจบัญชี/สิทธิ์ใช้ไม่ได้หรือสลับบัญชีจึงซ่อน private content และไม่ปล่อย cached owner เดิม POST ต่อ
+- Direct/bookmarked module URL นำเข้า `index.php?view=...`; Back/Forward, เมนูมือถือ และ document tabs ใช้ shell เดิม
+- เพิ่ม `npm.cmd run test:spa` เป็น opt-in Chrome QA กับ local mock server: **26 กรณีผ่าน** รวม 11 โมดูล, DOM/sidebar identity, ไม่มี iframe, cached fields, API writes ของเอกสาร/สมาชิก/กลุ่ม/จองเลข/ห้อง/แจ้งซ่อม, dynamic inline calendar, history/rapid routes, drawer, modal focus trap, pending-session inert, dirty-exit, failed fetch retry และ account-switch rejection โดยไม่มี uncaught exceptions
+- ปรับการใช้ Tailwind build ใน shadow ให้สอดคล้องกับ utility cascade ของหน้าเดิม และเพิ่ม browser assertion ป้องกัน global reset ของโมดูลทับ spacing utilities; ตรวจ screenshot จองเลขคำสั่ง/ปฏิทินจริงแล้ว
+- `npm.cmd test` ผ่านครบทุกชุด รวม integration **44**, race regressions **12**, syntax PHP **140**, JS/CJS **63**, inline **25**; หลังปรับ active menu, callback binding, focus/scroll และ CSS cascade รัน browser QA ซ้ำผ่าน 26 กรณี พร้อม modules/syntax ผ่าน
+- ใช้ฐาน `eoffice_module_qa_20261009_test`, mock services และ signing test ports เริ่ม 8211 เพื่อไม่ชน local QA server 8198; ไม่ deploy production
+
+## ลด layout flash ตอนเปิดหน้าโมดูล — 14 ตุลาคม 2026
+
+- ทั้ง 11 หน้าโหลด `app-navigation.css` และ `sidebar.css` ใน head พร้อม body class และ content/view wrapper ตั้งแต่ HTML เริ่มต้น
+- ย้าย navigation script มาทำงานแบบ parser-blocking ต้น body ก่อนเนื้อหาโมดูล; reuse wrapper เดิมและไม่เพิ่ม stylesheet ซ้ำ โดยคง fallback สำหรับ markup เดิม
+- จองพื้นที่ header 64px บนมือถือ/sidebar 256px บน desktop ระหว่างรอ shell script และถอด placeholder เมื่อ shell พร้อม ไม่ใช้การซ่อนหรือ fade ทั้งหน้า
+- Regression ตรวจตำแหน่ง CSS/script/wrappers, ใช้ DOM/input nodes เดิม, ไม่มี stylesheet ซ้ำ และ session initialization ผ่าน
+- Browser QA เทียบ 11 โมดูลกับหน้าหลักที่ 1440px/390px ผ่าน **22 กรณี** พร้อม drawer Escape/inert checks
+- หน่วง network request ของ navigation script จริง: desktop content อยู่ที่ x=256,y=0 และ mobile x=0,y=64 ทั้งก่อน/หลัง script; ไม่เห็น form ก่อน shell script, wrapper เป็น node เดิม และ stylesheet มีชุดเดียว
+- หลังย้าย script ทดสอบส่งใบแจ้งซ่อมและจองสถานที่ผ่านฟอร์มจริงด้วย local QA สำเร็จ; `test:modules`, `test:syntax` และ `git diff --check` ผ่าน
+- เป็นการลด flash จาก layout/CSS ที่มาช้า การเปิดหน้า HTML ใหม่ยังเป็น full-document navigation
+
 ## รวมดีไซน์ sidebar หน้าหลักและโมดูล — 14 ตุลาคม 2026
 
 - เพิ่ม `assets/sidebar.css` เป็นกติกาดีไซน์กลางของ sidebar ทั้งสองแบบ และนำกติกาที่ซ้ำออกจาก `app-navigation.css`

@@ -72,7 +72,11 @@
         } catch (error) { message(error.message, true); }
         finally { state.busy = false; controls(true); }
     });
-    window.sessionReady.then(user => {
+    if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(()=>{
+        const admin=window.eofficeUser?.status==='Admin';el('sign-routing-section').hidden=!admin;
+        if(admin&&!state.dirty&&!state.busy)return load();
+    });
+    else window.sessionReady.then(user => {
         if (user?.status !== 'Admin') return;
         el('sign-routing-section').hidden = false; load();
     });

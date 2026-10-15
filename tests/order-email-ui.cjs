@@ -84,7 +84,7 @@ async function testOrderActionFeedback() {
         return {total: 1, years: [], is_admin: false, worker: {enabled: false}, data: [item]};
     };
     vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js', 'utf8'), {
-        OrderUI: uiFor(document, request), document, URLSearchParams, Event,
+        OrderUI: uiFor(document, request), document, window:{}, URLSearchParams, Event,
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
         confirm: () => true, setInterval: callback => { poll = callback; },
     }, {filename: 'email_send/order-dashboard.js'});
@@ -124,7 +124,7 @@ async function testRecipientFormLifecycle() {
         return {total: 1, years: [], is_admin: false, worker: {enabled: false}, data: [item]};
     };
     vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js', 'utf8'), {
-        OrderUI: uiFor(document, request), document, URLSearchParams, Event,
+        OrderUI: uiFor(document, request), document, window:{}, URLSearchParams, Event,
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
         confirm: () => true, setInterval() {},
     });

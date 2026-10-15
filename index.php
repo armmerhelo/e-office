@@ -367,7 +367,7 @@ window.addEventListener('load', function() {
         </li>
         <li class="eoffice-app-navigation__group">ผู้ใช้งาน</li>
         <li id="group_menu_logout" >
-          <a href="#" id="menu-logout" onclick="logOut();" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150 " style="display:none">
+          <a href="#" id="menu-logout" onclick="logOut(); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150 " style="display:none">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
             </svg>
@@ -402,13 +402,6 @@ window.addEventListener('load', function() {
     <div id="overlay" onclick="window.toggleSidebar()" class="fixed inset-0 bg-black opacity-50 z-40 hidden lg:hidden"></div>
 
     <div id="main_div" class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-      <header id="page_header" class="bg-white shadow-lg rounded-xl p-3 sm:p-4 mb-4 flex">
-        <h1 id="current-view-title" class="text-2xl font-bold text-gray-800 pr-4">
-          ทะเบียนหนังสือรับ
-        </h1>
-        <br>
-
-      </header>
 
       <main id="main-content-area" class="min-w-0">
         <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-4 ">
@@ -575,11 +568,13 @@ window.addEventListener('load', function() {
   <script src="assets/google-login.js?v=<?php echo filemtime(__DIR__.'/assets/google-login.js'); ?>"></script>
 
   <script src="assets/security.js?v=<?php echo filemtime(__DIR__.'/assets/security.js'); ?>"></script>
+  <script src="assets/page-loading.js?v=<?php echo filemtime(__DIR__.'/assets/page-loading.js'); ?>"></script>
   <script src="assets/api-service.js?v=<?php echo filemtime(__DIR__.'/assets/api-service.js'); ?>"></script>
   <script src="assets/utils.js?v=<?php echo filemtime(__DIR__.'/assets/utils.js'); ?>"></script>
   <script src="assets/form-owner-boundary.js?v=<?php echo filemtime(__DIR__.'/assets/form-owner-boundary.js'); ?>"></script>
   <script src="assets/document-form-guard.js?v=<?php echo filemtime(__DIR__.'/assets/document-form-guard.js'); ?>"></script>
   <script src="assets/document-file-state.js?v=<?php echo filemtime(__DIR__.'/assets/document-file-state.js'); ?>"></script>
+  <script src="assets/module-router.js?v=<?php echo filemtime(__DIR__.'/assets/module-router.js'); ?>"></script>
   <script src="assets/main.js?v=<?php echo filemtime(__DIR__.'/assets/main.js'); ?>"></script>
   <script src="assets/modal.js?v=<?php echo filemtime(__DIR__.'/assets/modal.js'); ?>"></script>
   <!-- <script src="room_booking/main-room.js?v=<?php echo time(); ?>"></script> -->

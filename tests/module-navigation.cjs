@@ -85,6 +85,16 @@ for (const page of pages) {
     const html = fs.readFileSync(page, 'utf8');
     assert.match(html, /assets\/app-navigation\.js/, `${page} should include the shared navigation`);
     assert.doesNotMatch(html, /<iframe\b/i, `${page} must render as a top-level page`);
+    const head=html.slice(0,html.indexOf('</head>'));
+    for(const file of ['app-navigation.css','sidebar.css']) assert.ok(head.includes(`../assets/${file}?`),`${page}: shell CSS must load before body paint`);
+    assert.match(html,/<body\b[^>]*class="[^"]*\beoffice-module-page\b/);
+    const shellScript=html.match(/<script\b[^>]*src="\.\.\/assets\/app-navigation\.js[^\"]*"[^>]*><\/script>/g)||[];
+    assert.equal(shellScript.length,1,`${page}: initialize the shell exactly once`);
+    assert.doesNotMatch(shellScript[0],/\b(?:defer|async)\b/,`${page}: navigation must be built before parsing page content`);
+    const scriptPosition=html.indexOf(shellScript[0]);
+    assert.ok(html.indexOf('class="eoffice-module-content"')<scriptPosition && html.indexOf('class="eoffice-module-view')<scriptPosition,`${page}: prepare final content geometry in HTML`);
+    const firstContent=html.search(/<(?:main|form|section)\b/);
+    if(firstContent>=0)assert.ok(scriptPosition<firstContent,`${page}: shell must precede module content`);
 }
 
 assert.doesNotMatch(index, /<iframe\b/i, 'the main page must not embed module frames');
@@ -182,6 +192,17 @@ context.window.eofficeUser=null;
 context.showView('room_booking','load');
 assert.equal(context.loaded,'public');
 console.log('PASS real router: module redirects, document tabs, invalid/prototype routes, denied permissions and guests');
+
+context.window.eofficeUser={permissions:['members','departments','email','maintenance']};
+const mounted=[];
+context.window.eofficeModuleRouter={open:(view,options)=>mounted.push({view,...options}),leave:()=>true};
+context.navigated=null;
+for(const view of Object.keys(context.MODULE_ROUTES))context.showView(view,'load');
+assert.equal(mounted.length,Object.keys(context.MODULE_ROUTES).length);
+assert.equal(context.navigated,null,'persistent host must replace module redirects');
+context.showView('public','load');assert.equal(context.loaded,'public','document views still use the existing renderer');
+delete context.window.eofficeModuleRouter;
+console.log('PASS same-document main router delegates all module views without location navigation');
 
 const startupStart=main.indexOf('    var currentPage = localStorage.getItem("currentPage");');
 const startupEnd=main.indexOf('    if (getCookie("User_Token") === null)',startupStart);
@@ -352,6 +373,25 @@ async function navigationChecks() {
     console.log('PASS sidebar: document shortcuts, subdirectory URLs, mobile inert/Escape, dirty-form guards and stale session responses');
 }
 navigationChecks().catch(error=>{console.error(error);process.exitCode=1;});
+
+async function preparedShellChecks() {
+    const head=new Element('head'),body=new Element('body'),content=new Element('div'),view=new Element('div'),input=new Element('input');
+    content.className='eoffice-module-content';view.className='eoffice-module-view';input.value='existing input';view.append(input);content.append(view);body.append(content);
+    const stylesheet=new Element('link'),windowEvents=makeEventTarget();
+    const document={...makeEventTarget(),head,body,currentScript:{src:'http://localhost/assets/app-navigation.js'},
+        querySelector:selector=>selector==='.eoffice-module-content'?content:selector==='.eoffice-module-view'?view:selector.startsWith('link[')?stylesheet:null,
+        createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Element(tag)};
+    const window={...windowEvents,sessionReady:Promise.resolve({id:7,permissions:[]}),matchMedia:()=>({matches:true,addEventListener(){}})};
+    vm.runInNewContext(fs.readFileSync('assets/app-navigation.js','utf8'),{window,document,location:{href:'http://localhost/maintenance_requests/index.html',pathname:'/maintenance_requests/index.html'},URL,Event,CustomEvent});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(content.children[0],view);assert.equal(view.children[0],input);assert.equal(input.value,'existing input');
+    assert.equal(body.children.filter(node=>node.className==='eoffice-module-content').length,1);
+    assert.equal(head.children.filter(node=>node.tag==='link').length,0,'prepared head stylesheets must not be injected a second time');
+    assert.equal(body.classList.contains('eoffice-shell-ready'),true);
+    assert.equal(window.eofficeSessionState.status,'authenticated');
+    console.log('PASS prepared shell: reuse content/input nodes, avoid duplicate stylesheets and initialize session before page content');
+}
+preparedShellChecks().catch(error=>{console.error(error);process.exitCode=1;});
 
 async function documentResponseChecks() {
     const nodes=new Map(),requests=[];

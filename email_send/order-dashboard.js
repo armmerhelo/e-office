@@ -12,6 +12,9 @@
     }
     let page = 1, total = 0, activeDoc = null, busy = false, loading = false;
     let listRequest = 0, detailRequest = 0, detailReady = false, detailLoading = false;
+    let recipientGeneration=0,recipientRevision=0;
+    el('recipient-email').addEventListener('input',()=>{recipientRevision++;});
+    el('recipient-email').addEventListener('change',()=>{recipientRevision++;});
     // Auto-refresh uses submitted filters, leaving unfinished search text alone.
     let filters = {year: 'all', search: '', state: ''};
 
@@ -120,19 +123,21 @@
     }
 
     function resetRecipientForm() {
+        recipientGeneration++;recipientRevision++;
         el('recipient-email').value = '';
         el('add-recipient').dispatchEvent(new Event('eoffice:form-saved', {bubbles: true}));
     }
 
     async function action(docId, name, extra = {}) {
         if (busy) return;
+        const submittedRecipient=name==='add_recipient'?{generation:recipientGeneration,revision:recipientRevision,email:el('recipient-email').value}:null;
         busy = true; updateControls();
         const feedbackId = el('detail').open ? 'detail-message' : 'action-message';
         U.message(feedbackId, 'กำลังบันทึกงาน…');
         try {
             const result = await U.request('order_jobs.php', {doc_id: docId, action: name, ...extra});
             // The write succeeded even if the subsequent list/detail refresh fails.
-            if (name === 'add_recipient') resetRecipientForm();
+            if (submittedRecipient && submittedRecipient.generation===recipientGeneration && submittedRecipient.revision===recipientRevision && submittedRecipient.email===el('recipient-email').value) resetRecipientForm();
             await load(true);
             U.message(feedbackId, result.message);
             if (activeDoc?.doc_id === docId && el('detail').open) {
@@ -224,7 +229,7 @@
     el('prev').onclick = () => { if (!loading && !busy && page > 1) { page--; load(); } };
     el('next').onclick = () => { if (!loading && !busy && page * 20 < total) { page++; load(); } };
     el('close-detail').onclick = () => el('detail').close();
-    el('detail').addEventListener('close', () => { detailRequest++; activeDoc = null; detailReady = false; detailLoading = false; });
+    el('detail').addEventListener('close', () => { if(el('detail').open)return;detailRequest++; activeDoc = null; detailReady = false; detailLoading = false; });
     el('refresh-detail').onclick = () => { U.message('detail-message', ''); detail(); };
     el('reanalyze').onclick = () => {
         if (activeDoc && detailReady && confirm('อ่าน PDF ทุกไฟล์ใหม่ โดยไม่ส่งซ้ำให้ผู้ที่สำเร็จแล้ว และคงรายการผลส่งไม่แน่ชัดไว้ให้ตรวจสอบ')) action(activeDoc.doc_id, 'reanalyze', {confirmed: true});
@@ -236,7 +241,16 @@
         event.preventDefault();
         if (activeDoc && detailReady) action(activeDoc.doc_id, 'add_recipient', {email: el('recipient-email').value.trim()});
     };
-    load();
+    let suspendedDetail=null;
+    window.eofficeRegisterModuleSuspend?.(()=>{if(el('detail').open&&activeDoc)suspendedDetail={item:activeDoc};});
+    window.eofficeRegisterModuleResume?.(()=>{
+        if(!suspendedDetail)return;
+        const saved=suspendedDetail;suspendedDetail=null;activeDoc=saved.item;
+        // The cached input is authoritative after a late save or newer edits.
+        el('detail').showModal();detail();
+    });
+    if(window.eofficeRegisterModuleRefresh)window.eofficeRegisterModuleRefresh(()=>{if(!busy)return load(true);});
+    else load();
     // Do not replace a focused/hovered action while an operator is using it.
     setInterval(() => {
         if (!document.hidden && !busy && !loading && !el('detail').open && !document.querySelector('#rows:hover') && !document.activeElement?.closest('form,table')) load(true);

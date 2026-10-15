@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ระบบขออนุญาตใช้สถานที่ โรงเรียนศรียานุสรณ์</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../assets/booking-icons.js?v=20261014-svg" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -21,8 +21,12 @@
             scrollbar-width: none;
         }
     </style>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
 </head>
-<body class="text-gray-800">
+<body class="text-gray-800 eoffice-module-page">
+    <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/room_booking/new_room.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -268,7 +272,7 @@
                 desc: 'ห้องประชุมขนาดกลาง เหมาะสำหรับการประชุมกลุ่มย่อย หรือรับรองแขก',
                 capacity: '30 - 50 ท่าน',
                 equip: 'โปรเจคเตอร์, ระบบเสียงพื้นฐาน, โพเดียม',
-                location: 'อาคาร 1',
+                location: 'อาคาร 3',
                 image: 'https://images.unsplash.com/photo-1517502884422-41eaead166d4?auto=format&fit=crop&q=80&w=600'
             },
             'ห้องสารภี': {
@@ -276,7 +280,7 @@
                 desc: 'ห้องประชุมสำหรับคณะกรรมการหรือกลุ่มงานต่างๆ',
                 capacity: '20 - 30 ท่าน',
                 equip: 'สมาร์ททีวี, ไมค์ประชุม',
-                location: 'อาคาร 2',
+                location: 'อาคาร 3',
                 image: 'https://images.unsplash.com/photo-1573164713988-8665fc963095?auto=format&fit=crop&q=80&w=600'
             },
             'ห้องโสตทัศนศึกษา': {
@@ -284,7 +288,7 @@
                 desc: 'ห้องสำหรับจัดการเรียนการสอนแบบโสตทัศนูปกรณ์ หรือชมวีดิทัศน์',
                 capacity: '50 - 80 ท่าน',
                 equip: 'จอภาพยนตร์, โปรเจคเตอร์คุณภาพสูง, ระบบเสียงรอบทิศทาง',
-                location: 'อาคารศูนย์การเรียนรู้',
+                location: 'อาคาร 5',
                 image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=600'
             }
         };
@@ -579,7 +583,7 @@
             return null;
         }
     </script>
-    <script src="../assets/app-navigation.js?v=20261014-sidebar" defer></script>
-    <script src="../assets/module-drafts.js?v=20261012-time-defaults" defer></script>
+    </div></div>
+    <script src="../assets/module-drafts.js?v=20261014-spa" defer></script>
 </body>
 </html>

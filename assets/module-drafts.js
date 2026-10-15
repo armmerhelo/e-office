@@ -54,7 +54,7 @@
             hasDraft = true;
             discardStored = false;
             form.dataset.eofficeDraftState = 'saved';
-            report('บันทึกร่างข้อความล่าสุดในแท็บนี้แล้ว — ไฟล์แนบต้องเลือกใหม่เมื่อกลับมาหน้าเดิม');
+            report('บันทึกร่างข้อความล่าสุดในแท็บนี้แล้ว — ไฟล์แนบต้องเลือกใหม่หากโหลดหน้าใหม่');
         } catch {
             hasDraft = false;
             form.dataset.eofficeDraftState = 'unavailable';

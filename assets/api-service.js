@@ -32,6 +32,14 @@ function invalidateDocumentRequests() {
     publicRequestSequence++;
 }
 
+function setDocumentLoading(loading) {
+    if(!window.eofficePageLoading)return;
+    const target=document.getElementById('load_data'),panel=document.getElementById('doc-list');
+    if(loading)window.eofficePageLoading.show(target,{kind:'table',label:'กำลังโหลดรายการเอกสาร'});
+    else window.eofficePageLoading.finish(target);
+    if(panel){panel.dataset.loading=String(loading);panel.setAttribute('aria-busy',String(loading));}
+}
+
 
 async function logOut() {
     if (window.eofficeApproveDocumentLeaving?.(true) === false) return;
@@ -134,6 +142,7 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
     Page_number = Math.max(1, parseInt(Page_number, 10) || 1);
     if (Year === undefined) Year = getCookie('yearSelect');
     const requestSequence = ++receivedRequestSequence;
+    setDocumentLoading(true);
     console.log("Year : " + Year);
     console.log("Page : " + Page_number);
     localStorage.setItem("page_number", Page_number);
@@ -147,6 +156,7 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
 
     // **จุดสำคัญที่แก้ Error:** เช็คว่ามีกล่อง loop_receive อยู่ไหม ถ้าไม่มีให้หยุดทันที
     if (!loop_receive) {
+        setDocumentLoading(false);
         console.error("หา element 'loop_receive' ไม่เจอ");
         return;
     }
@@ -378,7 +388,7 @@ if (width >= 1300) {
             console.error('⚠️ ข้อผิดพลาดเครือข่าย หรือ โค้ด:', error);
         }
     } finally {
-        if (requestSequence === receivedRequestSequence && load_data) load_data.style.display = "none";
+        if (requestSequence === receivedRequestSequence) {if(load_data)load_data.style.display = "none";setDocumentLoading(false);}
     }
     if (requestSequence === receivedRequestSequence) {
         const currentUrl = new URL(window.location.href);
@@ -394,6 +404,7 @@ async function get_data_api_public(Page_number,search_txt, Year) {
     Page_number = Math.max(1, parseInt(Page_number, 10) || 1);
     if (Year === undefined) Year = getCookie('yearSelect');
     const requestSequence = ++publicRequestSequence;
+    setDocumentLoading(true);
     localStorage.setItem("page_number", Page_number);
     console.log("Page : " + Page_number);
 
@@ -404,6 +415,7 @@ async function get_data_api_public(Page_number,search_txt, Year) {
 
     // **จุดสำคัญที่แก้ Error:** เช็คว่ามีกล่อง loop_receive อยู่ไหม ถ้าไม่มีให้หยุดทันที
     if (!loop_receive) {
+        setDocumentLoading(false);
         console.error("หา element 'loop_receive' ไม่เจอ");
         return;
     }
@@ -543,7 +555,7 @@ async function get_data_api_public(Page_number,search_txt, Year) {
             console.error('⚠️ ข้อผิดพลาดเครือข่าย หรือ โค้ด:', error);
         }
     } finally {
-        if (requestSequence === publicRequestSequence && load_data) load_data.style.display = "none";
+        if (requestSequence === publicRequestSequence) {if(load_data)load_data.style.display = "none";setDocumentLoading(false);}
     }
 }
 async function get_data_api_report(user_token) {
@@ -633,6 +645,7 @@ async function get_data_api_send_table(Page_number,search_txt, Year, user_token)
     Page_number = Math.max(1, parseInt(Page_number, 10) || 1);
     if (Year === undefined) Year = getCookie('yearSelect');
     const requestSequence = ++sendTableRequestSequence;
+    setDocumentLoading(true);
     console.log("Page : " + Page_number);
     localStorage.setItem("page_number", Page_number);
     // ใช้ getElementById เพื่อความชัวร์ (แทนการเรียก ID ตรงๆ)
@@ -644,6 +657,7 @@ async function get_data_api_send_table(Page_number,search_txt, Year, user_token)
 
     // **จุดสำคัญที่แก้ Error:** เช็คว่ามีกล่อง loop_receive อยู่ไหม ถ้าไม่มีให้หยุดทันที
     if (!loop_receive) {
+        setDocumentLoading(false);
         console.error("หา element 'loop_receive' ไม่เจอ");
         return;
     }
@@ -863,7 +877,7 @@ async function get_data_api_send_table(Page_number,search_txt, Year, user_token)
             console.error('⚠️ ข้อผิดพลาดเครือข่าย หรือ โค้ด:', error);
         }
     } finally {
-        if (requestSequence === sendTableRequestSequence && load_data) load_data.style.display = "none";
+        if (requestSequence === sendTableRequestSequence) {if(load_data)load_data.style.display = "none";setDocumentLoading(false);}
     }
 }
 async function get_data_api_send(Page_number,search_txt, Year, user_token) {
@@ -873,6 +887,7 @@ async function get_data_api_send(Page_number,search_txt, Year, user_token) {
     Page_number = Math.max(1, parseInt(Page_number, 10) || 1);
     if (Year === undefined) Year = getCookie('yearSelect');
     const requestSequence = ++sendRequestSequence;
+    setDocumentLoading(true);
     console.log("Page : " + Page_number);
     localStorage.setItem("page_number", Page_number);
     // ใช้ getElementById เพื่อความชัวร์ (แทนการเรียก ID ตรงๆ)
@@ -884,6 +899,7 @@ async function get_data_api_send(Page_number,search_txt, Year, user_token) {
 
     // **จุดสำคัญที่แก้ Error:** เช็คว่ามีกล่อง loop_receive อยู่ไหม ถ้าไม่มีให้หยุดทันที
     if (!loop_receive) {
+        setDocumentLoading(false);
         console.error("หา element 'loop_receive' ไม่เจอ");
         return;
     }
@@ -1088,7 +1104,7 @@ async function get_data_api_send(Page_number,search_txt, Year, user_token) {
             console.error('⚠️ ข้อผิดพลาดเครือข่าย หรือ โค้ด:', error);
         }
     } finally {
-        if (requestSequence === sendRequestSequence && load_data) load_data.style.display = "none";
+        if (requestSequence === sendRequestSequence) {if(load_data)load_data.style.display = "none";setDocumentLoading(false);}
     }
 }
 
