@@ -179,6 +179,35 @@ async function run() {
         assert.equal(await evaluate("window.__qaWrites.filter(url=>url.includes('external_number_booking.php')).length"),1);
         assert.equal(await evaluate("document.getElementById('document-form').querySelector('[name=doc_name]').value"),'');
     });
+    await check('expired number-booking drafts block logout before its API and clear after cancel/save',async()=>{
+        await moduleView('book');
+        await until(root+".getElementById('reserveButton').disabled===false");
+        await evaluate(`window.__qaNumberGuardTransport=window.fetch;window.__qaNumberGuardExpired=false;window.__qaNumberGuardLogoutCalls=0;window.fetch=(url,options={})=>{const path=new URL(String(url),location.href).pathname;if(path==='/api/logout.php'){window.__qaNumberGuardLogoutCalls++;return Promise.resolve(new Response(JSON.stringify({status:'error',message:'QA must not log out'})));}if(path!=='/external_number_booking/external_number_booking.php')return window.__qaNumberGuardTransport(url,options);const expired=window.__qaNumberGuardExpired;return Promise.resolve(new Response(JSON.stringify({status:expired?'error':'success',isAdmin:true,data:[{id:77777,External_Number:'777/2569',Doc_Year:2569,Doc_Detail:'QA guard original',User_Name:'QA'}]}),{status:expired?401:200,headers:{'Content-Type':'application/json'}}));};${root}.getElementById('refreshBookings').click();`);
+        await until(root+".getElementById('registerContent').getAttribute('aria-busy')==='false'");
+        for(const kind of ['edit','booking']) {
+            await evaluate(`(()=>{const s=${root};window.__qaNumberGuardExpired=true;if(${JSON.stringify(kind)}==='edit'){s.querySelector('.booking-text-button').click();s.getElementById('editDocDetail').value='QA retained number edit';s.getElementById('editDocDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('editForm').requestSubmit();}else{s.getElementById('docDetail').value='QA retained number booking';s.getElementById('docDetail').dispatchEvent(new Event('input',{bubbles:true}));s.getElementById('bookingForm').requestSubmit();}})()`);
+            await until(root+".getElementById('mainApp').hidden && !"+root+".getElementById('saveEdit').disabled && !"+root+".getElementById('reserveButton').disabled");
+            assert.equal(await evaluate('window.eofficeModuleHasChanges()'),true,kind+': central guard retains hidden drafts');
+            const logout=await evaluate(`(async()=>{const original=window.confirm;let confirmations=0;window.confirm=()=>{confirmations++;return false;};try{window.eofficeCancelDocumentLeaving();await logOut();return {confirmations,calls:window.__qaNumberGuardLogoutCalls};}finally{window.confirm=original;}})()`);
+            assert.deepEqual(logout,{confirmations:1,calls:0},kind+': cancel must stop logout before the server is called');
+            await moduleView('maintenance');
+            assert.equal(await evaluate('window.eofficeModuleHasChanges()'),true,'navigation retains the expired draft');
+            await evaluate('window.__qaNumberGuardExpired=false');await moduleView('book');
+            if(kind==='edit') {
+                assert.equal(await evaluate(root+".getElementById('editModal').open"),true);
+                assert.equal(await evaluate(root+".getElementById('editDocDetail').value"),'QA retained number edit');
+                await evaluate(root+".getElementById('cancelEdit').click()");
+            } else {
+                assert.equal(await evaluate(root+".getElementById('docDetail').value"),'QA retained number booking');
+                await evaluate(root+".getElementById('bookingForm').reset()");
+            }
+            assert.equal(await evaluate('window.eofficeModuleHasChanges()'),false,'cancel/reset releases the central guard');
+        }
+        await evaluate(`${root}.querySelector('.booking-text-button').click();${root}.getElementById('editDocDetail').value='QA saved number edit';${root}.getElementById('editDocDetail').dispatchEvent(new Event('input',{bubbles:true}));${root}.getElementById('editForm').requestSubmit();`);
+        await until(root+".getElementById('saveEdit').disabled===false && !"+root+".getElementById('editModal').open");
+        assert.equal(await evaluate('window.eofficeModuleHasChanges()'),false,'successful save releases the central guard');
+        await evaluate('window.fetch=window.__qaNumberGuardTransport');
+    });
     await check('dynamic inline calendar handlers remain scoped',async()=>{
         await moduleView('room_booking');
         const before=await evaluate(root+".getElementById('current-month-display').textContent");

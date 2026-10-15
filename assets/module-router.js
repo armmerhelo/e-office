@@ -43,7 +43,7 @@
         return libraries.get(url);
     }
     function context(view,url,body,shadow) {
-        const values=Object.create(null),events=new EventTarget(),documentEvents=new EventTarget(),dirty=new Set(),retainedForms=new Set(),refreshers=new Set(),suspenders=new Set(),resumers=new Set(),suspendedDialogs=new Set();
+        const values=Object.create(null),events=new EventTarget(),documentEvents=new EventTarget(),dirty=new Set(),retainedForms=new Set(),refreshers=new Set(),suspenders=new Set(),resumers=new Set(),suspendedDialogs=new Set(),changeChecks=new Set();
         const ctx={view,url,body,shadow,events,dirty,active:false,currentScript:null,readyState:'loading',values,owner:String(window.eofficeUser?.id),disposed:false,
             access:accessStamp(),permissionStale:false,dataDirty:false,lastDataRevision:dataRevision,visited:false};
         const timers=new Set(),intervals=new Set(),abort=new AbortController();
@@ -97,6 +97,7 @@
                 if (key==='eofficeRegisterModuleRefresh') return fn=>refreshers.add(fn);
                 if (key==='eofficeRegisterModuleSuspend') return fn=>suspenders.add(fn);
                 if (key==='eofficeRegisterModuleResume') return fn=>resumers.add(fn);
+                if (key==='eofficeRegisterModuleChanges') return fn=>changeChecks.add(fn);
                 if (key==='Swal'&&window.Swal)return new Proxy(window.Swal,{
                     get(target,name) {
                         if(name==='fire')return (...args)=>{
@@ -172,7 +173,7 @@
             if(suspendedDialogs.delete(dialog)||dialog.open)return;
             for(const form of dialog.querySelectorAll?.('form')||[])retainedForms.delete(form);
         },true);
-        ctx.hasChanges=()=>[...dirty].some(form=>{
+        ctx.hasChanges=()=>[...changeChecks].some(check=>check()) || [...dirty].some(form=>{
             if(!form.isConnected)return false;
             if(retainedForms.has(form))return true;
             // Ignore explicitly closed/discarded dialogs, but not the cached
