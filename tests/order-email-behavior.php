@@ -158,4 +158,132 @@ $normal=order_fixture_doc(['behavior-normal-year.pdf']);$sent=0;
 app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use(&$sent){$sent++;return true;}]);
 order_verify(app_order_job((int)$padded['doc_id'])['status']==='success','legacy trailing spaces in year normalize before path helpers');
 order_verify(app_order_job((int)$invalidYear['doc_id'])['error_code']==='invalid_document_year'&&app_order_job((int)$normal['doc_id'])['status']==='success'&&$sent===2,'invalid year fails one job without exiting the CLI batch');
+$pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");
+$options=app_order_options();$options['require_approval']=true;
+$pdo->prepare('UPDATE eoffice_order_settings SET options_json=?')->execute([json_encode($options)]);
+$approvalJob=order_fixture_doc(['behavior-approval.pdf']);$approvedMails=0;
+$approvalTransport=['ai'=>static fn()=>[$alice,$bob],'mail'=>static function()use(&$approvedMails){$approvedMails++;return true;}];
+app_order_worker(90,$approvalTransport);
+order_verify(app_order_job((int)$approvalJob['doc_id'])['status']==='awaiting_approval'&&$approvedMails===0,'approval policy analyzes without sending any email');
+$hash=app_order_approval_hash((int)$approvalJob['id']);$pdo->prepare("UPDATE eoffice_order_jobs SET status='queued',approval_hash=? WHERE id=?")->execute([$hash,$approvalJob['id']]);
+app_order_worker(90,$approvalTransport);
+order_verify($approvedMails===2&&app_order_job((int)$approvalJob['doc_id'])['status']==='success','approved snapshot sends every approved pending recipient without invalidating itself');
+$approvalJob=order_fixture_doc(['behavior-approval-change.pdf']);app_order_worker(90,$approvalTransport);
+$hash=app_order_approval_hash((int)$approvalJob['id']);$pdo->prepare("UPDATE eoffice_order_jobs SET status='queued',approval_hash=? WHERE id=?")->execute([$hash,$approvalJob['id']]);
+$user=$pdo->query("SELECT User_Id,User_Name,User_Email FROM t_user WHERE User_Name='invalid'")->fetch();app_order_add_recipient($approvalJob,$user,'manual');
+app_order_worker(90,$approvalTransport);
+order_verify($approvedMails===2&&app_order_job((int)$approvalJob['doc_id'])['status']==='awaiting_approval','recipient change invalidates approval before SMTP');
+$pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");$options['analysis_only']=true;$options['require_approval']=false;
+$pdo->prepare('UPDATE eoffice_order_settings SET options_json=?')->execute([json_encode($options)]);
+$analysisJob=order_fixture_doc(['behavior-analysis-only.pdf']);app_order_worker(90,$approvalTransport);
+order_verify(app_order_job((int)$analysisJob['doc_id'])['error_code']==='analysis_only'&&$approvedMails===2,'analysis-only policy retains cached results and recipients without sending');
+$diag=app_order_diagnostics(app_order_settings());
+order_verify($diag['cron']['state']==='healthy'&&$diag['cron']['finished_at']!==null&&$diag['cron']['result']['processed']===1,'worker diagnostics distinguish start, completion and processed count');
+$pdo->exec("UPDATE eoffice_order_settings SET worker_at=DATE_SUB(NOW(),INTERVAL 1 HOUR)");
+order_verify(app_order_diagnostics(app_order_settings())['cron']['state']==='offline','old heartbeat is offline rather than a healthy status');
+// Migration imports existing encrypted keys once, including an unreadable cipher.
+$pdo->exec('UPDATE eoffice_order_settings SET active_key_id=NULL,enabled=0');
+$legacyCipher=app_order_encrypt('synthetic-legacy-vault-key');$pdo->prepare('UPDATE eoffice_order_settings SET api_key_cipher=?')->execute([$legacyCipher]);
+$beforeKeys=(int)$pdo->query('SELECT COUNT(*) FROM eoffice_order_api_keys')->fetchColumn();
+app_order_email_migrate($pdo);app_order_email_migrate($pdo);
+order_verify((int)$pdo->query('SELECT COUNT(*) FROM eoffice_order_api_keys')->fetchColumn()===$beforeKeys+1&&app_order_ai_config()['key']==='synthetic-legacy-vault-key','legacy key migration is idempotent and preserves the selected credential');
+$vaultId=(int)app_order_settings()['active_key_id'];$pdo->prepare('UPDATE eoffice_order_api_keys SET created_at=DATE_SUB(NOW(),INTERVAL 100 DAY),remind_days=90 WHERE id=?')->execute([$vaultId]);
+$pdo->prepare('UPDATE eoffice_order_api_keys SET enabled=0 WHERE id=?')->execute([$vaultId]);$blocked=false;
+try{app_order_ai_config();}catch(AppOrderAIException $e){$blocked=$e->reason==='api_key_inactive';}
+order_verify($blocked,'inactive selected key fails closed instead of falling back silently');
+$pdo->prepare('UPDATE eoffice_order_api_keys SET enabled=1 WHERE id=?')->execute([$vaultId]);
+$replacementId=app_order_key_insert(app_order_encrypt('synthetic-mid-round-replacement'),'Mid-round replacement',1);
+$pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");$pdo->exec('UPDATE eoffice_order_settings SET enabled=1');
+$rotatingJob=order_fixture_doc(['behavior-key-rotation-a.pdf','behavior-key-rotation-b.pdf']);$seenKeys=[];
+app_order_worker(90,['ai'=>static function($path,$config)use(&$seenKeys,$replacementId,$alice,$pdo){
+    $seenKeys[]=$config['key_id'];if(count($seenKeys)===1)$pdo->prepare('UPDATE eoffice_order_settings SET active_key_id=? WHERE id=1')->execute([$replacementId]);return [$alice];
+},'mail'=>static fn()=>true]);
+order_verify($seenKeys===[$vaultId,$replacementId],'key rotation applies on the next PDF request within an existing analysis round');
+$pdo->prepare('UPDATE eoffice_order_settings SET enabled=0,active_key_id=? WHERE id=1')->execute([$vaultId]);
+app_order_key_health($vaultId,'ai_rate_limited');app_order_key_health($vaultId);
+order_verify(app_order_key($vaultId)['last_error_code']==='ai_rate_limited'&&app_order_key($vaultId)['last_success_at']!==null,'per-key health retains rate-limit history and latest successful request separately');
+$ring=app_order_keyring_public(app_order_settings());
+order_verify(array_values(array_filter($ring['keys'],static fn($k)=>$k['id']===$vaultId))[0]['rotation_due'],'key age produces a rotation reminder without guessing provider expiry');
+$pdo->prepare("INSERT INTO eoffice_order_ai_usage (model,purpose,prompt_tokens,output_tokens,total_tokens,duration_ms,key_id) VALUES ('gemini-test','analysis',11,7,18,5,?)")->execute([$vaultId]);
+$ring=app_order_keyring_public(app_order_settings());$vaultPublic=array_values(array_filter($ring['keys'],static fn($k)=>$k['id']===$vaultId))[0];
+order_verify((int)$vaultPublic['usage']['total_tokens']===18&&!str_contains(json_encode($ring),'synthetic-legacy-vault-key'),'usage is attributed to a vault ID without exposing its secret');
+require __DIR__.'/../config/order-key-rotation.php';
+$old=app_order_secret_key();$new=random_bytes(32);$pdo->prepare('UPDATE eoffice_order_settings SET smtp_password_cipher=?')->execute([app_order_encrypt('synthetic-smtp-rotation')]);
+// One corrupt inactive entry must roll back every ciphertext, not only itself.
+$badId=app_order_key_insert('bad-cipher','Synthetic corrupt vault',1);$original=app_order_settings()['api_key_cipher'];$failed=false;
+try{app_order_rotate_settings_key($old,$new);}catch(AppOrderAIException $e){$failed=true;}
+order_verify($failed&&app_order_settings()['api_key_cipher']===$original,'rotation rolls back atomically if any vault secret cannot be decrypted');
+$pdo->exec("UPDATE eoffice_order_api_keys SET cipher=NULL,deleted_at=NOW() WHERE cipher='bad-cipher' OR cipher='synthetic-corrupted-cipher'");
+app_order_rotate_settings_key($old,$new);
+order_verify(app_order_decrypt(app_order_settings()['api_key_cipher'],$new)==='synthetic-legacy-vault-key'&&app_order_decrypt(app_order_settings()['smtp_password_cipher'],$new)==='synthetic-smtp-rotation','encryption rotation preserves the selected API key and SMTP password under the new key');
+order_verify(app_order_decrypt(app_order_key($vaultId)['cipher'],$new)==='synthetic-legacy-vault-key','encryption rotation covers vault credentials as well as compatibility storage');
+app_order_rotate_settings_key($new,$old);
+putenv('GEMINI_API_KEY=synthetic-server-key');$pdo->exec('UPDATE eoffice_order_settings SET active_key_id=NULL,api_key_cipher=NULL');
+order_verify(app_order_ai_config()['key']==='synthetic-server-key'&&app_order_ai_config()['key_id']===0,'explicit server mode resolves the server key and its usage identity');
+$pdo->prepare('UPDATE eoffice_order_settings SET api_key_cipher=?')->execute([app_order_encrypt('')]);
+order_verify(app_order_ai_config()['key']==='','clearing selection does not silently fall back to the server credential');
+// A consistent read has already established the SMTP transaction's snapshot.
+// Commit Admin changes on a separate connection at that exact boundary.
+$pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");
+$freshOptions=app_order_options();$freshOptions['analysis_only']=false;$freshOptions['require_approval']=false;
+$other=new PDO("mysql:host={$settings['host']};port={$settings['port']};dbname={$settings['database']};charset=utf8mb4",$settings['username'],$settings['password'],[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+foreach(['pause','analysis_only','require_approval'] as $change){
+    $pdo->prepare('UPDATE eoffice_order_settings SET enabled=1,options_json=?')->execute([json_encode($freshOptions)]);
+    $job=order_fixture_doc(['behavior-live-policy-'.$change.'.pdf']);$sends=0;$interleaved=false;
+    app_order_worker(90,['ai'=>static fn()=>[$alice],'before_send'=>static function()use($pdo,$other,$freshOptions,$change,&$interleaved){
+        order_verify($pdo->inTransaction(),'pre-SMTP '.$change.' runs inside the established document transaction');
+        if($change==='pause')$other->exec('UPDATE eoffice_order_settings SET enabled=0,revision=revision+1');
+        else{$next=$freshOptions;$next[$change]=true;$other->prepare('UPDATE eoffice_order_settings SET options_json=?,revision=revision+1')->execute([json_encode($next)]);}
+        $interleaved=true;
+    },'mail'=>static function()use(&$sends){$sends++;return true;}]);
+    $recipients=order_fixture_recipients($job);
+    order_verify($interleaved&&$sends===0&&$recipients[0]['status']==='pending','committed '.$change.' after the snapshot prevents SMTP without uncertain markers');
+    if($change!=='pause'){
+        app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use(&$sends){$sends++;return true;}]);
+        order_verify(app_order_job((int)$job['doc_id'])['status']==='awaiting_approval'&&$sends===0,'next cron holds the job under '.$change);
+    }
+    $pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");
+}
+$pdo->prepare('UPDATE eoffice_order_settings SET enabled=1,options_json=?')->execute([json_encode($freshOptions)]);
+$barrierJob=order_fixture_doc(['behavior-settings-send-barrier.pdf']);$barrier=false;
+$other->exec('SET SESSION innodb_lock_wait_timeout=1');
+app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use($other,&$barrier){
+    try{$other->exec('UPDATE eoffice_order_settings SET enabled=0');}
+    catch(PDOException $e){if((int)($e->errorInfo[1]??0)!==1205)throw $e;$barrier=true;}
+    return true;
+}]);
+order_verify($barrier&&app_order_job((int)$barrierJob['doc_id'])['status']==='success','settings writers cannot commit between the final current read and SMTP completion');
+$other->exec('UPDATE eoffice_order_settings SET enabled=0');
+order_verify(!app_order_settings()['enabled'],'settings writer proceeds after SMTP releases its share lock');
+$pdo->exec("UPDATE eoffice_order_jobs SET status='cancelled'");
+$approvalOptions=$freshOptions;$approvalOptions['require_approval']=true;
+$pdo->prepare('UPDATE eoffice_order_settings SET enabled=1,options_json=?')->execute([json_encode($approvalOptions)]);
+$coldJob=order_fixture_doc(['behavior-cold-approval.pdf']);
+app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function(){throw new RuntimeException('Unapproved mail must not be sent');}]);
+$reviewToken=app_order_approval_hash((int)$coldJob['id']);
+putenv('EOFFICE_DRIVE_ARCHIVE_ENABLED=true');putenv('EOFFICE_BACKUP_KEY='.base64_encode(random_bytes(32)));
+$coldPath=app_storage('original','2569','behavior-cold-approval.pdf');$coldPlain=file_get_contents($coldPath);$coldRevision=hash('sha256',$coldPlain);
+$coldVersion=app_drive_archive_id((int)$coldJob['doc_id'],'behavior-cold-approval.pdf','original',$coldRevision);$coldKey=app_drive_archive_key();
+$encrypted=app_settings()['storage'].'/synthetic-cold-approval.ebak';$writer=new AppBackupWriter($encrypted,$coldKey);$writer->write($coldPlain);$meta=$writer->finish();$coldBytes=file_get_contents($encrypted);unlink($encrypted);
+$parts=[['offset'=>0,'bytes'=>$meta['bytes'],'sha256'=>$meta['sha256'],'object'=>hash('sha256',$coldBytes)]];
+$pdo->prepare("INSERT INTO eoffice_drive_versions (id,doc_id,file_name,variant,revision,bytes,key_id,parts,status) VALUES (?,?,?,'original',?,?,?,?,'verified')")->execute([$coldVersion,$coldJob['doc_id'],'behavior-cold-approval.pdf',$coldRevision,strlen($coldPlain),substr(hash('sha256',$coldKey),0,16),json_encode($parts)]);
+$pdo->prepare("INSERT INTO eoffice_drive_files VALUES (?,?,'original',?)")->execute([$coldJob['doc_id'],'behavior-cold-approval.pdf',$coldVersion]);unlink($coldPath);
+$downloads=0;$prepared=app_order_prepare_approval((int)$coldJob['doc_id'],$reviewToken,static function()use($pdo,$coldBytes,&$downloads){
+    order_verify(!$pdo->inTransaction(),'approval restores cold Drive bytes outside the SQL transaction');$downloads++;return $coldBytes;
+});
+order_verify($downloads===1&&file_get_contents($prepared['files']['behavior-cold-approval.pdf']['path'])===$coldPlain,'approval preparation hydrates an evicted cache without recreating the original PDF');
+$pdo->beginTransaction();$q=$pdo->prepare('SELECT * FROM t_document WHERE Doc_Id=? FOR UPDATE');$q->execute([$coldJob['doc_id']]);$locked=$q->fetch();
+app_order_approve_prepared($locked,$reviewToken,$prepared);$pdo->commit();
+order_verify(app_order_job((int)$coldJob['doc_id'])['status']==='queued','cold Drive order is approved using prepared bytes and the reviewed snapshot');
+
+$pdo->prepare("UPDATE eoffice_order_jobs SET status='awaiting_approval',error_code='approval_required',approval_hash=NULL WHERE id=?")->execute([$coldJob['id']]);
+$user=$pdo->query("SELECT User_Id,User_Name,User_Email FROM t_user WHERE User_Name='bob'")->fetch();app_order_add_recipient($coldJob,$user,'manual');
+$pdo->beginTransaction();$q=$pdo->prepare('SELECT * FROM t_document WHERE Doc_Id=? FOR UPDATE');$q->execute([$coldJob['doc_id']]);$locked=$q->fetch();$rejected=false;
+try{app_order_approve_prepared($locked,$reviewToken,$prepared);}catch(DomainException $e){$rejected=true;}finally{$pdo->rollBack();}
+order_verify($rejected&&app_order_job((int)$coldJob['doc_id'])['approval_hash']===null,'recipient changes after preparation invalidate the reviewed approval token');
+$reviewToken=app_order_approval_hash((int)$coldJob['id']);
+file_put_contents(app_storage('original','2569','behavior-cold-approval.pdf'),"%PDF-1.4\n% changed during approval preparation\n%%EOF\n");
+$pdo->beginTransaction();$q=$pdo->prepare('SELECT * FROM t_document WHERE Doc_Id=? FOR UPDATE');$q->execute([$coldJob['doc_id']]);$locked=$q->fetch();$rejected=false;
+try{app_order_approve_prepared($locked,$reviewToken,$prepared);}catch(DomainException $e){$rejected=true;}finally{$pdo->rollBack();}
+order_verify($rejected&&app_order_job((int)$coldJob['doc_id'])['status']==='awaiting_approval','PDF replacement after cold preparation cannot approve stale analysis');
 echo "Order behavior: $passed passed\n";

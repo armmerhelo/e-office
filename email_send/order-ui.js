@@ -8,6 +8,12 @@ window.OrderUI = (() => {
     async function request(url,data){const response=await fetch(url,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok||result.status==='error')throw new Error(errors[result.code]||result.message||'ดำเนินการไม่สำเร็จ');return result;}
     function message(id,text,error=false){const el=document.getElementById(id);el.textContent=text;el.classList.toggle('error',error);el.classList.toggle('ok',!error);}
     errors.smtp_configuration_required='SMTP ยังตั้งค่าไม่ครบ กรุณาตรวจสอบการตั้งค่าบนเซิร์ฟเวอร์';
+    labels.awaiting_approval='รอตรวจผู้รับก่อนส่ง';
+    errors.api_key_inactive='Key ถูกพักใช้ ลบ หรือไม่พร้อม กรุณาเลือก Key ตัวหลักที่พร้อมใช้งาน';
+    errors.keyring_full='คลังรองรับ 50 Key กรุณาลบรายการที่เลิกใช้ก่อนเพิ่ม';
+    errors.approval_cache_not_ready='PDF cache เปลี่ยนระหว่างตรวจสอบ กรุณาลองยืนยันอีกครั้ง';
+    errors.approval_drive_unavailable='Drive ขัดข้องชั่วคราว กรุณาลองยืนยันอีกครั้ง';
+    Object.assign(errors,{approval_required:'รอเจ้าหน้าที่ตรวจรายชื่อและอนุมัติส่ง',analysis_only:'โหมดวิเคราะห์อย่างเดียว ยังไม่ส่งเมล',smtp_connection_failed:'เชื่อมต่อ SMTP ไม่สำเร็จ ตรวจ Host, Port, TLS และบัญชีผู้ส่ง',ai_rate_limited:'โควตาหรืออัตราการเรียก AI ถึงขีดจำกัด กรุณารอและตรวจโควตาใน AI Studio',ai_key_rejected:'AI ปฏิเสธ Key หรือสิทธิ์ ตรวจ API key และสิทธิ์โครงการ',ai_request_rejected:'โมเดลปฏิเสธรูปแบบคำขอ ทดลองเลือกโมเดลที่รองรับ PDF และ JSON'});
     errors.invalid_document_year='ปีของเอกสารไม่ถูกต้อง กรุณาตรวจสอบข้อมูลเดิม';
     errors.no_pending_recipients='ไม่มีผู้รับรอส่ง เลือกส่งใหม่รายคนหรือเพิ่มผู้รับได้';
     errors.recipient_revoked='ผู้รับถูกถอนออกจากเอกสารก่อนส่ง';

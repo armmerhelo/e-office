@@ -7,7 +7,10 @@ $pdo=app_pdo();$action=$argv[1]??'';$docId=(int)($argv[2]??0);
 if($action==='setup'){
     $pdo->exec("CREATE TRIGGER order_send_gate BEFORE UPDATE ON eoffice_order_recipients FOR EACH ROW BEGIN IF NEW.status='sending' AND OLD.status='pending' THEN SET @order_gate=GET_LOCK('order-test:sendgate',20); SET @order_release=RELEASE_LOCK('order-test:sendgate'); END IF; END");echo '{}';exit;
 }
-if($action==='cleanup'){$pdo->exec('DROP TRIGGER IF EXISTS order_send_gate');exit;}
+if($action==='setup-policy'){
+    $pdo->exec("CREATE TRIGGER order_policy_gate BEFORE UPDATE ON eoffice_order_jobs FOR EACH ROW BEGIN IF NEW.status='awaiting_approval' AND OLD.status<>'awaiting_approval' THEN SET @order_gate=GET_LOCK('order-test:sendgate',20); SET @order_release=RELEASE_LOCK('order-test:sendgate'); END IF; END");echo '{}';exit;
+}
+if($action==='cleanup'){$pdo->exec('DROP TRIGGER IF EXISTS order_send_gate');$pdo->exec('DROP TRIGGER IF EXISTS order_policy_gate');exit;}
 if($action==='gate'){$pdo->query("SELECT GET_LOCK('order-test:sendgate',0)");echo "LOCKED\n";flush();fgets(STDIN);$pdo->query("SELECT RELEASE_LOCK('order-test:sendgate')");exit;}
 if(str_starts_with($action,'blocked-')){
     $needle=$action==='blocked-marker'?"SET @order_gate=GET_LOCK%":"SELECT * FROM t_document WHERE Doc_Id=%FOR UPDATE%";

@@ -36,7 +36,7 @@
         <form id="filters" class="filters">
             <label class="search-field" for="search">ค้นหาคำสั่ง<input id="search" type="search" maxlength="200" placeholder="พิมพ์เลขที่หรือชื่อคำสั่ง" autocomplete="off"></label>
             <label for="year">ปีคำสั่ง<select id="year"><option value="all">ทุกปี</option></select></label>
-            <label for="state">สถานะงาน<select id="state"><option value="">ทุกสถานะ</option><option value="not_queued">ยังไม่เข้าคิว</option><option value="waiting_files">รอ PDF</option><option value="analyzing">รอ / กำลังวิเคราะห์</option><option value="sending">รอ / กำลังส่ง</option><option value="queued">เข้าคิวแล้ว</option><option value="success">สำเร็จ</option><option value="partial">สำเร็จบางส่วน / ต้องตรวจสอบ</option><option value="review">ต้องตรวจสอบงาน</option><option value="cancelled">ยกเลิก</option></select></label>
+            <label for="state">สถานะงาน<select id="state"><option value="">ทุกสถานะ</option><option value="not_queued">ยังไม่เข้าคิว</option><option value="waiting_files">รอ PDF</option><option value="analyzing">รอ / กำลังวิเคราะห์</option><option value="awaiting_approval">รอตรวจผู้รับ / พักการส่ง</option><option value="sending">รอ / กำลังส่ง</option><option value="queued">เข้าคิวแล้ว</option><option value="success">สำเร็จ</option><option value="partial">สำเร็จบางส่วน / ต้องตรวจสอบ</option><option value="review">ต้องตรวจสอบงาน</option><option value="cancelled">ยกเลิก</option></select></label>
             <button id="search-button" type="submit">ค้นหา</button>
             <button id="reset-filters" class="button-secondary" type="button">ล้างตัวกรอง</button>
         </form>
@@ -45,6 +45,7 @@
             <button type="button" data-state="" aria-pressed="true">ทั้งหมด</button>
             <button type="button" data-state="not_queued" aria-pressed="false">ยังไม่เข้าคิว</button>
             <button type="button" data-state="review" aria-pressed="false">ต้องตรวจสอบงาน</button>
+            <button type="button" data-state="awaiting_approval" aria-pressed="false">รอตรวจผู้รับ</button>
             <button type="button" data-state="partial" aria-pressed="false">ตรวจสอบผลส่ง</button>
             <button type="button" data-state="success" aria-pressed="false">สำเร็จ</button>
         </div>
@@ -72,8 +73,8 @@
         <div class="detail-danger-zone"><p class="muted">ยกเลิกได้เฉพาะงานที่ยังไม่ส่ง อีเมลที่ส่งแล้วเรียกคืนไม่ได้</p><button id="cancel-job" class="danger" type="button" disabled>ยกเลิกงานที่ยังไม่ส่ง</button></div>
     </div>
 </dialog>
-<script src="order-ui.js"></script>
-<script src="order-dashboard.js?v=20261015-recipient"></script>
+<script src="order-ui.js?v=20261015-approval"></script>
+<script src="order-dashboard.js?v=20261015-controls"></script>
     </div></div>
 </body>
 </html>

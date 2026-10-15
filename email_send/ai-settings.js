@@ -1,5 +1,5 @@
 (() => {
-    const U = OrderUI, el = id => document.getElementById(id);
+    const U = OrderUI, C=OrderSettingsControls, K=OrderKeyring, el = id => document.getElementById(id);
     const buttonLabels = {save: 'บันทึกการตั้งค่า', models: 'โหลดรายชื่อโมเดล', test: 'ทดสอบ AI'};
     const buttonIds = {save: 'save', models: 'load-models', test: 'test-ai'};
     let saved = null, busy = false, ready = false, saveError = '', enabledBeforeClear = false;
@@ -12,8 +12,9 @@
         return date.toLocaleDateString('th-TH', {day: 'numeric', month: 'short', year: 'numeric'}) + ` · ${parts[4]}:${parts[5]} น.`;
     }
     function dirty() {
-        return Boolean(saved && (el('api-key').value || el('clear-key').checked || el('model').value.trim() !== saved.model || el('enabled').checked !== saved.enabled));
+        return Boolean(saved && (K.dirty() || settingsDirty()));
     }
+    function settingsDirty(){return Boolean(saved&&(C.dirty(saved)||el('api-key').value||el('clear-key').checked||el('model').value.trim()!==saved.model||el('enabled').checked!==saved.enabled));}
     function status(id, text, good) {
         el(id).textContent = text;
         el(id).className = good ? 'status-good' : 'status-warning';
@@ -36,6 +37,10 @@
         el('discard').disabled = busy || !ready || !dirty();
         el('save-state').classList.toggle('unsaved', ready && dirty());
         el('retry-load').disabled = busy;
+        el('refresh-settings').disabled=busy;
+        K.controls();
+        el('smtp-admin').hidden=el('smtp_source').value!=='admin';
+        el('pdf-test').disabled=clear||!hasKey;
         el('api-key').disabled = clear;
         el('enabled').disabled = clear;
         el('show-key').disabled = clear || !el('api-key').value;
@@ -46,6 +51,8 @@
         el('clear-key').disabled = !saved?.encryption_ready;
         const deliveryChanged = saved && el('enabled').checked !== saved.enabled;
         el('delivery-preview').textContent = clear ? 'กำลังเตรียมล้าง key และหยุดส่งเมื่อบันทึก' : deliveryChanged ? (el('enabled').checked ? 'จะเปิดส่งอัตโนมัติเมื่อบันทึก' : 'จะหยุดส่งอัตโนมัติเมื่อบันทึก') : el('enabled').checked ? 'เปิดใช้งานอยู่ · ส่งตามรอบ Cron' : 'ปิดอยู่ · ยังไม่ส่งอีเมลอัตโนมัติ';
+        if(!clear&&el('enabled').checked&&el('analysis_only').checked)el('delivery-preview').textContent='วิเคราะห์ตามรอบ Cron · เก็บรายชื่อไว้ ยังไม่ส่งเมล'+(dirty()?' (มีค่าที่ยังไม่บันทึก)':'');
+        else if(!clear&&el('enabled').checked&&el('require_approval').checked)el('delivery-preview').textContent='วิเคราะห์แล้วรอเจ้าหน้าที่ตรวจผู้รับก่อนส่ง'+(dirty()?' (มีค่าที่ยังไม่บันทึก)':'');
         if (!busy) {
             el('save-state').textContent = saveError ? 'บันทึกไม่สำเร็จ · ' + saveError : !ready ? 'ยังไม่พร้อมแก้ไขการตั้งค่า' : dirty() ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'การตั้งค่าเป็นปัจจุบัน';
             el('save-state').classList.toggle('error', Boolean(saveError));
@@ -54,30 +61,49 @@
     }
     function render(settings) {
         saved = settings; ready = true; saveError = ''; enabledBeforeClear = settings.enabled;
+        C.render(settings,dateTime);
+        K.render(settings,dateTime,keyAction);
         el('enabled').checked = settings.enabled;
         el('model').value = settings.model;
         el('api-key').value = ''; el('clear-key').checked = false; hideKey();
-        status('saved-delivery', settings.enabled ? 'เปิดส่งอัตโนมัติ' : settings.activated_at ? 'หยุดส่งชั่วคราว' : 'ยังไม่เปิดใช้งาน', settings.enabled);
-        el('saved-delivery-note').textContent = settings.enabled ? 'ระบบจะทำงานตามรอบ Cron' : 'เปิดสวิตช์และบันทึกเพื่อเริ่มส่ง';
-        status('saved-key', settings.key_configured ? 'ตั้งค่าแล้ว' : 'ยังไม่มี API key', settings.key_configured);
+        status('saved-delivery', settings.enabled ? (settings.options.analysis_only?'วิเคราะห์อย่างเดียว':settings.options.require_approval?'เปิดระบบ · รอตรวจผู้รับ':'เปิดส่งอัตโนมัติ') : settings.activated_at ? 'หยุดส่งชั่วคราว' : 'ยังไม่เปิดใช้งาน', settings.enabled);
+        el('saved-delivery-note').textContent = settings.enabled ? (settings.options.analysis_only?'ยังไม่ส่งเมลถึงผู้รับ':'ระบบจะทำงานตามรอบ Cron') : 'เปิดสวิตช์และบันทึกเพื่อเริ่มทำงาน';
+        status('saved-key', settings.key_configured ? (settings.key_usable?'ตั้งค่าแล้ว':'มีข้อมูล แต่ถอดรหัสไม่ได้') : 'ยังไม่มี API key', settings.key_usable);
         el('saved-key-source').textContent = settings.key_configured ? 'ใช้ key จาก' + (settings.key_source === 'admin' ? 'หน้า Admin' : 'เซิร์ฟเวอร์') + ' · ปิดบังค่า' : 'กำหนด key ใหม่ หรือให้ผู้ดูแลตั้งบนเซิร์ฟเวอร์';
+        const activeKey=settings.keyring.keys.find(key=>key.active);
+        if(activeKey)el('saved-key-source').textContent=activeKey.label+' · '+activeKey.reference+' · ปิดบังค่า';
         status('saved-encryption', settings.encryption_ready ? 'พร้อมบันทึก key' : 'ยังไม่พร้อม', settings.encryption_ready);
         el('saved-encryption-note').textContent = settings.encryption_ready ? 'เข้ารหัสก่อนจัดเก็บในระบบ' : 'ต้องตั้ง EOFFICE_SETTINGS_KEY';
         el('encryption-notice').hidden = settings.encryption_ready;
-        status('saved-worker', dateTime(settings.worker_at, 'ยังไม่พบการทำงาน'), Boolean(settings.worker_at));
+        status('saved-worker', dateTime(settings.worker_at, 'ยังไม่พบการทำงาน'), settings.diagnostics.cron.state==='healthy');
         el('activation-date').textContent = dateTime(settings.activated_at, 'ยังไม่เคยเปิดใช้งาน');
         el('summary').setAttribute('aria-busy', 'false');
         const needsSetup = !settings.key_configured || !settings.encryption_ready;
-        el('readiness-title').textContent = !settings.key_configured ? 'เริ่มต้นเชื่อมต่อ AI ก่อนเปิดส่งอีเมล' : !settings.worker_at ? 'มี API key แล้ว · ยังไม่พบรอบทำงาน Cron' : settings.enabled ? 'เปิดส่งอัตโนมัติแล้ว · ตรวจสอบสถานะงานได้ที่หน้าติดตาม' : 'มี API key แล้ว · การส่งอัตโนมัติปิดอยู่';
+        el('readiness-title').textContent = !settings.key_usable ? 'API key ยังไม่พร้อมใช้งาน' : !settings.diagnostics.smtp.configured&&!settings.options.analysis_only?'SMTP ยังไม่พร้อมส่งอีเมล':settings.diagnostics.cron.state!=='healthy'?'Cron ยังไม่พร้อมหรือทำงานล่าช้า':settings.enabled ? (settings.options.analysis_only?'เปิดวิเคราะห์อย่างเดียว · ยังไม่ส่งอีเมล':'เปิดระบบแล้ว · ตรวจสอบงานได้ที่หน้าติดตาม') : 'ตั้งค่าระบบแล้ว · การทำงานอัตโนมัติปิดอยู่';
         el('readiness-description').textContent = !settings.encryption_ready ? 'ตั้ง EOFFICE_SETTINGS_KEY บนเซิร์ฟเวอร์เพื่อบันทึก key ผ่านหน้านี้ จากนั้นกำหนด key และทดสอบ AI' : !settings.key_configured ? 'เพิ่ม Gemini API key เลือกโมเดล แล้วทดสอบการอ่าน PDF ก่อนเปิดส่งและบันทึก' : !settings.worker_at ? 'ให้ผู้ดูแลตรวจ Cron ที่เรียก php scripts/order-emails.php ทุก 5 นาที การมี key ยังไม่ได้ยืนยันว่าทดสอบ AI ผ่าน' : 'ตรวจสอบ key และโมเดลด้วยปุ่มทดสอบ AI การแก้ไขจะมีผลเมื่อบันทึกการตั้งค่าเท่านั้น';
+        if(settings.key_configured&&!settings.key_usable)el('readiness-description').textContent='มีข้อมูล API key แต่ถอดรหัสไม่ได้ ตรวจ EOFFICE_SETTINGS_KEY หรือบันทึก key ใหม่ คุณยังหยุดระบบได้';
+        else if(settings.key_usable&&!settings.diagnostics.smtp.configured&&!settings.options.analysis_only)el('readiness-description').textContent='กำหนด SMTP และผู้ส่งให้ครบ แล้วส่งอีเมลทดสอบก่อนเปิดการส่งจริง';
+        else if(settings.key_usable&&settings.diagnostics.cron.state!=='healthy')el('readiness-description').textContent='ตรวจเวลาทำงานล่าสุดและ log บนเซิร์ฟเวอร์ การเคยมี heartbeat ไม่ได้ยืนยันว่า Cron ยังทำงานอยู่';
         el('readiness-action').hidden = false;
-        el('readiness-action').href = needsSetup ? '#connection-title' : !settings.worker_at ? '#server-guide' : '#delivery-title';
-        el('readiness-action').textContent = needsSetup ? 'ตั้งค่าการเชื่อมต่อ ↓' : !settings.worker_at ? 'ดูคู่มือตั้ง Cron ↓' : 'ดูการส่งอัตโนมัติ ↓';
+        el('readiness-action').href = needsSetup||!settings.key_usable ? '#connection-title' : !settings.diagnostics.smtp.configured&&!settings.options.analysis_only?'#smtp-title':settings.diagnostics.cron.state!=='healthy' ? '#server-guide' : '#delivery-title';
+        el('readiness-action').textContent = needsSetup||!settings.key_usable ? 'ตั้งค่าการเชื่อมต่อ ↓' : !settings.diagnostics.smtp.configured&&!settings.options.analysis_only?'ตั้งค่า SMTP ↓':settings.diagnostics.cron.state!=='healthy' ? 'ดูคู่มือตั้ง Cron ↓' : 'ดูการส่งอัตโนมัติ ↓';
         syncModelOption();
     }
     function invalidateTest() {
         el('test-result').textContent = 'ยังไม่ได้ทดสอบค่าชุดนี้';
         el('test-result').classList.remove('ok', 'error');
+    }
+    async function keyAction(action,extra){
+        if(busy||!ready)return;
+        if(settingsDirty()){U.message('keyring-message','กรุณาบันทึกหรือยกเลิกการแก้ไขส่วนอื่นก่อนจัดการคลัง Key',true);return;}
+        if(!K.confirmDrafts(action,extra))return;
+        busy=true;hideKey();updateControls();U.message('keyring-message','กำลังดำเนินการ…');
+        try{
+            const result=await U.request('ai_settings.php',{action,revision:saved.revision,model:saved.model,...extra});
+            render(result.settings);invalidateTest();U.message('keyring-message',result.message);
+            el('settings-form').dispatchEvent(new Event('eoffice:form-saved',{bubbles:true}));
+        }catch(error){U.message('keyring-message',error.message+' · หากมีการทดสอบแล้ว ให้โหลดค่าล่าสุดก่อนทำรายการต่อ',true);}
+        finally{busy=false;updateControls();}
     }
 
     async function load() {
@@ -103,14 +129,20 @@
         if (busy || !ready) return;
         if (action !== 'models' && !el('model').reportValidity()) return;
         if (action === 'save' && !dirty()) return;
+        if(action==='save'&&K.dirty()){U.message('message','มีแบบร่างในคลัง Key กรุณากดบันทึกในคลัง หรือยกเลิกการแก้ไขก่อน',true);return;}
         const clear = el('clear-key').checked;
         if ((action === 'models' || action === 'test') && (clear || !(el('api-key').value.trim() || saved.key_configured))) return;
         // Candidate key is only kept in this form and sent to the protected API.
         const data = {action, api_key: clear ? '' : el('api-key').value.trim(), model: el('model').value.trim()};
+        data.options=C.values();data.smtp_password=el('smtp-password').value;
         if (action === 'save') {
             data.enabled = clear ? false : el('enabled').checked;
             data.clear_key = clear;
             data.revision = saved.revision;
+            if(data.enabled&&!saved.enabled&&!data.options.analysis_only){
+                const d=saved.diagnostics;
+                if(!confirm(`เปิดระบบส่งอีเมล?\nมีผู้รับค้าง ${d.pending_recipients} คน · งานรอคิว ${d.counts.queued||0} งาน\nงานที่พร้อมจะดำเนินการตามนโยบายในรอบ Cron ถัดไป`))return;
+            }
             if (data.api_key && !saved.encryption_ready) {
                 saveError = 'ยังบันทึก API key ใหม่ไม่ได้ กรุณาตั้ง EOFFICE_SETTINGS_KEY บนเซิร์ฟเวอร์ก่อน';
                 U.message('message', saveError, true); updateControls();
@@ -161,6 +193,18 @@
     el('load-models').onclick = () => run('models');
     el('test-ai').onclick = () => run('test');
     el('retry-load').onclick = load;
+    el('refresh-settings').onclick=()=>{if(!dirty()||confirm('โหลดค่าล่าสุดและยกเลิกการแก้ไขที่ยังไม่บันทึก?'))load();};
+    el('settings-form').addEventListener('input',()=>{saveError='';updateControls();});
+    el('settings-form').addEventListener('change',()=>{saveError='';updateControls();});
+    for(const [id,action,target] of [['smtp-check','smtp_check','smtp-result'],['smtp-test','smtp_test','smtp-result'],['preview-mail','preview','message'],['pdf-test','pdf_test','pdf-result']]){
+        el(id).onclick=async()=>{
+            if(busy||!ready)return;
+            busy=true;hideKey();updateControls();U.message(target,'กำลังดำเนินการ…');
+            try{await C.run(action,{action,options:C.values(),smtp_password:el('smtp-password').value,model:el('model').value.trim(),api_key:el('api-key').value.trim()});if(action==='preview')U.message(target,'แสดงตัวอย่างจากค่าที่กรอกแล้ว');}
+            catch(error){U.message(target,error.message,true);}
+            finally{busy=false;updateControls();}
+        };
+    }
     el('readiness-action').onclick = event => {
         if (event.button > 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
         const target = el(el('readiness-action').getAttribute('href').slice(1));

@@ -1,5 +1,56 @@
 # ผลการแก้ไขและทดสอบ E-Office
 
+## ตรวจรอบสุดท้ายก่อน commit ชุด AI/อีเมล — 15 ตุลาคม 2026
+
+- รีวิว diff ครบทั้ง migration, Key vault/rotation, SMTP, policy holds, approval snapshot, UI และ regression tests ไม่พบข้อผิดพลาดใหม่ที่ยืนยันได้ในขอบเขตที่ตรวจ
+- รัน `npm.cmd test` ซ้ำผ่านครบ: order **35 HTTP + 77 behavior = 112**, integration **44**, document races **12**, notifications **17**, syntax PHP **146**, JS/CJS **72**, inline **23** พร้อมชุดอื่นทั้งหมด
+- รัน `npm.cmd run test:spa` ซ้ำผ่าน **43 กรณี**; ใช้ MySQL 3307, ฐาน QA `_test` และ mock services
+- รอบนี้ไม่มีการแก้โค้ดเพิ่มเติมจากผลรีวิว ใช้ผลตรวจเพื่อเตรียม commit; ยังไม่ได้ deploy production
+
+## แก้ policy-hold race และอนุมัติ PDF จาก cold Drive cache — 15 ตุลาคม 2026
+
+- เพิ่ม `app_order_hold_for_policy()` ให้การอ่านนโยบายล่าสุดและเขียนเหตุผลพักงานเป็น transaction เดียว ใช้ lock order settings → job เหมือน Admin reconciliation; worker ไม่สามารถเขียน stale hold หลัง automatic-mode save ผ่านไปแล้ว
+- เพิ่ม SQL-trigger/advisory-gate regression: หยุด worker ตอนเขียน awaiting_approval ให้ Admin save มาชน ยืนยันว่า save รอ settings lock แล้วคืนงานเข้าคิว จากนั้นส่งจบในรอบ worker ถัดไป
+- แยกการอนุมัติเป็น `app_order_prepare_approval()` (เตรียม/กู้ cache โดยไม่มี SQL transaction) และ `app_order_approve_prepared()` (ตรวจใต้ document lock ด้วย settings/job current reads, review token และ hash ของ PDF ที่วิเคราะห์)
+- ทดสอบ cold Drive จริงด้วย encrypted fixture/mocked transport: ดาวน์โหลดก่อน transaction, ไม่สร้าง original คืน, approve → queued สำเร็จ; รายชื่อและ PDF ที่เปลี่ยนหลังเตรียมถูกปฏิเสธ
+- API จัดการ PDF/Drive failure แบบ structured 409/503 พร้อมปล่อย advisory lock รักษางานรออนุมัติไว้; เพิ่มข้อความ UI ขอให้ยืนยันใหม่ แทนข้อความว่าจะลองให้อัตโนมัติ
+- `npm.cmd test` ผ่านครบ: order **35 HTTP + 77 behavior = 112**, integration **44**, document races **12**, notifications **17**, syntax PHP **146**, JS/CJS **72**, inline **23** และชุดอื่นใน npm test
+- ใช้ฐาน disposable `_test`, synthetic files และ mock transports ไม่มีการส่ง SMTP/เรียก Gemini หรือ Drive จริง งานยังไม่ได้ commit หรือ deploy production
+
+## แก้ 3 จุดจากรีวิว AI/Key — 15 ตุลาคม 2026
+
+- ยืนยัน failing regression ก่อนแก้: เมื่อ Admin commit pause หลัง SMTP transaction เปิด snapshot แล้ว worker ยังส่งด้วยค่าเก่า ภายใต้ REPEATABLE READ
+- แก้ final check เป็น current locking read (`LOCK IN SHARE MODE`) และยึด SMTP config/แม่แบบจาก settings row เดียวกัน ถือ share lock จนจบการส่งนั้น; ตรวจลำดับ lock ว่าระยะนี้ไม่ถือ job-row lock ซึ่ง Admin reconciliation ต้องอัปเดต
+- เพิ่ม deterministic mock interleaving หลัง document/recipient reads ก่อน final check: pause, analysis-only, require-approval ต้องหยุด SMTP และคืนผู้รับเป็น pending; รอบถัดไปพักงานตามนโยบาย นอกจากนี้ยืนยัน settings writer รอระหว่าง delivery และทำต่อได้หลังปล่อย share lock
+- แก้คืนคิวด้วยนโยบายปลายทางทุกครั้ง จึงไม่ค้างเมื่อเปลี่ยน review → analysis-only พร้อมปิด review → automatic; มี regression ตรวจทั้งกลับไป review และกลับไปส่งจนสำเร็จ
+- บังคับ identity `key_server` เป็น 0 ป้องกัน request ที่แนบ vault ID เขียนผลทดสอบผิด Key; regression ยืนยัน tested_at/model/code ของ Key สำรองที่ไม่เคยทดสอบไม่เปลี่ยน
+- `npm.cmd test` ผ่านครบหลังแก้: order **33 HTTP + 72 behavior = 105**, integration **44**, document races **12**, notification queue **17**, syntax PHP **146** / JS/CJS **72** / inline **23** พร้อมชุดอื่นทั้งหมด
+- ทดสอบด้วยฐาน `_test` และ mock services ไม่มี SMTP/Gemini จริง งานยังอยู่ใน working tree ยังไม่ได้ commit หรือ deploy
+
+## คลัง API Key และการหมุนเวียนกุญแจ — 15 ตุลาคม 2026
+
+- เพิ่มคลัง Gemini หลาย Key (สูงสุด 50) ชื่อเรียก/รหัสสุ่ม สถานะพร้อมใช้/พักใช้ รอบเตือน 1–730 วัน และการลบ ciphertext โดยรักษาประวัติการใช้งาน
+- ย้าย Key เดิมเข้าคลังแบบ idempotent โดยไม่ถอดรหัส; เก็บการเลือกเดิม ไม่สลับกลับ server เองเมื่อ Key ถูกพักใช้หรือถอดรหัสไม่ได้
+- ทดสอบก่อนสลับตัวหลักทุกครั้ง ตรวจ revision/สิทธิ์ซ้ำหลัง remote test; ห้ามพักใช้/ลบตัวหลักจนกว่าจะสลับหรือหยุดใช้ มีปุ่มกลับไปใช้ GEMINI_API_KEY ของเซิร์ฟเวอร์แยกต่างหาก
+- เพิ่ม health/usage แยกราย Key, แจ้งเตือนหมุนเวียนตามอายุ และอ่าน Key ใหม่ก่อนทุก PDF request แม้เป็นงานวิเคราะห์รอบเดิม ไม่มี automatic quota cycling
+- เพิ่ม CLI `scripts/rotate-order-settings-key.php`: ต้องหยุดระบบและได้ worker lock, เข้ารหัสคลัง/API/SMTP ใหม่ทั้งชุดแบบ transaction พร้อม rollback ถ้ามี ciphertext ที่อ่านไม่ได้ ขั้นตอนสำรอง/เปลี่ยน env อยู่ใน ORDER_EMAILS.md
+- `npm.cmd test` ผ่านครบหลังเพิ่มระบบคลัง; ชุด order ตรวจซ้ำล่าสุด **32 HTTP + 62 behavior**, UI **5**, Browser SPA **43**, syntax PHP **146**, JS/CJS **72**, inline **23**
+- Browser mock จริงบนพอร์ตชั่วคราว 8202: เพิ่ม Key → ล้างช่อง secret → ทดสอบ/เลือกตัวหลัก → ปุ่มพักใช้/ลบหายสำหรับตัวหลัก → กลับ server → ลบ Key ผ่านครบ; mobile ไม่มี horizontal overflow และไม่มี console error/warning
+- ทดสอบใช้ค่า synthetic และกุญแจเข้ารหัสชั่วคราวใน process; ลบ credential ทดลองแล้ว (`cipher=NULL`), คืนโหมด server/ปิด worker ตามเดิม และหยุดเซิร์ฟเวอร์ 8202 แล้ว เว็บ QA 8198 ยังเปิดอยู่ ไม่มีการเรียก Google/ส่งเมลจริง
+- เพิ่ม regression สำหรับ rotation atomic rollback, migration ซ้ำ, key-specific usage, inactive-key fail-closed, key rotation ระหว่าง PDF, และ Admin pause ชนการ activate ซึ่งต้องได้ 409 และไม่เปิดระบบกลับ
+- งานอยู่ใน working tree ยังไม่ได้ commit หรือ deploy production
+
+## ตั้งค่า AI และอีเมลครบกระบวนการ — 15 ตุลาคม 2026
+
+- เพิ่ม SMTP จาก server/Admin, STARTTLS/implicit TLS, ผู้ส่ง/Reply-To, รหัสผ่านเข้ารหัส, ตรวจการเชื่อมต่อและส่งเมลทดสอบ พร้อมผลผูกกับชุดค่าที่ทดสอบและ cooldown
+- เพิ่มแม่แบบข้อความและ preview ด้วย safe text nodes, ทดลอง PDF สูงสุด 5 MB พร้อมรายชื่อที่จับคู่/ไม่มั่นใจ, นโยบายวิเคราะห์อย่างเดียวและรอตรวจผู้รับก่อนส่ง พร้อมปุ่มอนุมัติในหน้าติดตาม
+- Approval ผูกกับ snapshot ของไฟล์/ผู้รับที่เจ้าหน้าที่เปิดดู และตรวจซ้ำก่อน SMTP; รายชื่อหรือไฟล์เปลี่ยนต้องตรวจใหม่ คงการป้องกันส่งซ้ำและสถานะ uncertain
+- เพิ่ม Cron age/จบรอบ/จำนวนงาน, checklist ความพร้อม, ผู้แก้ไขและประวัติเปลี่ยนค่า/ทดสอบ, usage tokens 30 วันและราคาประเมินจากอัตราที่ Admin กรอก โดยไม่เปิดเผย secret/fingerprint ใน API
+- `npm.cmd test` ผ่านครบ: syntax PHP **142**, JS/CJS **71**, inline **23**; order HTTP **30** + behavior **51**, integration **44**, document races **12**, notification queue **17** และชุดอื่นใน npm test
+- `npm.cmd run test:spa` ผ่าน **43 กรณี**; ตรวจ browser เพิ่มที่ desktop/mobile 390px: ไม่มี horizontal overflow, save/discard ถูกต้อง, ประวัติผู้แก้ไขอัปเดต, preview ทำงาน และไม่มี console error/warning
+- ใช้ MySQL loopback **3307**, ฐาน `eoffice_module_qa_20261009_test` และฐาน disposable ของ order tests พร้อม mock services; migrate ฐาน QA แล้ว ค่า sender ที่ทดลองใน browser คืนเป็น `E-Office` แล้ว ไม่มีการส่งเมลหรือเรียก Gemini จริงจาก QA
+- Production ต้อง migrate ก่อนใช้งานตาม `ORDER_EMAILS.md`; รอบนี้เป็นการพัฒนาและทดสอบ local ยังไม่ได้ deploy หรือ commit
+
 ## วนรีวิวและแก้จนรอบตรวจสะอาด — 15 ตุลาคม 2026
 
 - แก้ `tests/booking-edit-ui.cjs` ที่ยังตัด inline script/เรียก `fetchMyDocuments()` จาก HTML เก่า ให้รัน `email_send/my-dashboard.js` ปัจจุบันทั้งไฟล์ผ่าน public refresh hook และตรวจ DOM ที่ renderer สร้างจริง

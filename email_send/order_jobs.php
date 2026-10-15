@@ -5,12 +5,14 @@ if($_SERVER['REQUEST_METHOD']==='GET'){
     $docId=(int)($_GET['doc_id']??0);
     if($docId){
         $doc=app_order_document($docId);if(!$doc)app_fail('ไม่พบคำสั่ง',404);
-        $job=app_order_job($docId);$files=[];$recipients=[];
+        $job=app_order_job($docId);$files=[];$recipients=[];$reviewToken=null;
         if($job){
+            $beforeToken=app_order_approval_hash((int)$job['id']);
             $q=$pdo->prepare('SELECT id,file_name,caption,status,attempts,retry_at,error_code FROM eoffice_order_files WHERE job_id=? ORDER BY id');$q->execute([$job['id']]);$files=$q->fetchAll();
             $q=$pdo->prepare('SELECT id,user_id,recipient_name,recipient_email,source,status,attempts,error_code,attempted_at,sent_at FROM eoffice_order_recipients WHERE job_id=? ORDER BY id');$q->execute([$job['id']]);$recipients=$q->fetchAll();
+            $afterToken=app_order_approval_hash((int)$job['id']);if(hash_equals($beforeToken,$afterToken))$reviewToken=$afterToken;
         }
-        app_json(['status'=>'success','job'=>$job,'files'=>$files,'recipients'=>$recipients]);
+        app_json(['status'=>'success','job'=>$job,'files'=>$files,'recipients'=>$recipients,'review_token'=>$reviewToken]);
     }
     $page=max(1,(int)($_GET['page']??1));$limit=20;$offset=($page-1)*$limit;
     $where="d.Doc_Type='External' AND d.Is_Delete='active'";$params=[];
@@ -30,10 +32,17 @@ if($_SERVER['REQUEST_METHOD']==='GET'){
     app_json(['status'=>'success','data'=>$rows,'total'=>$total,'page'=>$page,'years'=>$years,'is_admin'=>$actor['User_Status']==='Admin','worker'=>['enabled'=>(bool)$settings['enabled'],'activated_at'=>$settings['activated_at'],'last_run'=>$settings['worker_at']]]);
 }
 $input=app_input();$docId=(int)($input['doc_id']??0);$action=app_text($input,'action',30,true);
-if($docId<=0||!in_array($action,['enqueue','reanalyze','add_recipient','cancel_recipient','retry_recipient','cancel_job'],true))app_fail('คำสั่งไม่ถูกต้อง');
+if($docId<=0||!in_array($action,['enqueue','reanalyze','add_recipient','cancel_recipient','retry_recipient','cancel_job','approve'],true))app_fail('คำสั่งไม่ถูกต้อง');
 $lock='email:'.$docId;$q=$pdo->prepare('SELECT GET_LOCK(?,0)');$q->execute([$lock]);if(!$q->fetchColumn())app_fail('คำสั่งนี้กำลังทำงาน กรุณาลองอีกครั้ง',409);
-$response=null;$failure=null;
+$response=null;$failure=null;$failureStatus=409;
 try{
+    $prepared=null;
+    if($action==='approve'){
+        if(($input['confirmed']??false)!==true)throw new DomainException('กรุณาตรวจรายชื่อและยืนยันงานที่รออนุมัติ');
+        $token=$input['review_token']??null;
+        if(!is_string($token)||!preg_match('/^[a-f0-9]{64}$/D',$token))throw new DomainException('กรุณารีเฟรชและตรวจรายชื่อก่อนยืนยัน');
+        $prepared=app_order_prepare_approval($docId,$token);
+    }
     $pdo->beginTransaction();$q=$pdo->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Doc_Type='External' AND Is_Delete='active' FOR UPDATE");$q->execute([$docId]);$doc=$q->fetch();
     if(!$doc)throw new DomainException('ไม่พบคำสั่ง');
     $current=app_user(true,true);if(!app_can($current,'email'))throw new DomainException('คุณไม่มีสิทธิ์ทำรายการนี้');
@@ -44,13 +53,16 @@ try{
         else throw new DomainException('มีงานอยู่แล้ว กรุณาดูรายละเอียดและเลือกจัดการรายการ');
     }else{
         if(!$job)throw new DomainException('กรุณานำคำสั่งเข้าคิวก่อน');
-        if($action==='cancel_job')app_order_cancel((int)$job['id']);
+        if($action==='approve'){
+            app_order_approve_prepared($doc,$token,$prepared);
+        }
+        elseif($action==='cancel_job')app_order_cancel((int)$job['id']);
         elseif($action==='reanalyze'){
             if(($input['confirmed']??false)!==true)throw new DomainException('กรุณายืนยันการวิเคราะห์ใหม่');
             $pdo->prepare("UPDATE eoffice_order_recipients SET status='uncertain',error_code='smtp_result_unknown' WHERE job_id=? AND status='sending'")->execute([$job['id']]);
             $pdo->prepare('DELETE FROM eoffice_order_files WHERE job_id=?')->execute([$job['id']]);
             $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped')")->execute([$job['id']]);
-            $pdo->prepare('UPDATE eoffice_order_jobs SET model=NULL,retry_attempts=0,retry_at=NULL WHERE id=?')->execute([$job['id']]);
+            $pdo->prepare('UPDATE eoffice_order_jobs SET model=NULL,approval_hash=NULL,retry_attempts=0,retry_at=NULL WHERE id=?')->execute([$job['id']]);
             app_order_update((int)$job['id'],'queued');
         }elseif($action==='add_recipient'){
             if($job['status']==='cancelled')throw new DomainException('งานถูกยกเลิกแล้ว กรุณายืนยันการวิเคราะห์ใหม่ก่อนเพิ่มผู้รับ');
@@ -74,8 +86,10 @@ try{
         }
     }
     app_order_audit($action,(int)$actor['User_Id'],$docId);$pdo->commit();$response=['status'=>'success','message'=>'บันทึกงานแล้ว ระบบจะดำเนินการในรอบ cron ถัดไป'];
-}catch(DomainException $e){if($pdo->inTransaction())$pdo->rollBack();$failure=$e->getMessage();}
+}catch(DomainException $e){if($pdo->inTransaction())$pdo->rollBack();$failure=['status'=>'error','message'=>$e->getMessage()];}
+catch(AppOrderAIException $e){if($pdo->inTransaction())$pdo->rollBack();$failure=['status'=>'error','code'=>$action==='approve'&&$e->reason==='pdf_cache_not_ready'?'approval_cache_not_ready':$e->reason,'message'=>'ยังยืนยันงานไม่ได้ กรุณาตรวจเอกสารและลองอีกครั้ง'];}
+catch(AppDriveArchiveRetry $e){if($pdo->inTransaction())$pdo->rollBack();$failureStatus=503;$failure=['status'=>'error','code'=>'approval_drive_unavailable','message'=>'Drive ขัดข้องชั่วคราว กรุณาลองยืนยันอีกครั้ง'];}
 catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 finally{$pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]);}
-if($failure!==null)app_fail($failure,409);
+if($failure!==null)app_json($failure,$failureStatus);
 app_json($response);

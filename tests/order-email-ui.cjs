@@ -55,6 +55,9 @@ function makeDocument() {
         elements, getElementById, createElement: tag => new Element(tag), hidden: false,
         activeElement: {closest: () => null},
         querySelectorAll(selector) {
+            if (selector === '[data-option]') return [...fs.readFileSync('email_send/ai_settings.html','utf8').matchAll(/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"[^>]*\bdata-option[^>]*>/g)].map(match=>{
+                const field=getElementById(match[1]);field.type=match[0].match(/type="([^"]+)"/)?.[1]||'text';return field;
+            });
             if (selector === '[data-state]') return [];
             if (selector === '#rows button, #recipient-rows button') return ['rows', 'recipient-rows'].flatMap(id => descendants(getElementById(id))).filter(node => node.tagName === 'BUTTON');
             return [];
@@ -154,7 +157,8 @@ async function testRecipientFormLifecycle() {
 
 async function testSettingsDraftActions() {
     const document = makeDocument(), requests = [];
-    let settings = {enabled: true, model: 'gemini-test', key_configured: true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null, revision:7};
+    let settings = {keyring:{keys:[],server:{configured:false}},enabled: true, model: 'gemini-test', key_configured: true, key_usable:true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null, revision:7,
+        options:{analysis_only:false,require_approval:false,smtp_source:'server',smtp_host:'',smtp_port:587,smtp_security:'starttls',smtp_username:'',smtp_from:'',smtp_name:'E-Office',smtp_reply_to:'',subject:'คำสั่ง {doc_number}',intro:'เรียน {recipient_name}',signature:'E-Office',input_price:0,output_price:0},diagnostics:{smtp:{effective:{},configured:false},cron:{state:'missing'},counts:{},pending_recipients:0,usage:[],events:[],base_url:'http://localhost',mock:true}};
     const request = async (url, data) => {
         requests.push(data || {method: 'GET'});
         if (!data) return {settings};
@@ -169,10 +173,15 @@ async function testSettingsDraftActions() {
     modelOptions.append(new Element('option'));
     document.getElementById('model').required = true;
     const windowEvents={};const window = {addEventListener(type,callback) {(windowEvents[type] ||= []).push(callback);}};
-    vm.runInNewContext(fs.readFileSync('email_send/ai-settings.js', 'utf8'), {
+    const context=vm.createContext({
         OrderUI: uiFor(document, request), document, window, Event,
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
-    }, {filename: 'email_send/ai-settings.js'});
+    });
+    vm.runInContext(fs.readFileSync('email_send/settings-controls.js','utf8'),context);
+    context.OrderSettingsControls=window.OrderSettingsControls;
+    vm.runInContext(fs.readFileSync('email_send/keyring-controls.js','utf8'),context);
+    context.OrderKeyring=window.OrderKeyring;
+    vm.runInContext(fs.readFileSync('email_send/ai-settings.js', 'utf8'),context,{filename:'email_send/ai-settings.js'});
     await settle();
 
     const model = document.getElementById('model'), testButton = document.getElementById('test-ai');
@@ -231,6 +240,12 @@ async function testSettingsDraftActions() {
     assert.equal(warns(), false, 'discard clears the local departure guard');
     assert.equal(cleanEvents, 1, 'discard synchronizes the shell form guard');
     assert.equal(document.getElementById('delivery-preview').textContent, 'ปิดอยู่ · ยังไม่ส่งอีเมลอัตโนมัติ');
+    document.getElementById('smtp_name').value='Changed sender';document.getElementById('settings-form').dispatch('input');
+    assert.equal(document.getElementById('save').disabled,false,'SMTP/template changes participate in unsaved state');
+    assert.equal(warns(),true);
+    document.getElementById('discard').click();assert.equal(document.getElementById('smtp_name').value,'E-Office');assert.equal(warns(),false);
+    document.getElementById('keyring-label').value='Draft backup';document.getElementById('settings-form').dispatch('input');assert.equal(warns(),true,'unfinished key additions participate in the leave guard');
+    document.getElementById('discard').click();assert.equal(document.getElementById('keyring-label').value,'');assert.equal(warns(),false);
 }
 
 function testSaveBarDoesNotOverlay() {
@@ -239,6 +254,24 @@ function testSaveBarDoesNotOverlay() {
     assert.ok(rule, 'save bar has a dedicated layout rule');
     assert.match(rule[1], /position:\s*static\s*;/);
     assert.doesNotMatch(rule[1], /position:\s*(?:sticky|fixed)\s*;/, 'save bar must stay in document flow rather than cover form controls');
+}
+
+function testKeyringControls(){
+    const document=makeDocument(),window={},calls=[];
+    vm.runInNewContext(fs.readFileSync('email_send/keyring-controls.js','utf8'),{window,document,OrderUI:uiFor(document,async()=>{}),confirm:()=>true});
+    const base={enabled:true,usable:true,created_at:'2026-10-15',remind_days:90,rotation_due:false,tested_at:null,tested_model:null,test_code:null,last_success_at:null,last_error_at:null,last_error_code:null,usage:{requests:2,input_tokens:10,output_tokens:4,total_tokens:14}};
+    const settings={keyring:{keys:[{...base,id:1,reference:'key_a',label:'Primary',active:true},{...base,id:2,reference:'key_b',label:'Reserve',active:false}],server:{configured:true,active:false}},encryption_ready:true};
+    window.OrderKeyring.render(settings,()=> '—',(action,data)=>calls.push({action,data}));
+    const cards=document.getElementById('keyring-list').children;
+    const buttons=card=>card.children.at(-1).children;
+    assert.ok(!buttons(cards[0]).some(b=>['พักใช้','ลบ Key'].includes(b.textContent)),'active key cannot be paused/deleted from its card');
+    assert.ok(buttons(cards[1]).some(b=>b.textContent==='ทดสอบและเลือกเป็นตัวหลัก'));
+    buttons(cards[1]).find(b=>b.textContent==='ทดสอบและเลือกเป็นตัวหลัก').click();assert.equal(calls.at(-1).action,'key_activate');assert.equal(calls.at(-1).data.confirmed,true);
+    const input=cards[1].children.find(n=>n.tagName==='INPUT');input.value='Renamed reserve';assert.equal(window.OrderKeyring.dirty(),true);
+    buttons(cards[1]).find(b=>b.textContent==='บันทึกชื่อ/รอบเตือน').click();assert.equal(calls.at(-1).data.label,'Renamed reserve');
+    document.getElementById('keyring-server').click();assert.equal(calls.at(-1).action,'key_server');
+    document.getElementById('keyring-label').value='New';document.getElementById('keyring-secret').value='synthetic-ui-only-secret';document.getElementById('keyring-add').click();assert.equal(calls.at(-1).action,'key_add');
+    window.OrderKeyring.render(settings,()=> '—',()=>{});assert.equal(document.getElementById('keyring-secret').value,'');assert.equal(window.OrderKeyring.dirty(),false);
 }
 
 (async () => {
@@ -250,4 +283,5 @@ function testSaveBarDoesNotOverlay() {
     console.log('PASS AI test invalidation and clearing the key pauses delivery without sending a new key');
     testSaveBarDoesNotOverlay();
     console.log('PASS settings save bar stays in normal document flow');
+    testKeyringControls();console.log('PASS key vault cards protect the primary key, bind confirmations and clear sensitive drafts');
 })().catch(error => { console.error(error); process.exitCode = 1; });

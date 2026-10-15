@@ -32,7 +32,7 @@ if(in_array($action,['seed','drop'],true)){
     echo json_encode(['users'=>$users,'pdf'=>base64_encode($pdf)]);exit;
 }
 $pdo=app_pdo();
-if($action==='corrupt-key'){$pdo->exec("UPDATE eoffice_order_settings SET api_key_cipher='synthetic-corrupted-cipher' WHERE id=1");exit;}
+if($action==='corrupt-key'){$pdo->exec("UPDATE eoffice_order_settings SET api_key_cipher='synthetic-corrupted-cipher' WHERE id=1");$pdo->exec("UPDATE eoffice_order_api_keys SET cipher='synthetic-corrupted-cipher' WHERE id=(SELECT active_key_id FROM eoffice_order_settings WHERE id=1)");exit;}
 if($action==='pause-lock'){
     $pdo->beginTransaction();$pdo->query('SELECT id FROM eoffice_order_settings WHERE id=1 FOR UPDATE');echo "LOCKED\n";flush();fgets(STDIN);
     $pdo->exec('UPDATE eoffice_order_settings SET enabled=0,revision=revision+1,updated_at=NOW() WHERE id=1');$pdo->commit();echo "PAUSED\n";exit;
@@ -42,6 +42,10 @@ if($action==='blocked-save'){
 }
 if($action==='worker'){echo app_order_worker();exit;}
 if($action==='worker-empty'){putenv('EOFFICE_TEST_AI_RECIPIENTS=[]');echo app_order_worker();exit;}
+if(str_starts_with($action,'remove-approval-pdf:')){
+    $doc=app_order_document((int)substr($action,20));if(!$doc)throw new RuntimeException('Fixture document required');
+    foreach(app_order_pdf_files($doc) as $file)unlink($file['path']);echo '{}';exit;
+}
 if(str_starts_with($action,'prepare-ai:')){
     $job=app_order_job((int)substr($action,11));if(!$job)throw new RuntimeException('Missing fixture order');
     app_order_sync_files($job,app_order_pdf_files(app_order_document((int)$job['doc_id'])));

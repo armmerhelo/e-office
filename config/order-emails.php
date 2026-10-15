@@ -2,6 +2,7 @@
 require_once __DIR__.'/services.php';
 require_once __DIR__.'/order-ai.php';
 require_once __DIR__.'/drive-archive.php';
+require_once __DIR__.'/order-controls.php';
 
 function app_order_audit(string $action,?int $actor=null,?int $doc=null): void {
     app_pdo()->prepare('INSERT INTO eoffice_order_audit (actor_id,doc_id,action) VALUES (?,?,?)')->execute([$actor,$doc,$action]);
@@ -180,6 +181,34 @@ function app_order_file_signature(array $files): array {
     $signature=array_map(static fn($file)=>$file['hash'],$files);ksort($signature);return $signature;
 }
 
+function app_order_prepare_approval(int $docId,string $token,?callable $archiveGet=null): array {
+    if(app_pdo()->inTransaction())throw new RuntimeException('Approval preparation requires no transaction');
+    $job=app_order_job($docId);
+    if(!$job||$job['status']!=='awaiting_approval')throw new DomainException('กรุณาตรวจรายชื่อและยืนยันงานที่รออนุมัติ');
+    if(!hash_equals(app_order_approval_hash((int)$job['id']),$token))throw new DomainException('รายชื่อหรือเอกสารเปลี่ยนแล้ว กรุณารีเฟรชและตรวจสอบอีกครั้ง');
+    $snapshot=app_order_snapshot($job,$archiveGet);
+    if(!$snapshot)throw new DomainException('ไม่พบคำสั่ง');
+    return $snapshot;
+}
+
+// Caller holds the document lock and email:<docId> advisory lock. Only prepared
+// local/cache bytes may be read here; never perform remote I/O in this phase.
+function app_order_approve_prepared(array $doc,string $token,array $prepared): void {
+    $pdo=app_pdo();if(!$pdo->inTransaction())throw new RuntimeException('Approval requires document transaction');
+    $settings=app_order_settings(true);
+    $q=$pdo->prepare('SELECT * FROM eoffice_order_jobs WHERE doc_id=? FOR UPDATE');$q->execute([$doc['Doc_Id']]);$job=$q->fetch();
+    if(!$job||$job['status']!=='awaiting_approval')throw new DomainException('งานเปลี่ยนแล้ว กรุณารีเฟรชและตรวจสอบอีกครั้ง');
+    if(app_order_options($settings)['analysis_only'])throw new DomainException('ระบบอยู่ในโหมดวิเคราะห์อย่างเดียว ให้ Admin เปิดการส่งก่อน');
+    $hash=app_order_approval_hash((int)$job['id']);
+    if(!hash_equals($hash,$token))throw new DomainException('รายชื่อหรือเอกสารเปลี่ยนแล้ว กรุณารีเฟรชและตรวจสอบอีกครั้ง');
+    $files=app_order_pdf_files($doc);
+    if((int)$prepared['doc']['Doc_Id']!==(int)$doc['Doc_Id']||app_order_file_signature($files)!==app_order_file_signature($prepared['files']))throw new DomainException('ไฟล์เปลี่ยน กรุณาวิเคราะห์ใหม่ก่อนยืนยัน');
+    $q=$pdo->prepare('SELECT file_name,file_hash,status FROM eoffice_order_files WHERE job_id=?');$q->execute([$job['id']]);$analyzed=[];
+    foreach($q as $file){if($file['status']!=='success')throw new DomainException('ยังวิเคราะห์ PDF ไม่ครบ');$analyzed[$file['file_name']]=$file['file_hash'];}
+    ksort($analyzed);if(!$analyzed||$analyzed!==app_order_file_signature($files))throw new DomainException('ไฟล์เปลี่ยน กรุณาวิเคราะห์ใหม่ก่อนยืนยัน');
+    $pdo->prepare("UPDATE eoffice_order_jobs SET approval_hash=?,status='queued',error_code=NULL WHERE id=?")->execute([$hash,$job['id']]);
+}
+
 function app_order_retry_snapshot(array $job): void {
     $pdo=app_pdo();$pdo->beginTransaction();
     try{
@@ -252,11 +281,12 @@ function app_order_build_recipients(array $job): void {
     }
 }
 
-function app_order_body(array $doc,array $files): string {
-    $html='<p>'.htmlspecialchars($doc['Doc_Name'],ENT_QUOTES,'UTF-8').'</p><ul>';
+function app_order_body(array $doc,array $files,string $recipientName='',?array $options=null): string {
+    $options??=app_order_options();
+    $html='<p>'.nl2br(htmlspecialchars(app_order_template($options['intro'],$doc,$recipientName),ENT_QUOTES,'UTF-8')).'</p><ul>';
     foreach($files as $file){$url=app_settings()['base_url'].'/api/view_file.php?'.http_build_query(['Doc_Id'=>$doc['Doc_Id'],'File_Path'=>$file['name'],'Year'=>trim((string)$doc['Doc_Year'])]);
         $html.='<li><a href="'.htmlspecialchars($url,ENT_QUOTES,'UTF-8').'">'.htmlspecialchars($file['caption']?:$file['name'],ENT_QUOTES,'UTF-8').'</a></li>';}
-    return $html.'</ul>';
+    return $html.'</ul><p>'.nl2br(htmlspecialchars(app_order_template($options['signature'],$doc,$recipientName),ENT_QUOTES,'UTF-8')).'</p>';
 }
 
 function app_order_finish(array $job): void {
@@ -317,7 +347,10 @@ function app_order_process_job(array $job,float $deadline,?array $transports=nul
             $attempt=(int)$file['attempts']+1;
             $pdo->prepare("UPDATE eoffice_order_files SET status='analyzing',attempts=? WHERE id=?")->execute([$attempt,$file['id']]);
             try{
-                $targets=($transports['ai']??'app_order_analyze')($files[$file['file_name']]['path'],$config,(int)$doc['Doc_Id']);
+                // Keep this round's model, but resolve the selected credential
+                // again for every request so a rotation takes effect promptly.
+                $currentConfig=app_order_ai_config();$currentConfig['model']=$config['model'];
+                $targets=($transports['ai']??'app_order_analyze')($files[$file['file_name']]['path'],$currentConfig,(int)$doc['Doc_Id']);
                 if(!is_array($targets)||!array_is_list($targets)||count($targets)>500)throw new AppOrderAIException('invalid_ai_response',true);
                 foreach($targets as $target)if(!is_int($target)||$target<=0)throw new AppOrderAIException('invalid_ai_response',true);
                 // Re-check snapshot after a remote request; changed bytes must
@@ -346,11 +379,13 @@ function app_order_process_job(array $job,float $deadline,?array $transports=nul
     // accepted/uncertain/cancelled recipients when rebuilding the current list.
     $pdo->beginTransaction();try{app_order_build_recipients($job);$pdo->commit();}catch(Throwable $e){$pdo->rollBack();throw $e;}
     app_order_finish($job);
+    if(app_order_job((int)$job['doc_id'])['status']!=='sending')return;
+    if(app_order_hold_for_policy($job))return;
     $q=$pdo->prepare("SELECT * FROM eoffice_order_recipients WHERE job_id=? AND status='pending' ORDER BY id LIMIT 50");$q->execute([$job['id']]);
     foreach($q->fetchAll() as $recipient){
         if(microtime(true)>=$deadline)return;
-        if(!app_order_settings()['enabled'])return;
-        if(!app_settings()['mock']&&(!app_env('SMTP_HOST')||!app_env('SMTP_USERNAME')||!app_env('SMTP_PASSWORD')))throw new AppOrderAIException('smtp_configuration_required');
+        if(app_order_hold_for_policy($job))return;
+        if(!app_settings()['mock']&&!app_order_smtp_ready(app_order_smtp()))throw new AppOrderAIException('smtp_configuration_required');
         // Document writers use the same row lock. Hold it during this single
         // delivery so a replacement/deletion cannot invalidate the links.
         $marked=false;$contacted=false;
@@ -376,8 +411,19 @@ function app_order_process_job(array $job,float $deadline,?array $transports=nul
             if(!$ready){$pdo->commit();continue;}
             $recipient=$ready;
             $status='success';$error=null;
+            // Worker transports are restricted to isolated mock databases.
+            if(isset($transports['before_send']))$transports['before_send']($job,$recipient);
+            // A current locking read, not the transaction's earlier consistent
+            // snapshot. Hold the share lock through this delivery so a settings
+            // change cannot commit between the final check and SMTP submission.
+            // This phase owns no job-row lock; settings saves may update jobs.
+            $latestSettings=app_order_settings(true);$controls=app_order_options($latestSettings);
+            if(!$latestSettings['enabled']||$controls['analysis_only']||($controls['require_approval']&&($job['approval_hash']??null)!==app_order_approval_hash((int)$job['id']))){
+                $pdo->prepare("UPDATE eoffice_order_recipients SET status='pending' WHERE id=?")->execute([$recipient['id']]);$pdo->commit();return;
+            }
             $contacted=true;
-            try{if(!(($transports['mail']??'app_mail')('คำสั่ง '.$current['Doc_Number'],$recipient['recipient_email'],app_order_body($current,$currentFiles))))throw new RuntimeException('SMTP not accepted');}
+            $send=$transports['mail']??static fn($subject,$email,$body)=>app_order_send_mail($subject,$email,$body,app_order_smtp($latestSettings,$controls));
+            try{if(!$send(app_order_template($controls['subject'],$current,$recipient['recipient_name']),$recipient['recipient_email'],app_order_body($current,$currentFiles,$recipient['recipient_name'],$controls)))throw new RuntimeException('SMTP not accepted');}
             catch(Throwable $e){$status='uncertain';$error='smtp_result_unknown';}
             $pdo->prepare('UPDATE eoffice_order_recipients SET status=?,error_code=?,sent_at=? WHERE id=?')->execute([$status,$error,$status==='success'?date('Y-m-d H:i:s'):null,$recipient['id']]);
             if($status==='success')foreach($files as $file){
@@ -403,10 +449,12 @@ function app_order_worker(int $seconds=90,?array $transports=null): int {
     if($transports!==null&&(!app_settings()['mock']||!str_ends_with(app_settings()['database'],'_test')))throw new RuntimeException('Mock test transports only');
     $pdo=app_pdo();if($pdo->inTransaction())throw new RuntimeException('Worker cannot run in a transaction');
     if(!$pdo->query("SELECT GET_LOCK('eoffice:orders',0)")->fetchColumn())return 0;
-    $processed=0;$deadline=microtime(true)+max(1,min(240,$seconds));
+    $processed=0;$failures=0;$deadline=microtime(true)+max(1,min(240,$seconds));
     try{
         $pdo->exec('UPDATE eoffice_order_settings SET worker_at=NOW() WHERE id=1');
-        if(!app_order_settings()['enabled'])return 0;
+        if(!app_order_settings()['enabled']){
+            $pdo->exec("UPDATE eoffice_order_settings SET worker_finished_at=NOW(),worker_result='{\"processed\":0,\"failed\":0,\"paused\":true}' WHERE id=1");return 0;
+        }
         $jobs=$pdo->query("SELECT * FROM eoffice_order_jobs WHERE status IN ('waiting_files','analyzing','sending','queued') AND (retry_at IS NULL OR retry_at<=NOW()) ORDER BY updated_at,id LIMIT 50")->fetchAll();
         foreach($jobs as $job){
             if(microtime(true)>=$deadline||!app_order_settings()['enabled'])break;
@@ -419,6 +467,7 @@ function app_order_worker(int $seconds=90,?array $transports=null): int {
                 $job=$currentJob;app_order_process_job($job,$deadline,$transports);
             }
             catch(Throwable $e){
+                $failures++;
                 if($pdo->inTransaction())$pdo->rollBack();
                 if($e instanceof AppDriveArchiveRetry)app_order_retry_io($job,'drive_temporary_failure');
                 elseif($e instanceof AppOrderAIException&&$e->reason==='pdf_cache_not_ready')app_order_retry_io($job,'pdf_cache_not_ready');
@@ -430,6 +479,7 @@ function app_order_worker(int $seconds=90,?array $transports=null): int {
             $processed++;
             $pdo->prepare('UPDATE eoffice_order_jobs SET updated_at=NOW() WHERE id=?')->execute([$job['id']]);
         }
+        $pdo->prepare('UPDATE eoffice_order_settings SET worker_finished_at=NOW(),worker_result=? WHERE id=1')->execute([json_encode(['processed'=>$processed,'failed'=>$failures],JSON_THROW_ON_ERROR)]);
     }finally{$pdo->query("SELECT RELEASE_LOCK('eoffice:orders')");}
     return $processed;
 }

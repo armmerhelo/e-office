@@ -5,7 +5,7 @@ const os=require('node:os');
 const crypto=require('node:crypto');
 const php=process.env.PHP_BIN||'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const port=Number(process.env.ORDER_TEST_PORT||8094),base=`http://localhost:${port}`;
-const env={...process.env,DB_DATABASE:`eoffice_orders_${process.pid}_test`,APP_URL:base,EOFFICE_MOCK_SERVICES:'true',EOFFICE_SETTINGS_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode',`eoffice-orders-${process.pid}`,'storage')};
+const env={...process.env,DB_DATABASE:`eoffice_orders_${process.pid}_test`,APP_URL:base,EOFFICE_MOCK_SERVICES:'true',GEMINI_API_KEY:'synthetic-server-credential-for-tests',EOFFICE_SETTINGS_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(os.tmpdir(),'opencode',`eoffice-orders-${process.pid}`,'storage')};
 let servers=[],created=false,users,pdf,passed=0;
 function fixture(action){const r=cp.spawnSync(php,['tests/order-email-fixture.php',action],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}
 function snapshot(){return JSON.parse(fixture('snapshot'));}
@@ -28,8 +28,29 @@ async function run(){
     await test('same-origin protection applies to AI settings',async()=>{await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:true},headers:{Origin:'https://foreign.example'},status:403});});
     await test('order before first activation never auto-queues',async()=>{old=await create([pdf]);assert.equal(snapshot().eoffice_order_jobs.length,0);});
     const testKey='synthetic-test-key-not-a-real-credential';
+    await test('extended settings protect secrets, validate templates and preview escaped content',async()=>{
+        const r=await setting({enabled:false,options:{smtp_source:'admin',smtp_host:'smtp.example.test',smtp_port:465,smtp_security:'tls',smtp_username:'qa@example.test',smtp_from:'qa@example.test',intro:'<script>alert(1)</script> {doc_name}'},smtp_password:'synthetic-smtp-password'});
+        assert.equal(r.settings.smtp_password_configured,true);assert.equal(r.settings.diagnostics.smtp.configured,true);
+        assert.ok(!JSON.stringify(r).includes('synthetic-smtp-password'));assert.ok(!JSON.stringify(r).includes('smtp_password_cipher'));
+        const preview=await request('/email_send/ai_settings.php',{data:{action:'preview'}});assert.ok(preview.body.includes('&lt;script&gt;'));
+        const s=await request('/email_send/ai_settings.php');
+        await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:false,revision:s.settings.revision,options:{subject:'{unknown}'}},status:400});
+        await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:false,revision:s.settings.revision,options:{smtp_port:0}},status:400});
+        await setting({enabled:false,options:{smtp_source:'server',intro:'เรียน {recipient_name}\nแจ้งคำสั่ง: {doc_name}'}});
+    });
     await test('Admin stores encrypted key and public API never returns it',async()=>{const result=await setting({api_key:testKey});assert.ok(result.settings.activated_at);assert.equal(result.settings.key_configured,true);assert.ok(!JSON.stringify(result).includes(testKey));const cipher=snapshot().eoffice_order_settings[0].api_key_cipher;assert.ok(cipher&&!cipher.includes(testKey));const get=await request('/email_send/ai_settings.php');assert.ok(!JSON.stringify(get).includes(cipher));});
     await test('model list and test use protected Admin endpoints',async()=>{assert.equal((await request('/email_send/ai_settings.php',{data:{action:'models'}})).models[0].id,'gemini-test');await request('/email_send/ai_settings.php',{data:{action:'test',model:'gemini-test'}});await request('/email_send/ai_settings.php',{data:{action:'save',model:'../../bad',enabled:true},status:400});});
+    await test('SMTP and PDF diagnostics run separately without creating a document job',async()=>{
+        const before=snapshot().eoffice_order_jobs.length;
+        await request('/email_send/ai_settings.php',{data:{action:'smtp_test',test_email:'not-email'},status:400});
+        const smtp=await request('/email_send/ai_settings.php',{data:{action:'smtp_test',test_email:'qa@example.test'}});assert.match(smtp.message,/จำลอง/);
+        await request('/email_send/ai_settings.php',{data:{action:'smtp_check'},status:429});
+        await request('/email_send/ai_settings.php',{data:{action:'pdf_test',model:'gemini-test',pdf_base64:Buffer.from('not PDF').toString('base64')},status:400});
+        const result=await request('/email_send/ai_settings.php',{data:{action:'pdf_test',model:'gemini-test',pdf_base64:pdf.toString('base64')}});
+        assert.equal(result.mentions[0].user_id,0);assert.equal(snapshot().eoffice_order_jobs.length,before);
+        const get=await request('/email_send/ai_settings.php');assert.ok(get.settings.diagnostics.events.some(e=>e.event==='smtp_test'));
+        assert.ok(!JSON.stringify(get).includes('fingerprint'));
+    });
     await test('new order queues explicit recipients without sending from web request',async()=>{newDoc=await create([pdf,pdf],{send_to:[users.alice.id],doc_name:'Synthetic order แต่งตั้งคณะกรรมการ'});const s=snapshot();assert.equal(s.eoffice_order_jobs.length,1);assert.equal(s.eoffice_order_jobs[0].doc_id,newDoc.doc_id);assert.equal(s.eoffice_order_recipients.length,1);assert.equal(s.eoffice_order_recipients[0].source,'document');assert.equal(s.eoffice_order_recipients[0].status,'pending');const notification=s.eoffice_outbox.map(row=>JSON.parse(row.payload)).find(p=>p.type==='document_notification');assert.equal(notification.delivery.mail.status,'skipped');});
     await test('old order edit does not enroll it automatically',async()=>{await create([],{formtype:'edit_document',doc_id:old.doc_id,doc_file_name:[],file_id:[]});assert.equal((await request('/email_send/order_jobs.php?doc_id='+old.doc_id)).job,null);});
     await test('new order without PDF waits and later upload activates it',async()=>{waitingDoc=await create();assert.equal((await request('/email_send/order_jobs.php?doc_id='+waitingDoc.doc_id)).job.status,'waiting_files');await create([pdf],{formtype:'edit_document',doc_id:waitingDoc.doc_id});assert.equal((await request('/email_send/order_jobs.php?doc_id='+waitingDoc.doc_id)).job.status,'analyzing');});
@@ -140,6 +161,106 @@ async function run(){
             assert.deepEqual(JSON.parse(await workerResult).sent,[]);
             const detail=await request('/email_send/order_jobs.php?doc_id='+doc.doc_id);assert.equal(detail.recipients[0].status,'cancelled');assert.equal(detail.recipients[0].error_code,'recipient_revoked');
         }finally{gate.kill();worker?.kill();revoker?.kill();await Promise.all(outcomes.map(p=>p.catch(()=>{})));race('cleanup');}
+    });
+    await test('staff approval endpoint binds analyzed files and allows deliberate release',async()=>{
+        fixture('worker');await setting({options:{require_approval:true}});
+        const doc=await create([pdf]);fixture('worker');
+        const detail=await request('/email_send/order_jobs.php?doc_id='+doc.doc_id);assert.equal(detail.job.status,'awaiting_approval');
+        await request('/email_send/order_jobs.php',{as:'staff',data:{doc_id:doc.doc_id,action:'approve'},status:409});
+        await request('/email_send/order_jobs.php',{as:'owner',data:{doc_id:doc.doc_id,action:'approve',confirmed:true},status:403});
+        await request('/email_send/order_jobs.php',{as:'staff',data:{doc_id:doc.doc_id,action:'approve',confirmed:true,review_token:'stale-token'},status:409});
+        await request('/email_send/order_jobs.php',{as:'staff',data:{doc_id:doc.doc_id,action:'approve',confirmed:true,review_token:detail.review_token}});
+        fixture('worker');assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'success');
+        const paused=await create([pdf]);fixture('worker');
+        await setting({options:{require_approval:false}});assert.equal((await request('/email_send/order_jobs.php?doc_id='+paused.doc_id)).job.status,'queued');fixture('worker');
+    });
+    await test('analysis-only jobs resume when sending is enabled and preserve activation',async()=>{
+        const first=(await request('/email_send/ai_settings.php')).settings.activated_at;
+        await setting({options:{analysis_only:true}});const doc=await create([pdf]);fixture('worker');
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.error_code,'analysis_only');
+        await request('/email_send/order_jobs.php',{as:'staff',data:{doc_id:doc.doc_id,action:'approve',confirmed:true},status:409});
+        await setting({options:{analysis_only:false}});assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'queued');fixture('worker');
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'success');assert.equal((await request('/email_send/ai_settings.php')).settings.activated_at,first);
+    });
+    await test('destination policy reconciles approval holds across analysis-only transitions',async()=>{
+        await setting({options:{analysis_only:false,require_approval:true}});const doc=await create([pdf]);fixture('worker');
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.error_code,'approval_required');
+        await setting({options:{analysis_only:true,require_approval:false}});
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.error_code,'analysis_only');
+        await setting({options:{analysis_only:false,require_approval:true}});
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.error_code,'approval_required');
+        await setting({options:{analysis_only:true,require_approval:false}});
+        await setting({options:{analysis_only:false,require_approval:false}});
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'queued');
+        fixture('worker');assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'success');
+    });
+    await test('an Admin policy save cannot miss a worker hold that is still being written',async()=>{
+        await setting({options:{analysis_only:false,require_approval:true}});
+        const doc=await create([pdf],{send_to:[users.alice.id]});race('setup-policy');
+        const gate=raceProcess('gate');let worker,save;const outcomes=[];
+        try{
+            await new Promise((resolve,reject)=>{gate.stdout.once('data',resolve);gate.once('error',reject);});
+            worker=raceProcess('worker');const workerResult=processOutput(worker);outcomes.push(workerResult);await waitRaceBlocked('marker');
+            const current=(await request('/email_send/ai_settings.php')).settings;
+            save=request('/email_send/ai_settings.php',{data:{action:'save',revision:current.revision,enabled:true,model:'gemini-test',options:{require_approval:false,analysis_only:false}}});
+            outcomes.push(save);
+            let blocked=false;for(let i=0;i<30;i++){if(fixture('blocked-save').trim()==='1'){blocked=true;break;}await new Promise(r=>setTimeout(r,100));}
+            assert.ok(blocked,'settings save must wait for the worker policy transaction');
+            gate.stdin.end('release\n');assert.deepEqual(JSON.parse(await workerResult).sent,[]);await save;
+            assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'queued');
+            race('cleanup');fixture('worker');assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'success');
+        }finally{gate.kill();worker?.kill();await Promise.all(outcomes.map(p=>p.catch(()=>{})));race('cleanup');}
+    });
+    await test('approval preparation failures return a document error and release the advisory lock',async()=>{
+        await setting({options:{require_approval:true,analysis_only:false}});const doc=await create([pdf],{send_to:[users.alice.id]});fixture('worker');
+        const detail=await request('/email_send/order_jobs.php?doc_id='+doc.doc_id);assert.equal(detail.job.status,'awaiting_approval');
+        fixture('remove-approval-pdf:'+doc.doc_id);
+        const failed=await request('/email_send/order_jobs.php',{as:'staff',data:{action:'approve',doc_id:doc.doc_id,confirmed:true,review_token:detail.review_token},status:409});
+        assert.equal(failed.code,'pdf_unavailable');
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).job.status,'awaiting_approval');
+        await request('/email_send/order_jobs.php',{as:'staff',data:{action:'cancel_job',doc_id:doc.doc_id}});
+        await setting({options:{require_approval:false}});
+    });
+    await test('named key vault supports safe activation, stale writes, pause, delete and explicit server return',async()=>{
+        const current=(await request('/email_send/ai_settings.php')).settings;
+        const secret='synthetic-keyring-credential-for-tests';
+        const add=await request('/email_send/ai_settings.php',{data:{action:'key_add',revision:current.revision,label:'School backup',api_key:secret,remind_days:30}});
+        const entry=add.settings.keyring.keys.find(k=>k.label==='School backup');assert.ok(entry);assert.match(entry.reference,/^key_[a-f0-9]{16}$/);assert.equal(entry.active,false);
+        assert.ok(!JSON.stringify(add).includes(secret));assert.ok(!JSON.stringify(add).includes('cipher'));assert.ok(!JSON.stringify(add).includes('fingerprint'));
+        await request('/email_send/ai_settings.php',{as:'staff',data:{action:'key_delete',revision:add.settings.revision,key_id:entry.id,confirmed:true},status:403});
+        await request('/email_send/ai_settings.php',{data:{action:'key_test',revision:add.settings.revision,key_id:entry.id,model:'../../bad'},status:400});
+        await request('/email_send/ai_settings.php',{data:{action:'key_activate',revision:current.revision,key_id:entry.id,model:'gemini-test',confirmed:true},status:409});
+        let result=await request('/email_send/ai_settings.php',{data:{action:'key_test',revision:add.settings.revision,key_id:entry.id,model:'gemini-test'}});
+        assert.ok(result.settings.keyring.keys.find(k=>k.id===entry.id).tested_at);
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_activate',revision:result.settings.revision,key_id:entry.id,model:'gemini-test',confirmed:true}});
+        assert.equal(result.settings.keyring.keys.find(k=>k.id===entry.id).active,true);assert.equal(result.settings.enabled,true);
+        await request('/email_send/ai_settings.php',{data:{action:'key_delete',revision:result.settings.revision,key_id:entry.id,confirmed:true},status:409});
+        await request('/email_send/ai_settings.php',{data:{action:'key_update',revision:result.settings.revision,key_id:entry.id,label:'Paused',remind_days:30,key_enabled:false},status:409});
+        const other=result.settings.keyring.keys.find(k=>!k.active&&k.enabled&&k.usable);assert.ok(other);
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_activate',revision:result.settings.revision,key_id:other.id,model:'gemini-test',confirmed:true}});
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_update',revision:result.settings.revision,key_id:entry.id,label:'Retired school backup',remind_days:60,key_enabled:false}});
+        await request('/email_send/ai_settings.php',{data:{action:'key_activate',revision:result.settings.revision,key_id:entry.id,model:'gemini-test',confirmed:true},status:400});
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_delete',revision:result.settings.revision,key_id:entry.id,confirmed:true}});assert.ok(!result.settings.keyring.keys.some(k=>k.id===entry.id));
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_add',revision:result.settings.revision,label:'Never tested reserve',api_key:'synthetic-untested-reserve'}});
+        const untouched=result.settings.keyring.keys.find(k=>k.label==='Never tested reserve');assert.equal(untouched.tested_at,null);
+        result=await request('/email_send/ai_settings.php',{data:{action:'key_server',key_id:untouched.id,revision:result.settings.revision,model:'gemini-test',confirmed:true}});
+        const after=result.settings.keyring.keys.find(k=>k.id===untouched.id);
+        assert.equal(after.tested_at,null,'server test cannot attribute results to an unrelated vault ID supplied by the client');
+        assert.equal(after.tested_model,null);assert.equal(after.test_code,null);
+        assert.equal(result.settings.key_source,'server');assert.equal(result.settings.keyring.server.active,true);assert.ok(!result.settings.keyring.keys.some(k=>k.active));
+        assert.ok(!JSON.stringify(result).includes(env.GEMINI_API_KEY));
+    });
+    await test('key activation cannot undo a concurrent Admin pause',async()=>{
+        const before=(await request('/email_send/ai_settings.php')).settings;
+        const entry=before.keyring.keys.find(k=>k.enabled&&k.usable);assert.ok(entry);
+        const blocker=cp.spawn(php,['tests/order-email-fixture.php','pause-lock'],{env,stdio:['pipe','pipe','pipe']});let activation;
+        try{
+            await new Promise((resolve,reject)=>{blocker.stdout.once('data',resolve);blocker.once('error',reject);});
+            activation=request('/email_send/ai_settings.php',{data:{action:'key_activate',revision:before.revision,key_id:entry.id,model:'gemini-test',confirmed:true},status:409});
+            let blocked=false;for(let i=0;i<30;i++){if(fixture('blocked-save').trim()==='1'){blocked=true;break;}await new Promise(r=>setTimeout(r,100));}
+            assert.ok(blocked);blocker.stdin.end('pause\n');await activation;
+            const after=(await request('/email_send/ai_settings.php')).settings;assert.equal(after.enabled,false);assert.equal(after.keyring.server.active,true);
+        }finally{blocker.stdin.end();blocker.kill();if(activation)await activation.catch(()=>{});}
     });
     console.log(fixture('behavior').trim());console.log(`Order HTTP: ${passed} passed`);
 }

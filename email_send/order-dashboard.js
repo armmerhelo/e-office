@@ -174,6 +174,9 @@
             if (el('detail-message').classList.contains('error')) U.message('detail-message', '');
             activeDoc.status = result.job?.status;
             el('detail-status').replaceChildren(U.badge(result.job?.status));
+            if(result.job?.status==='awaiting_approval'&&result.review_token)el('detail-status').append(U.button('ยืนยันรายชื่อและอนุมัติส่ง',()=>{
+                if(confirm('ตรวจสอบรายชื่อผู้รับและ PDF ครบแล้ว ยืนยันส่งถึงผู้รับที่รอดำเนินการ?'))action(docId,'approve',{confirmed:true,review_token:result.review_token});
+            }));
             if (result.job?.error_code) el('detail-status').append(U.node('span', ' · ' + U.error(result.job.error_code)));
             el('file-count').textContent = number(result.files.length) + ' ไฟล์';
             el('recipient-count').textContent = number(result.recipients.length) + ' คน';
