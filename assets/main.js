@@ -17,6 +17,8 @@ function applyPermissionMenus() {
     }
     display_style('system_management', eofficeCan('members') || eofficeCan('departments') ? 'block' : 'none');
     const aiSettings = document.getElementById('group_ai_settings');
+    const sendEmail = document.getElementById('group_send_email');
+    if (aiSettings?.parentNode && sendEmail) aiSettings.parentNode.insertBefore(sendEmail, aiSettings);
     if (aiSettings) aiSettings.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';

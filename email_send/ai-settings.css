@@ -1,5 +1,23 @@
 /* Settings-specific layout shares the tracking page's typography and controls. */
 .ai-settings-page main { max-width: 1240px; }
+.ai-settings-page .page-header { flex-wrap: wrap; gap: 18px; }
+.ai-settings-page .settings-link { white-space: nowrap; }
+.ai-settings-page .readiness-banner { display: flex; align-items: center; gap: 16px; padding: 20px 22px; margin: 22px 0; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 14px; color: #3730a3; }
+.ai-settings-page .readiness-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; background: #fff; border: 1px solid #c7d2fe; border-radius: 12px; font-size: .85rem; font-weight: 600; }
+.ai-settings-page .readiness-banner > div { flex: 1; min-width: 0; }
+.ai-settings-page .readiness-banner h2 { font-size: .95rem; line-height: 1.7; }
+.ai-settings-page .readiness-banner p { font-size: .78rem; margin-top: 4px; line-height: 1.8; color: #475569; }
+.ai-settings-page .readiness-banner a { flex-shrink: 0; font-size: .78rem; font-weight: 500; color: #3730a3; text-underline-offset: 4px; }
+.ai-settings-page .summary-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ai-settings-page .summary-heading h2 { font-size: .95rem; }
+.ai-settings-page .summary-heading span { color: #64748b; font-size: .73rem; }
+.ai-settings-page .key-resource { display: inline-block; margin-top: 8px; color: #4338ca; font-size: .76rem; text-underline-offset: 3px; }
+.ai-settings-page .key-resource span { color: #64748b; }
+.ai-settings-page :is(#connection-title, #delivery-title, #server-guide) { scroll-margin-top: 24px; }
+.ai-settings-page .save-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.ai-settings-page #discard { font-size: .78rem; }
+.ai-settings-page #save-state.unsaved { color: #92400e; }
+.ai-settings-page #connection-help { grid-column: 1 / -1; margin: 0; color: #92400e; }
 .ai-settings-page .settings-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
 .ai-settings-page .status-card { margin: 0; padding: 18px; }
 .ai-settings-page .status-card > p { min-height: 28px; font-size: .85rem; font-weight: 600; margin: 6px 0; overflow-wrap: anywhere; }
@@ -83,6 +101,18 @@
 .ai-settings-page .server-guide div > code { display: block; padding: 12px; margin: 12px 0; background: #f1f5f9; border-radius: 8px; font-size: .74rem; }
 .ai-settings-page .load-error { background: #fff1f2; border-color: #fecdd3; }
 .ai-settings-page .load-error p { font-size: .82rem; margin: 8px 0 14px; }
+/* Viewport fallbacks also support opening this page outside the application shell. */
+@media (max-width: 800px) {
+    .ai-settings-page .settings-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ai-settings-page .settings-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+    .ai-settings-page .readiness-banner { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    .ai-settings-page .readiness-banner a { margin-left: 54px; }
+    .ai-settings-page .save-bar { flex-direction: column; align-items: stretch; }
+    .ai-settings-page .save-actions { flex-wrap: wrap; }
+    .ai-settings-page .save-actions button { flex: 1; }
+}
 @container eoffice-content (max-width: 1000px) {
     .ai-settings-page .settings-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ai-settings-page .settings-layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; }
@@ -94,6 +124,10 @@
     .ai-settings-page .server-guide { grid-column: 1 / -1; }
 }
 @container eoffice-content (max-width: 520px) {
+    .ai-settings-page .readiness-banner { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    .ai-settings-page .readiness-banner a { margin-left: 54px; }
+    .ai-settings-page .save-actions { flex-wrap: wrap; }
+    .ai-settings-page .save-actions button { flex: 1; }
     .ai-settings-page .settings-summary { gap: 10px; }
     .ai-settings-page .status-card { padding: 14px 12px; }
     .ai-settings-page .status-card > p { font-size: .78rem; }

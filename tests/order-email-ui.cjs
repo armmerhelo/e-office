@@ -176,6 +176,16 @@ async function testSettingsDraftActions() {
     await settle();
 
     const model = document.getElementById('model'), testButton = document.getElementById('test-ai');
+    const action = document.getElementById('readiness-action');
+    action.setAttribute('href', '#server-guide');
+    const guide = document.getElementById('server-guide');
+    let prevented = false, scrolled = false, focused = false;
+    guide.scrollIntoView = () => {scrolled = true;};
+    guide.focus = () => {focused = true;};
+    action.onclick({button: 0, preventDefault() {prevented = true;}});
+    assert.equal(prevented, true, 'local section links must bypass the shell router');
+    assert.equal(guide.open, true, 'Cron guidance expands before scrolling');
+    assert.equal(scrolled && focused, true, 'section links scroll and move keyboard focus within the module');
     model.value = 'gemini-candidate'; model.dispatch('input'); await settle();
     const warns=()=>{let warned=false;for(const callback of windowEvents.beforeunload)callback({preventDefault(){warned=true;}});return warned;};
     assert.equal(warns(),true);
@@ -201,6 +211,26 @@ async function testSettingsDraftActions() {
     assert.equal(save.enabled, false, 'clearing key must pause automatic delivery');
     assert.equal(save.api_key, '', 'clear-key request must not send any candidate credential');
     assert.equal(save.revision,7,'settings save binds the loaded revision');
+    assert.equal(testButton.disabled, true, 'AI actions need a configured or candidate key');
+    assert.equal(document.getElementById('load-models').disabled, true);
+    const beforeDiscard = requests.length;
+    const key = document.getElementById('api-key');
+    key.value = 'draft-only-key'; key.dispatch('input');
+    assert.equal(testButton.disabled, false, 'a candidate key can be tested before saving');
+    model.value = 'abandoned-model'; model.dispatch('input');
+    document.getElementById('enabled').checked = true;
+    document.getElementById('enabled').dispatch('change');
+    let cleanEvents = 0;
+    document.getElementById('settings-form').addEventListener('eoffice:form-saved', () => cleanEvents++);
+    document.getElementById('discard').click();
+    assert.equal(requests.length, beforeDiscard, 'discard must not send a write or refresh request');
+    assert.equal(key.value, '', 'discard removes the candidate credential');
+    assert.equal(model.value, settings.model);
+    assert.equal(document.getElementById('enabled').checked, settings.enabled);
+    assert.equal(document.getElementById('save').disabled, true);
+    assert.equal(warns(), false, 'discard clears the local departure guard');
+    assert.equal(cleanEvents, 1, 'discard synchronizes the shell form guard');
+    assert.equal(document.getElementById('delivery-preview').textContent, 'ปิดอยู่ · ยังไม่ส่งอีเมลอัตโนมัติ');
 }
 
 function testSaveBarDoesNotOverlay() {
