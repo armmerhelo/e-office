@@ -126,6 +126,39 @@ async function run() {
         }
         await evaluate(`const room=${root}.getElementById('roomSelect');room.value='';room.dispatchEvent(new Event('change',{bubbles:true}));`);
     });
+    await check('room booking filters, pagination, mobile cards and explicit status cancellation',async()=>{
+        await moduleView('edit_room_booking');
+        await until(root+".getElementById('bookingResults').getAttribute('aria-busy')==='false'");
+        assert.ok(await evaluate(root+".querySelectorAll('#tableBody tr').length<=10"));
+        await evaluate(`(()=>{const s=${root};s.getElementById('searchInput').value='qa-no-match-987654321';s.getElementById('searchInput').dispatchEvent(new Event('input',{bubbles:true}));})()`);
+        assert.equal(await evaluate(root+".getElementById('emptyTitle').textContent"),'ไม่พบรายการที่ตรงกับตัวกรอง');
+        await evaluate(root+".getElementById('resetFilters').click()");
+        assert.equal(await evaluate(root+".getElementById('emptyState').classList.contains('hidden')"),true);
+        await evaluate(`(()=>{const s=${root};s.getElementById('searchInput').value=s.querySelector('#tableBody tr').cells[1].textContent.trim();s.getElementById('searchInput').dispatchEvent(new Event('input',{bubbles:true}));})()`);
+        assert.equal(await evaluate(root+".getElementById('resetFilters').checkVisibility()"),true,'clear filters is available with matching results');
+        await evaluate(`(()=>{const s=${root};s.getElementById('sortFilter').value='soonest';s.getElementById('sortFilter').dispatchEvent(new Event('change'));s.getElementById('resetFilters').click();})()`);
+        assert.equal(await evaluate(root+".getElementById('sortFilter').value"),'latest');
+        assert.equal(await evaluate(root+".getElementById('resetFilters').hidden"),true);
+        await evaluate(`(()=>{const s=${root},select=s.querySelector('#tableBody select'),previous=select.value,confirm=window.confirm;window.confirm=()=>false;select.value=previous==='confirmed'?'pending':'confirmed';select.dispatchEvent(new Event('change'));window.__qaStatusPrevious=previous;setTimeout(()=>window.confirm=confirm,20);})()`);
+        await sleep(50);
+        assert.equal(await evaluate(root+".querySelector('#tableBody select').value"),await evaluate('window.__qaStatusPrevious'));
+        await evaluate(`(()=>{const s=${root};window.__qaBookingTransport=window.fetch;window.fetch=(url,opts)=>new URL(String(url),location.href).pathname==='/room_booking/api/my_bookings.php'?Promise.reject(new Error('QA offline')):window.__qaBookingTransport(url,opts);s.getElementById('refreshBookings').click();})()`);
+        await until(root+".getElementById('bookingFeedback').hidden===false && "+root+".getElementById('bookingResults').getAttribute('aria-busy')==='false'");
+        assert.ok(await evaluate(root+".querySelectorAll('#tableBody button[title=\"แก้ไข\"]').length>0"),'failed refresh retains actions');
+        await evaluate('window.fetch=window.__qaBookingTransport');
+        await evaluate(root+".getElementById('refreshBookings').click()");
+        await until(root+".getElementById('bookingResults').getAttribute('aria-busy')==='false'");
+        await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});
+        assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+        assert.equal(await evaluate(`getComputedStyle(${root}.querySelector('#tableBody tr')).display`),'block');
+        await evaluate(root+".querySelector('#tableBody button[title=\"แก้ไข\"]').click()");
+        await sleep(30);
+        assert.equal(await evaluate(root+".activeElement.id"),'edit_room_name');
+        await evaluate(root+".getElementById('editModal').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
+        await sleep(350);
+        assert.equal(await evaluate(root+".getElementById('editModal').classList.contains('hidden')"),true);
+        await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+    });
     await check('late booking edit success preserves newer fields across cached navigation',async()=>{
         await moduleView('edit_room_booking');
         await until(root+".querySelector('#tableBody button[title=\"แก้ไข\"]')!==null");
@@ -308,7 +341,9 @@ async function run() {
         await evaluate(`window.__qaReadTransport=window.fetch;window.__qaReadCalls={};window.fetch=async(url,opts)=>{const response=await window.__qaReadTransport(url,opts);const p=new URL(String(url),location.href).pathname;if(!['/room_booking/api/get_bookings.php','/room_booking/api/my_bookings.php','/maintenance_requests/api/get_maintenance.php'].includes(p)||!response.ok)return response;window.__qaReadCalls[p]=(window.__qaReadCalls[p]||0)+1;const data=await response.json();const date=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'});const record=p.includes('maintenance')?{id:99999992,requester_name:'QA refresh marker',request_date:date,repair_types:'ไฟฟ้า',building:'QA',room:'1',damage_details:'QA refresh',consideration_status:'pending',action_result:'pending',materials:[],images:[]}:{id:99999991,User_Id:window.eofficeUser.id,room_name:'QA refresh',topic:'QA refresh marker',requester_name:'QA',department:'QA',attendees:3,start_datetime:date+' 09:00:00',end_datetime:date+' 10:00:00',created_at:date,status:'pending'};data.data.push(record);return new Response(JSON.stringify(data),{status:response.status,headers:{'Content-Type':'application/json'}});};`);
         for(const [view,endpoint]of [['room_booking','/room_booking/api/get_bookings.php'],['edit_room_booking','/room_booking/api/my_bookings.php'],['maintenance_admin','/maintenance_requests/api/get_maintenance.php']]) {
             await moduleView(view);
+            if(view==='edit_room_booking') await evaluate(`const search=${root}.getElementById('searchInput');search.value='QA refresh marker';search.dispatchEvent(new Event('input',{bubbles:true}));`);
             await until(`(window.__qaReadCalls[${JSON.stringify(endpoint)}]||0)>0 && ${root}.textContent.includes('QA refresh marker')`);
+            if(view==='edit_room_booking') await evaluate(`${root}.getElementById('resetFilters').click()`);
         }
         await evaluate('window.fetch=window.__qaReadTransport');
     });
@@ -470,7 +505,7 @@ async function run() {
         await until(root+".getElementById('bookingForm').dataset.eofficeDraftInitialized==='true'");
         await evaluate(`window.__qaDraftNode=${root}.getElementById('topic');window.__qaDraftNode.value='QA retained across permission change';window.__qaDraftNode.dispatchEvent(new Event('input',{bubbles:true}));`);
         await moduleView('edit_room_booking');
-        await until(root+".querySelector('h1').textContent.includes('จัดการรายการ')");
+        await until(root+".getElementById('bookingListTitle').textContent==='รายการจองทั้งหมด'");
         await evaluate(`(()=>{const s=${root};s.getElementById('editModal').classList.remove('hidden');s.getElementById('editForm').dispatchEvent(new Event('eoffice:form-dirty',{bubbles:true}));})()`);
         await evaluate(`window.__qaPrivilegedNode=document.querySelector('.eoffice-module-host:not([hidden])');window.__qaRoleTransport=window.fetch;window.__qaRoleReads=0;window.fetch=async(url,opts)=>{const response=await window.__qaRoleTransport(url,opts);const p=new URL(String(url),location.href).pathname;if(!response.ok)return response;if(p==='/api/me.php'){const data=await response.json();data.user.status='User';data.user.permissions=data.user.permissions.filter(p=>p!=='room_booking');return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});}if(p==='/room_booking/api/my_bookings.php'){window.__qaRoleReads++;const data=await response.json();data.is_admin=false;data.data=[];return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});}return response;};window.dispatchEvent(new Event('eoffice:permissions-changed'));`);
         await until("window.eofficeSessionState.status==='authenticated' && window.eofficeUser.status==='User'");
@@ -480,7 +515,7 @@ async function run() {
         await evaluate("window.__qaConfirm=window.confirm;window.confirm=()=>false;document.querySelector('.eoffice-module-status button').click()");await sleep(100);
         assert.equal(await evaluate('window.__qaPrivilegedNode.isConnected'),true,'cancel must retain the stale draft without displaying it');
         await evaluate("window.confirm=()=>true;document.querySelector('.eoffice-module-status button').click()");
-        await until(`window.__qaRoleReads>0 && !!document.querySelector('.eoffice-module-host:not([hidden])') && ${root}.querySelector('h1').textContent.includes('รายการจองห้องประชุมของฉัน')`);
+        await until(`window.__qaRoleReads>0 && !!document.querySelector('.eoffice-module-host:not([hidden])') && ${root}.getElementById('bookingListTitle').textContent==='รายการจองของฉัน'`);
         assert.equal(await evaluate("window.__qaPrivilegedNode.isConnected"),false,'privileged DOM/context must be disposed');
         await evaluate('window.confirm=window.__qaConfirm');
         await moduleView('room_booking2');

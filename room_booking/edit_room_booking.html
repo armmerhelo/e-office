@@ -31,42 +31,36 @@
     </style>
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="my-bookings.css?v=20261015-compact-filters">
 </head>
 <body class="text-gray-800 p-4 md:p-8 eoffice-module-page">
     <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/room_booking/edit_room_booking.html">
     <script src="../assets/app-navigation.js?v=20261014-spa"></script>
 
-    <div class=" mx-auto">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <div>
-                <h1 class="text-2xl md:text-3xl font-bold text-indigo-700 flex items-center gap-2">
-                    <i class="ph ph-calendar-check text-4xl"></i>
-                    รายการจองห้องประชุมของฉัน
-                </h1>
-                <p class="text-gray-500 mt-1 flex items-center gap-2">
-                    <i class="ph ph-user"></i>
-                    ผู้ใช้งาน: <span id="currentUserDisplay" class="font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full text-xs">กำลังโหลดข้อมูล...</span>
-                </p>
+    <main class="my-bookings mx-auto" aria-label="รายการจองห้องประชุม">
+        <section class="booking-filters" aria-label="ค้นหาและกรองรายการจอง">
+            <label class="booking-search">ค้นหารายการ<input type="search" id="searchInput" placeholder="หัวข้อ ห้องประชุม หรือชื่อผู้จอง"></label>
+            <label>สถานะ<select id="statusFilter"><option value="all">ทุกสถานะ</option><option value="pending">รอดำเนินการ</option><option value="confirmed">อนุมัติแล้ว</option><option value="cancelled">ยกเลิกแล้ว</option></select></label>
+            <label>ช่วงเวลา<select id="periodFilter"><option value="all">ทุกช่วงเวลา</option><option value="upcoming">กำลังใช้งาน / ที่จะมาถึง</option><option value="today">มีการใช้งานวันนี้</option><option value="past">สิ้นสุดแล้ว</option></select></label>
+            <label>เรียงตาม<select id="sortFilter"><option value="latest">วันใช้งาน: หลัง → ก่อน</option><option value="soonest">วันใช้งาน: ก่อน → หลัง</option></select></label>
+            <div class="booking-filter-actions">
+                <button type="button" id="refreshBookings" class="booking-secondary">โหลดใหม่</button>
+                <button type="button" id="resetFilters" class="booking-secondary" hidden>ล้างตัวกรอง</button>
             </div>
-            <div class="w-full md:w-auto flex gap-2">
-                <div class="relative w-full md:w-64">
-                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" id="searchInput" placeholder="ค้นหาหัวข้อการประชุม..."
-                           class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all">
-                </div>
-            </div>
-        </div>
+        </section>
+        <div id="bookingFeedback" class="booking-feedback" role="status" hidden></div>
 
-        <div class="bg-white rounded-xl shadow-md overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full  text-sm text-left table-fixed">
+        <section id="bookingResults" class="booking-results bg-white rounded-xl overflow-hidden" aria-label="รายการจองห้องประชุม" aria-busy="true">
+            <div class="booking-list-heading"><h2 id="bookingListTitle">รายการจองของฉัน</h2><span id="resultCount" role="status">กำลังโหลดรายการ…</span></div>
+            <div class="booking-table-wrap">
+                <table class="booking-table w-full text-sm text-left">
+                    <caption class="sr-only">สถานะ ห้องประชุม วันเวลา หัวข้อ อุปกรณ์ และการจัดการการจอง</caption>
                     <thead class="bg-indigo-50 text-indigo-800 font-semibold uppercase text-xs">
                         <tr>
                           <th class="px-6 py-4 w-[180px]">สถานะ</th>
                                       <th class="px-6 py-4 w-[200px]">ห้องประชุม</th>
+                                      <th class="px-6 py-4 w-[190px]">วันและเวลาใช้งาน</th>
                                       <th class="px-6 py-4 w-[350px]">หัวข้อการประชุม</th>
-                                      
-                                      <th class="px-6 py-4 w-[190px]">เวลาเริ่ม - สิ้นสุด</th>
                                       <th class="px-2 py-4 w-[150px]">อุปกรณ์</th>
                                       <th class="px-2 py-4 text-center w-[110px]">จัดการ</th>
                         </tr>
@@ -77,18 +71,21 @@
             </div>
             <div id="emptyState" class="hidden flex flex-col items-center justify-center py-12">
                 <i class="ph ph-folder-open text-6xl text-gray-300 mb-4"></i>
-                <p class="text-gray-500 text-lg">ไม่พบข้อมูลการจองห้องของคุณในขณะนี้</p>
+                <h3 id="emptyTitle">ยังไม่มีรายการจองห้องประชุม</h3>
+                <p id="emptyDescription">เริ่มจองห้องประชุมสำหรับกิจกรรมของคุณได้เลย</p>
+                <a id="emptyCreate" class="booking-primary" href="new_room.html">จองห้องประชุมใหม่</a>
             </div>
-        </div>
-    </div>
+            <footer class="booking-pagination"><span id="pageInfo"></span><nav aria-label="หน้ารายการจอง"><button type="button" id="previousPage" class="booking-secondary">ก่อนหน้า</button><span id="pageNumber">1 / 1</span><button type="button" id="nextPage" class="booking-secondary">ถัดไป</button></nav></footer>
+        </section>
+    </main>
 
-    <div id="editModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+    <div id="editModal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl transform scale-95 transition-transform duration-300 overflow-hidden flex flex-col max-h-[90vh]">
             <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-indigo-50">
-                <h2 class="text-xl font-bold text-indigo-800 flex items-center gap-2">
+                <h2 id="editModalTitle" class="text-xl font-bold text-indigo-800 flex items-center gap-2">
                     <i class="ph ph-pencil-simple text-2xl"></i> แก้ไขข้อมูลการจอง
                 </h2>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 transition-colors">
+                <button type="button" aria-label="ปิดหน้าต่างแก้ไข" onclick="closeModal()" class="text-gray-400 hover:text-red-500 transition-colors">
                     <i class="ph ph-x text-2xl"></i>
                 </button>
             </div>
@@ -182,7 +179,7 @@
         </div>
     </div>
 
-    <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 z-[60]">
+    <div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 z-[60]">
         <i class="ph ph-check-circle text-2xl"></i>
         <span id="toastMessage" class="font-medium">บันทึกข้อมูลสำเร็จ</span>
     </div>
@@ -200,6 +197,10 @@
 
         let bookings = [];
         let canManageBookings = false;
+        let bookingPage = 1, bookingLoaded = false, bookingLoading = false;
+        const bookingPageSize = 10;
+        const normalizedStatus = value => ['confirm','confirmed'].includes(String(value).toLowerCase()) ? 'confirmed' : ['cancel','cancelled'].includes(String(value).toLowerCase()) ? 'cancelled' : 'pending';
+        const bookingDate = value => new Date(String(value || '').replace(' ', 'T'));
 
         function renderTable(data = bookings) {
             const tbody = document.getElementById('tableBody');
@@ -217,8 +218,8 @@
 
             data.forEach(raw => {
                 const booking = escapeRecord(raw);
-                const start = new Date(booking.start_datetime);
-                const end = new Date(booking.end_datetime);
+                const start = bookingDate(raw.start_datetime);
+                const end = bookingDate(raw.end_datetime);
                 const dateOptions = { year: 'numeric', month: 'short', day: 'numeric' };
                 const timeOptions = { hour: '2-digit', minute: '2-digit' };
 
@@ -254,42 +255,18 @@
                 }
 
                 let eqHtml = '<div class="flex gap-1 flex-wrap">';
-                if(booking.equipment_audio == 1) eqHtml += `<span class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full" title="เครื่องเสียง"><i class="ph ph-speaker-high"></i></span>`;
-                if(booking.equipment_computer == 1) eqHtml += `<span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full" title="คอมพิวเตอร์"><i class="ph ph-desktop"></i></span>`;
-                if(booking.equipment_projector == 1) eqHtml += `<span class="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-full" title="โปรเจคเตอร์"><i class="ph ph-projector-screen"></i></span>`;
-                if(booking.equipment_food == 1) eqHtml += `<span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full" title="อาหาร/เครื่องดื่ม"><i class="ph ph-coffee"></i></span>`;
-                if(booking.equipment_other) eqHtml += `<span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full truncate max-w-[100px]" title="${booking.equipment_other}">อื่นๆ</span>`;
+                if(booking.equipment_audio == 1) eqHtml += `<span class="booking-equipment">เครื่องเสียง</span>`;
+                if(booking.equipment_computer == 1) eqHtml += `<span class="booking-equipment">คอมพิวเตอร์</span>`;
+                if(booking.equipment_projector == 1) eqHtml += `<span class="booking-equipment">โปรเจคเตอร์</span>`;
+                if(booking.equipment_food == 1) eqHtml += `<span class="booking-equipment">อาหาร/เครื่องดื่ม</span>`;
+                if(booking.equipment_other) eqHtml += `<span class="booking-equipment">${booking.equipment_other}</span>`;
                 if(eqHtml === '<div class="flex gap-1 flex-wrap">') eqHtml += '<span class="text-gray-400 text-xs">- ไม่มี -</span>';
                 eqHtml += '</div>';
-
-                let statusHtml = '';
-                const currentStatus = booking.status ? booking.status.toLowerCase() : 'pending';
-
-                if (currentStatus === 'confirm' || currentStatus === 'confirmed') {
-                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200 transition-colors cursor-pointer w-28 justify-center">
-                                    <i class="ph ph-check-circle-fill text-emerald-600"></i> อนุมัติแล้ว
-                                  </button>
-                                    <p class="text-xs pt-2">${booking.created_at}</p>
-                                  `;
-                } else if (currentStatus === 'cancel' || currentStatus === 'cancelled') {
-                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 transition-colors cursor-pointer w-28 justify-center">
-                                    <i class="ph ph-x-circle-fill text-red-600"></i> ยกเลิก
-                                  </button>
-                                  <p class="text-xs pt-2">${booking.created_at}</p>
-                                  `;
-                } else {
-                    statusHtml = `<button onclick="changeStatus('${booking.id}', '${currentStatus}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200 transition-colors cursor-pointer w-28 justify-center">
-                                    <i class="ph ph-clock-fill text-amber-600"></i> รอดำเนินการ
-                                  </button>
-                                    <p class="text-xs pt-2">${booking.created_at}</p>
-                                  `;
-                }
 
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-indigo-50/50 transition-colors group";
                 tr.innerHTML = `
                     <td class="px-6 py-4">
-                        ${statusHtml}
                     </td>
                     <td class="px-6 py-4">
                         <div class="font-medium text-gray-900">${booking.room_name}</div>
@@ -297,14 +274,9 @@
                     <td class="px-6 py-4 max-w-[550px]">
                         <div class="text-gray-800 break-words overflow-hidden">${booking.topic}</div>
                         <div class="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                            <i class="ph ph-users"></i> ผู้มาใช้บริการ: <span class="font-medium text-indigo-600">${booking.attendees || 0} คน</span>
+                             <i class="ph ph-users"></i> ผู้เข้าร่วม <span class="font-medium text-indigo-600">${booking.attendees || 0} คน</span>
                         </div>
-                        <div class="flex items-center gap-2 py-2">
-                            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
-                                ${booking.requester_name ? booking.requester_name.substring(0, 2) : '??'}
-                            </div>
-                            <span class="text-gray-600">${booking.requester_name || '-'}</span>
-                        </div>
+                        <div class="booking-requester text-gray-600">ผู้จอง: ${booking.requester_name || '-'}</div>
                     </td>
 
                     <td class="px-6 py-4">
@@ -316,37 +288,63 @@
                     <td class="px-2 py-4 text-center w-[110px]">
                         <div class="flex items-center justify-center gap-1.5">
                             <button onclick="openEditModal('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-colors" title="แก้ไข" aria-label="แก้ไขการจอง">
-                                <i class="ph ph-pencil-simple text-lg"></i>
+                                <i class="ph ph-pencil-simple text-lg" aria-hidden="true"></i><span>แก้ไข</span>
                             </button>
                             <button onclick="printSlip('${booking.id}')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-colors" title="พิมพ์ใบจอง" aria-label="พิมพ์ใบจอง">
-                                <i class="ph ph-printer text-lg"></i>
+                                <i class="ph ph-printer text-lg" aria-hidden="true"></i><span>พิมพ์ใบจอง</span>
                             </button>
                         </div>
                     </td>
                 `;
                 tbody.appendChild(tr);
-                if (!canManageBookings) {
-                    const statusButton = tr.querySelector('button[onclick^="changeStatus"]');
-                    if (statusButton) {
-                        statusButton.disabled = true;
-                        statusButton.removeAttribute('onclick');
-                        statusButton.classList.remove('cursor-pointer');
-                    }
+                tr.insertBefore(tr.cells[3], tr.cells[2]);
+                [...tr.cells].forEach((cell,index) => cell.dataset.label = ['สถานะ','ห้องประชุม','วันและเวลาใช้งาน','หัวข้อการประชุม','อุปกรณ์','จัดการ'][index]);
+                const status = normalizedStatus(raw.status);
+                if (end < new Date() && status !== 'cancelled') {
+                    const ended = document.createElement('span');
+                    ended.className = 'booking-ended';
+                    ended.textContent = 'สิ้นสุดแล้ว';
+                    tr.cells[2].append(ended);
+                }
+                const statusLabels = {pending:'รอดำเนินการ',confirmed:'อนุมัติแล้ว',cancelled:'ยกเลิกแล้ว'};
+                const badge = document.createElement('span');
+                badge.className = 'booking-status booking-status--' + status;
+                badge.textContent = statusLabels[status];
+                if (!canManageBookings) tr.cells[0].append(badge);
+                const created = bookingDate(raw.created_at);
+                if (!isNaN(created)) {
+                    const note = document.createElement('small');
+                    note.className = 'booking-created';
+                    note.textContent = 'สร้างรายการ ' + created.toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'});
+                    tr.cells[0].append(note);
+                }
+                if (canManageBookings) {
+                    const select = document.createElement('select');
+                    select.setAttribute('aria-label', 'เปลี่ยนสถานะการจอง: ' + raw.topic);
+                    const field = document.createElement('div');
+                    field.className = 'booking-status-field';
+                    const hint = document.createElement('span');
+                    hint.id = 'booking-status-hint-' + raw.id;
+                    hint.className = 'booking-status-hint';
+                    hint.setAttribute('role', 'tooltip');
+                    hint.textContent = 'เปลี่ยนสถานะการจอง';
+                    select.setAttribute('aria-describedby', hint.id);
+                    for (const [value,label] of Object.entries(statusLabels)) select.add(new Option(label,value));
+                    select.value = status;
+                    select.className = 'booking-status-control booking-status--' + status;
+                    select.addEventListener('change', () => changeStatus(raw.id,status,select));
+                    field.append(select, hint);
+                    tr.cells[0].prepend(field);
                 }
             });
         }
 
-        async function changeStatus(id, currentStatus) {
+        async function changeStatus(id, currentStatus, control) {
             await window.sessionReady;
             if (!canManageBookings) return;
-            let nextStatus = 'pending';
-            if (currentStatus === 'pending') {
-                nextStatus = 'confirmed';
-            } else if (currentStatus === 'confirm' || currentStatus === 'confirmed') {
-                nextStatus = 'cancelled';
-            } else {
-                nextStatus = 'pending';
-            }
+            const nextStatus = control.value;
+            if (!window.confirm('ยืนยันเปลี่ยนสถานะการจองเป็น “' + control.selectedOptions[0].textContent + '” หรือไม่?')) { control.value = currentStatus; return; }
+            control.disabled = true;
 
             try {
                 const response = await fetch('api/update_status.php', {
@@ -362,12 +360,12 @@
 
                 const result = await response.json();
 
-                if (result.status === 'success') {
+                if (response.ok && result.status === 'success') {
                     const index = bookings.findIndex(b => String(b.id) === String(id));
                     if (index !== -1) {
                         bookings[index].status = nextStatus;
                     }
-                    renderTable();
+                    filterBookings();
                     showToast('เปลี่ยนสถานะเรียบร้อยแล้ว', 'success');
                 } else {
                     showToast(result.message || 'เกิดข้อผิดพลาดในการเปลี่ยนสถานะ', 'error');
@@ -375,11 +373,16 @@
             } catch (error) {
                 console.error('Error changing status:', error);
                 showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            } finally {
+                control.value = normalizedStatus(bookings.find(b => String(b.id) === String(id))?.status || currentStatus);
+                control.className = 'booking-status-control booking-status--' + control.value;
+                control.disabled = false;
             }
         }
 
         const modal = document.getElementById('editModal');
         const modalContent = modal.querySelector('.bg-white');
+        let editTrigger;
         let editGeneration = 0, editRevision = 0, editSaving = false;
         const editForm = document.getElementById('editForm');
         const editSnapshot = () => JSON.stringify([...editForm.elements].map(node =>
@@ -433,6 +436,7 @@
                 return;
             }
 
+            editTrigger = modal.getRootNode?.().activeElement || document.activeElement;
             editGeneration++; editRevision = 0;
             editForm.dispatchEvent(new Event('eoffice:form-saved', {bubbles:true}));
             document.getElementById('edit_id').value = booking.id;
@@ -476,6 +480,7 @@
                 modal.classList.remove('opacity-0');
                 modalContent.classList.remove('scale-95');
                 modalContent.classList.add('scale-100');
+                document.getElementById('edit_room_name').focus?.();
             }, 10);
         }
 
@@ -489,6 +494,8 @@
                 if (generation !== editGeneration) return;
                 modal.classList.add('hidden');
                 document.getElementById('editForm').reset();
+                if (editTrigger?.isConnected) editTrigger.focus();
+                else document.getElementById('searchInput')?.focus?.();
             }, 300);
         }
 
@@ -503,7 +510,8 @@
             const department = document.getElementById('edit_department').value;
             const attendees = document.getElementById('edit_attendees').value;
 
-            if(!room_name || !topic || !requester_name || !start_datetime || !end_datetime || !attendees) {
+            if (editForm.reportValidity && !editForm.reportValidity()) return;
+            if(!room_name || !topic.trim() || !requester_name.trim() || !department.trim() || !start_datetime || !end_datetime || Number(attendees) < 1) {
                 showToast('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'error');
                 return;
             }
@@ -589,6 +597,7 @@
             const printTimeStr = new Date().toLocaleString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' น.';
 
             const printWindow = window.open('', '_blank');
+            if (!printWindow) { showToast('กรุณาอนุญาตหน้าต่างป๊อปอัปเพื่อพิมพ์ใบจอง', 'error'); return; }
             printWindow.document.write(`
                 <html>
                 <head>
@@ -653,45 +662,101 @@
         }
 
         function filterBookings() {
-            const keyword = document.getElementById('searchInput').value.toLowerCase();
-            const filteredData = bookings.filter(b =>
-                (b.topic && b.topic.toLowerCase().includes(keyword)) ||
-                (b.room_name && b.room_name.toLowerCase().includes(keyword))
-            );
-            renderTable(filteredData);
+            const keyword = document.getElementById('searchInput').value.trim().toLocaleLowerCase('th');
+            const status = document.getElementById('statusFilter').value;
+            const period = document.getElementById('periodFilter').value;
+            const now = new Date(), today = new Date(now.getFullYear(),now.getMonth(),now.getDate()), tomorrow = new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+            const filteredData = bookings.filter(b => {
+                const start = bookingDate(b.start_datetime), end = bookingDate(b.end_datetime);
+                return [b.topic,b.room_name,b.requester_name,b.department].some(value => String(value || '').toLocaleLowerCase('th').includes(keyword)) &&
+                    (status === 'all' || normalizedStatus(b.status) === status) &&
+                    (period === 'all' || (period === 'upcoming' && end >= now) || (period === 'past' && end < now) || (period === 'today' && start < tomorrow && end >= today));
+            }).sort((a,b) => (bookingDate(a.start_datetime) - bookingDate(b.start_datetime)) * (document.getElementById('sortFilter').value === 'soonest' ? 1 : -1) || Number(b.id)-Number(a.id));
+            const pages = Math.max(1,Math.ceil(filteredData.length / bookingPageSize));
+            bookingPage = Math.min(bookingPage,pages);
+            renderTable(filteredData.slice((bookingPage-1)*bookingPageSize,bookingPage*bookingPageSize));
+            document.getElementById('resultCount').textContent = bookingLoading ? 'กำลังโหลดรายการ…' : filteredData.length.toLocaleString('th-TH') + ' รายการ';
+            document.getElementById('pageInfo').textContent = filteredData.length ? `แสดง ${(bookingPage-1)*bookingPageSize+1}–${Math.min(bookingPage*bookingPageSize,filteredData.length)} จาก ${filteredData.length} รายการ` : 'ไม่มีรายการที่จะแสดง';
+            document.getElementById('pageNumber').textContent = `${bookingPage} / ${pages}`;
+            document.getElementById('previousPage').disabled = bookingPage <= 1;
+            document.getElementById('nextPage').disabled = bookingPage >= pages;
+            const filtered = !!keyword || status !== 'all' || period !== 'all';
+            document.getElementById('emptyTitle').textContent = !bookingLoaded ? 'ยังไม่สามารถแสดงรายการได้' : filtered ? 'ไม่พบรายการที่ตรงกับตัวกรอง' : 'ยังไม่มีรายการจองห้องประชุม';
+            document.getElementById('emptyDescription').textContent = !bookingLoaded ? 'กดโหลดใหม่เพื่อลองอีกครั้ง' : filtered ? 'ลองเปลี่ยนคำค้น สถานะ หรือช่วงเวลา' : 'เริ่มจองห้องประชุมสำหรับกิจกรรมของคุณได้เลย';
+            document.getElementById('resetFilters').hidden = !filtered && document.getElementById('sortFilter').value === 'latest';
+            document.getElementById('emptyCreate').hidden = filtered || !bookingLoaded;
+            if (bookingLoading && !bookingLoaded) {
+                document.getElementById('emptyState').classList.add('hidden');
+                document.getElementById('tableBody').parentNode.classList.remove('hidden');
+                document.getElementById('tableBody').innerHTML = '<tr><td colspan="6"><div class="booking-loading" role="status"><span></span>กำลังโหลดรายการจองห้องประชุม…</div></td></tr>';
+            }
         }
-        document.getElementById('searchInput').addEventListener('input', filterBookings);
+        document.getElementById('searchInput').addEventListener('input', () => { bookingPage=1; filterBookings(); });
+        for (const id of ['statusFilter','periodFilter','sortFilter']) document.getElementById(id).addEventListener('change', () => { bookingPage=1; filterBookings(); });
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            document.getElementById('searchInput').value='';
+            document.getElementById('statusFilter').value='all';
+            document.getElementById('periodFilter').value='all';
+            document.getElementById('sortFilter').value='latest';
+            bookingPage=1;filterBookings();document.getElementById('searchInput').focus();
+        });
+        document.getElementById('previousPage').addEventListener('click', () => { bookingPage--;filterBookings(); });
+        document.getElementById('nextPage').addEventListener('click', () => { bookingPage++;filterBookings(); });
+        document.getElementById('refreshBookings').addEventListener('click', fetchBookings);
+        for (const label of editForm.querySelectorAll('label')) {
+            const input=label.nextElementSibling;
+            if (input?.matches('input,select')) label.htmlFor=input.id;
+        }
+        editForm.addEventListener('submit', event => { event.preventDefault();saveChanges(); });
+        modal.addEventListener('keydown', event => {
+            if (event.key==='Escape') { event.preventDefault();closeModal(); }
+            if (event.key==='Tab') {
+                const fields=[...modal.querySelectorAll('button,input,select')].filter(node=>!node.disabled && node.type!=='hidden');
+                const active=modal.getRootNode().activeElement || document.activeElement;
+                if (event.shiftKey && active===fields[0]) {event.preventDefault();fields.at(-1).focus();}
+                else if (!event.shiftKey && active===fields.at(-1)) {event.preventDefault();fields[0].focus();}
+            }
+        });
 
         let bookingRequest=0;
         async function fetchBookings() {
             const request=++bookingRequest;
+            bookingLoading=true;
+            document.getElementById('bookingResults').setAttribute('aria-busy','true');
+            document.getElementById('refreshBookings').disabled=true;
+            document.getElementById('bookingFeedback').hidden=true;
+            filterBookings();
             await window.sessionReady;
-            const currentUserId = getCookie('User_Id')|| '';
-            const currentUserDisplay = escapeHTML(getCookie('User_DisplayName') || 'ผู้ใช้งานระบบ');
-
-            document.getElementById('currentUserDisplay').innerHTML = `
-                <i class="ph ph-identification-card inline-block align-middle mr-1"></i>
-                ${currentUserDisplay} (ID: ${currentUserId})
-            `;
+            if(request!==bookingRequest)return;
 
             try {
                 const response = await fetch(`api/my_bookings.php`);
                 const result = await response.json();
                 if(request!==bookingRequest)return;
-                if (result.status === 'success' && Array.isArray(result.data)) {
+                if (response.ok && result.status === 'success' && Array.isArray(result.data)) {
                     canManageBookings = !!result.is_admin;
-                    document.querySelector('h1').lastChild.textContent = result.is_admin ? ' จัดการรายการจองห้องประชุม' : ' รายการจองห้องประชุมของฉัน';
+                    document.getElementById('bookingListTitle').textContent = canManageBookings ? 'รายการจองทั้งหมด' : 'รายการจองของฉัน';
                     bookings = result.data;
+                    bookingLoaded = true;
+                    if(bookings.length===1000) {
+                        document.getElementById('bookingFeedback').textContent='แสดงสูงสุด 1,000 รายการล่าสุดตามวันใช้งาน';
+                        document.getElementById('bookingFeedback').hidden=false;
+                    }
                 } else {
-                    bookings = [];
-                    showToast(result.message || 'ไม่พบข้อมูลการจองของท่าน', 'error');
+                    throw new Error(result.message || 'โหลดรายการไม่สำเร็จ');
                 }
             } catch (error) {
                 if(request!==bookingRequest)return;
                 console.error('Error fetching bookings:', error);
-                showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อดึงข้อมูลได้', 'error');
+                document.getElementById('bookingFeedback').textContent = 'โหลดรายการไม่สำเร็จ กรุณากดโหลดใหม่' + (bookingLoaded ? ' • ขณะนี้แสดงข้อมูลจากการโหลดครั้งก่อน' : '');
+                document.getElementById('bookingFeedback').hidden=false;
             } finally {
-                if(request===bookingRequest)filterBookings();
+                if(request===bookingRequest) {
+                    bookingLoading=false;
+                    document.getElementById('bookingResults').setAttribute('aria-busy','false');
+                    document.getElementById('refreshBookings').disabled=false;
+                    filterBookings();
+                }
             }
         }
 
