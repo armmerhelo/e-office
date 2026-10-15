@@ -291,7 +291,7 @@
     document.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => closeDialog(node.dataset.close)));
     document.addEventListener('keydown', event => {
         const overlay = [...document.querySelectorAll('.overlay')].find(node => !node.hidden);
-        if (!overlay) return;
+        if (!overlay || overlay.id === 'modal_sign_routes') return;
         if (event.key === 'Escape') closeDialog(overlay.id);
         if (event.key === 'Tab') {
             const nodes = [...overlay.querySelectorAll('button, input, select')].filter(node => !node.disabled && node.getClientRects().length);

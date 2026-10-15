@@ -43,6 +43,11 @@
         [hidden] { display: none !important; }
         .overlay { position: fixed; inset: 0; z-index: 50; background: #11182780; display: flex; align-items: center; justify-content: center; padding: 16px; }
         .dialog { background: white; width: 100%; max-width: 680px; max-height: 92vh; border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 20px 60px #0003; }
+        .dialog-wide { max-width: 1120px; }
+        .dialog-wide .dialog-body { min-height: 0; }
+        .sign-route-table { table-layout: fixed; min-width: 840px; }
+        .sign-route-table th:last-child { width: 100px; }
+        .sign-route-table select { width: 100%; }
         .dialog-head { padding: 18px 22px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         .dialog-body { padding: 22px; overflow-y: auto; }
         .dialog-foot { padding: 16px 22px; border-top: 1px solid #e5e7eb; justify-content: flex-end; }
@@ -64,8 +69,8 @@
         .permission-option strong { display: block; font-size: 14px; }
         @media (max-width: 600px) { body { padding: 8px; } .toolbar { padding: 16px; } .filters, .filters input, .filters select { width: 100%; } .form-grid, .permission-grid { grid-template-columns: 1fr; } .dialog-body { padding: 16px; } .dialog-foot .btn { flex: 1; } }
     </style>
-    <script src="../assets/member-management.js?v=20261014-lifecycle" defer></script>
-    <script src="../assets/sign-routing-management.js?v=20261014-lifecycle" defer></script>
+    <script src="../assets/member-management.js?v=20261015-routing-modal" defer></script>
+    <script src="../assets/sign-routing-management.js?v=20261015-routing-modal" defer></script>
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
@@ -76,24 +81,12 @@
     <main>
         <header class="card toolbar">
             <div><h1>จัดการสมาชิกและสิทธิ์</h1><p class="muted">กำหนดสิทธิ์รายบุคคล สมาชิกหนึ่งคนดูแลงานได้หลายอย่าง</p></div>
-            <button id="add-member" class="btn primary" type="button" disabled>+ เพิ่มสมาชิก</button>
+            <div class="actions">
+                <span id="sign-routing-section" hidden><button id="open-sign-routes" type="button" class="btn" aria-haspopup="dialog" aria-controls="modal_sign_routes">ตั้งค่า Auto send</button></span>
+                <button id="add-member" class="btn primary" type="button" disabled>+ เพิ่มสมาชิก</button>
+            </div>
         </header>
         <div id="page-message" class="message" role="status" hidden></div>
-        <section id="sign-routing-section" class="card" aria-labelledby="sign-routing-title" hidden>
-            <header class="toolbar">
-                <div><h2 id="sign-routing-title">Auto send — เลขาฝ่าย / รองฝ่าย</h2><p class="muted">เมื่อเลขาฝ่ายประทับตรา ยืนยันลงทะเบียนรับเอกสาร และบันทึกสำเร็จ ระบบจะเพิ่มรองฝ่ายเป็นผู้รับและแจ้งเตือนอัตโนมัติ พร้อมบันทึกประวัติการรับ</p></div>
-                <button id="reload-sign-routes" type="button" class="btn">โหลดข้อมูลใหม่</button>
-            </header>
-            <div style="padding:0 22px 22px">
-                <div id="sign-routing-message" class="message" role="status" hidden></div>
-                <form id="form_sign_routes">
-                    <div class="table-scroll"><table><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
-                    <p id="sign-route-empty" class="muted" hidden>ยังไม่มี Auto send กดเพิ่มคู่เลขา / รองฝ่ายเพื่อเริ่มตั้งค่า</p>
-                    <p class="muted" style="margin:14px 0">คู่เดิมใช้ “ทุกฝ่าย (คู่เดิม)” ให้เลือกฝ่ายให้ตรงกับตราประทับเพื่อส่งเฉพาะฝ่ายนั้น การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
-                    <div class="actions"><button id="add-sign-route" class="btn" type="button" disabled>+ เพิ่มคู่เลขา / รองฝ่าย</button><button id="save-sign-routes" class="btn primary" type="submit" disabled>บันทึก Auto send</button></div>
-                </form>
-            </div>
-        </section>
         <section class="card" aria-label="รายการสมาชิก">
             <div class="toolbar filters">
                 <input id="search_txt" type="search" placeholder="ค้นหาชื่อสมาชิก..." aria-label="ค้นหาชื่อสมาชิก">
@@ -110,6 +103,23 @@
         </section>
         <p class="muted">บุคลากรทั่วไปมีสิทธิ์พื้นฐานในการใช้งานระบบ การเพิ่ม–ถอนสิทธิ์และการเปลี่ยนระดับผู้ใช้ทำได้โดย Admin สูงสุดเท่านั้น</p>
     </main>
+
+    <div id="modal_sign_routes" class="overlay" hidden>
+        <section class="dialog dialog-wide" role="dialog" aria-modal="true" aria-labelledby="sign-routes-modal-title" aria-describedby="sign-routes-description" tabindex="-1">
+            <header class="dialog-head"><h2 id="sign-routes-modal-title">ตั้งค่า Auto send — เลขาฝ่าย / รองฝ่าย</h2><button class="btn small" type="button" data-sign-routes-close aria-label="ปิดหน้าต่าง">✕</button></header>
+            <div class="dialog-body">
+                <p id="sign-routes-description" class="muted">กำหนดเลขาฝ่ายและรองฝ่ายสำหรับส่งเอกสารอัตโนมัติหลังยืนยันลงทะเบียนรับและบันทึกสำเร็จ</p>
+                <div class="actions" style="margin:16px 0"><button id="reload-sign-routes" type="button" class="btn">โหลดข้อมูลใหม่</button><button id="add-sign-route" class="btn" type="button" disabled>+ เพิ่มคู่เลขา / รองฝ่าย</button></div>
+                <div id="sign-routing-message" class="message" role="status" hidden></div>
+                <form id="form_sign_routes">
+                    <div class="table-scroll"><table class="sign-route-table"><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
+                    <p id="sign-route-empty" class="muted" hidden>ยังไม่มี Auto send กดเพิ่มคู่เลขา / รองฝ่ายเพื่อเริ่มตั้งค่า</p>
+                    <p class="muted" style="margin:14px 0">คู่เดิมใช้ “ทุกฝ่าย (คู่เดิม)” ให้เลือกฝ่ายให้ตรงกับตราประทับเพื่อส่งเฉพาะฝ่ายนั้น การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
+                </form>
+            </div>
+            <footer class="dialog-foot actions"><button class="btn" type="button" data-sign-routes-close>ปิด</button><button id="save-sign-routes" class="btn primary" type="submit" form="form_sign_routes" disabled>บันทึก Auto send</button></footer>
+        </section>
+    </div>
 
     <div id="modal_user_manage" class="overlay" hidden>
         <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal_title">

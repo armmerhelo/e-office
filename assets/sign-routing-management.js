@@ -1,6 +1,39 @@
 (() => {
     const el = id => document.getElementById(id);
-    const state = {users:[], departments:[], version:'', request:0, busy:false, dirty:false};
+    const state = {users:[], departments:[], routes:[], version:'', request:0, busy:false, dirty:false};
+    const modal = el('modal_sign_routes');
+    let returnFocus, previousOverflow;
+    function openDialog() {
+        returnFocus = document.activeElement;
+        previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        modal.hidden = false;
+        modal.querySelector('[data-sign-routes-close]').focus();
+        if (!state.version) load();
+    }
+    function closeDialog() {
+        if (state.busy || (state.dirty && !confirm('มีการตั้งค่า Auto send ที่ยังไม่ได้บันทึก ต้องการปิดและยกเลิกการเปลี่ยนแปลงหรือไม่?'))) return;
+        if (state.dirty) {
+            el('sign-route-rows').replaceChildren(); state.routes.forEach(addRow); emptyHint();
+            setDirty(false); message('');
+        }
+        modal.hidden = true;
+        document.body.style.overflow = previousOverflow;
+        returnFocus?.focus();
+    }
+    el('open-sign-routes').addEventListener('click', openDialog);
+    modal.querySelectorAll('[data-sign-routes-close]').forEach(node => node.addEventListener('click', closeDialog));
+    modal.addEventListener('click', event => { if (event.target === modal) closeDialog(); });
+    modal.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { event.preventDefault(); closeDialog(); }
+        if (event.key === 'Tab') {
+            const nodes = [...modal.querySelectorAll('button, select')].filter(node => !node.disabled && node.getClientRects().length);
+            const first = nodes[0], last = nodes[nodes.length - 1];
+            if (!first) { event.preventDefault(); modal.querySelector('[role=dialog]').focus(); return; }
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+    });
     function setDirty(dirty) {
         state.dirty = dirty;
         el('form_sign_routes').dispatchEvent(new Event(dirty ? 'eoffice:form-dirty' : 'eoffice:form-saved', {bubbles:true}));
@@ -17,6 +50,7 @@
     function controls(ready) {
         el('save-sign-routes').disabled = el('add-sign-route').disabled = !ready;
         el('reload-sign-routes').disabled = state.busy;
+        modal.querySelectorAll('[data-sign-routes-close]').forEach(node => { node.disabled = state.busy; });
         el('sign-route-rows').querySelectorAll('select, button').forEach(node => { node.disabled = !ready; });
     }
     function emptyHint() { el('sign-route-empty').hidden = !!el('sign-route-rows').children.length; }
@@ -50,7 +84,7 @@
         try {
             const data = await api('get_sign_routes_api.php');
             if (request !== state.request) return;
-            state.users = data.users; state.departments = data.departments; state.version = data.route_version;
+            state.users = data.users; state.departments = data.departments; state.version = data.route_version; state.routes = data.routes;
             el('sign-route-rows').replaceChildren(); data.routes.forEach(addRow); emptyHint();
             setDirty(false); controls(true); message('');
         } catch (error) { if (request === state.request) message(error.message, true); }
@@ -67,7 +101,7 @@
         state.busy = true; controls(false); message('กำลังบันทึก Auto send...');
         try {
             const data = await api('save_sign_routes_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({routes, route_version:state.version})});
-            state.version = data.route_version; setDirty(false); message(data.message);
+            state.version = data.route_version; state.routes = data.routes; setDirty(false); message(data.message);
             window.dispatchEvent(new Event('eoffice-sign-routes-changed'));
         } catch (error) { message(error.message, true); }
         finally { state.busy = false; controls(true); }
