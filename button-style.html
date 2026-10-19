@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ชุดปุ่มกลาง — E-Office</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f8fafc; color: #334155; font: 14px/1.7 'Prompt', sans-serif; }
+        main { max-width: 960px; margin: auto; padding: 32px 20px; }
+        h1 { font-size: 26px; color: #1e293b; }
+        h2 { font-size: 17px; }
+        section { padding: 24px; margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 12px; background: white; }
+        .examples { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+        code { color: #4338ca; }
+        p { color: #64748b; }
+        .spinner { width: 16px; height: 16px; border: 2px solid #ffffff60; border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+    </style>
+    <link rel="stylesheet" href="assets/ui-buttons.css?v=20261016-buttons-3">
+</head>
+<body>
+<main>
+    <a href="index.php">← กลับ E-Office</a>
+    <h1>ชุดปุ่มกลาง E-Office</h1>
+    <p>Indigo + เทา · มุมโค้ง 8px · ปุ่มมาตรฐาน 44px · ฟอนต์ 14px / 500</p>
+    <section>
+        <h2>รูปแบบตามหน้าที่</h2>
+        <div class="examples">
+            <button type="button" class="eo-btn eo-btn--primary">บันทึกข้อมูล</button>
+            <button type="button" class="eo-btn eo-btn--secondary">ยกเลิก</button>
+            <button type="button" class="eo-btn eo-btn--soft">แก้ไข</button>
+            <button type="button" class="eo-btn eo-btn--ghost">ล้างตัวกรอง</button>
+            <button type="button" class="eo-btn eo-btn--danger">ลบรายการ</button>
+            <button type="button" class="eo-btn eo-btn--danger-text">ลบ</button>
+        </div>
+        <p>ใช้ <code>eo-btn</code> ร่วมกับ <code>eo-btn--primary / secondary / soft / ghost / danger / danger-text</code></p>
+    </section>
+    <section>
+        <h2>ขนาดและไอคอน</h2>
+        <div class="examples">
+            <button type="button" class="eo-btn eo-btn--primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>เพิ่มรายการ</button>
+            <button type="button" class="eo-btn eo-btn--soft eo-btn--sm">แก้ไขในตาราง</button>
+            <button type="button" class="eo-btn eo-btn--secondary eo-btn--sm">ดาวน์โหลด</button>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="ปิดหน้าต่าง"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+        </div>
+        <p>ปุ่มเล็ก 36px บนเดสก์ท็อป และพื้นที่กดอย่างน้อย 44px บนมือถือ</p>
+    </section>
+    <section>
+        <h2>สถานะปุ่ม</h2>
+        <div class="examples">
+            <button type="button" class="eo-btn eo-btn--primary" disabled>บันทึกไม่ได้</button>
+            <button type="button" class="eo-btn eo-btn--secondary" disabled>ก่อนหน้า</button>
+            <button type="button" class="eo-btn eo-btn--primary" aria-busy="true" disabled><span class="spinner" aria-hidden="true"></span>กำลังบันทึก…</button>
+            <button type="button" class="eo-btn eo-btn--soft" aria-pressed="true">ตัวกรองที่เลือก</button>
+        </div>
+        <p>ใช้ Tab เพื่อตรวจวงแหวน focus และชี้ปุ่มเพื่อดู hover; ระบุ <code>disabled</code> ขณะส่งข้อมูลเพื่อป้องกันการกดซ้ำ</p>
+    </section>
+</main>
+</body>
+</html>

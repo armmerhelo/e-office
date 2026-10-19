@@ -124,6 +124,7 @@ $doc_id_int         = (int)$Doc_Id;
             flex-direction: column;
         }
     </style>
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
 <body class="h-screen flex flex-col">
 
@@ -153,7 +154,7 @@ $doc_id_int         = (int)$Doc_Id;
                     <i data-lucide="file-signature" class="w-6 h-6"></i>
                 </div> -->
 
-                <button class="btn-back" width="50px">
+                <button class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="กลับ">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -171,17 +172,17 @@ $doc_id_int         = (int)$Doc_Id;
 
             <!-- Drawing Tools -->
             <div class="flex items-center bg-gray-50 p-1.5 rounded-xl border border-gray-200 gap-1 shadow-inner overflow-x-auto max-w-full">
-                <button onclick="setTool('hand')" id="btn-hand" class="tool-btn active p-2 rounded-lg hover:bg-white border border-transparent transition flex-shrink-0" title="เลื่อนดู (Hand)">
+                <button onclick="setTool('hand')" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active flex-shrink-0" title="เลื่อนดู (Hand)" aria-label="เลื่อนดูเอกสาร">
                     <i data-lucide="hand" class="w-5 h-5"></i>
                 </button>
 
                 <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
 
-                <button onclick="setTool('pen')" id="btn-pen" class="tool-btn p-2 rounded-lg hover:bg-white border border-transparent transition flex-shrink-0" title="ปากกาสีดำ">
+                <button onclick="setTool('pen')" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn flex-shrink-0" title="ปากกาสีดำ" aria-label="ปากกาสีดำ">
                     <i data-lucide="pen-tool" class="w-5 h-5"></i>
                 </button>
 
-                <button onclick="setTool('eraser')" id="btn-eraser" class="tool-btn p-2 rounded-lg hover:bg-white border border-transparent transition flex-shrink-0" title="ยางลบ">
+                <button onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn flex-shrink-0" title="ยางลบ" aria-label="ยางลบ">
                     <i data-lucide="eraser" class="w-5 h-5"></i>
                 </button>
 
@@ -189,14 +190,14 @@ $doc_id_int         = (int)$Doc_Id;
                     <i data-lucide="stamp" class="w-5 h-5"></i>
                     <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                 </button> -->
-                <button onclick="openStampModal()" id="btn-stamp" class="tool-btn p-2 rounded-lg hover:bg-white border border-transparent transition group relative flex-shrink-0" title="ประทับตรา">
+                <button onclick="openStampModal()" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn group relative flex-shrink-0" title="ประทับตรา" aria-label="ประทับตรา">
     <i data-lucide="stamp" class="w-5 h-5"></i>
     <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
 </button>
 
                 <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
 
-                <button onclick="undoLastAction()" class="p-2 rounded-lg hover:bg-white text-gray-500 hover:text-red-500 transition flex-shrink-0" title="ย้อนกลับ">
+                <button onclick="undoLastAction()" class="eo-btn eo-btn--ghost eo-btn--icon flex-shrink-0" title="ย้อนกลับ" aria-label="ย้อนกลับ">
                     <i data-lucide="undo-2" class="w-5 h-5"></i>
                 </button>
                   <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
@@ -204,13 +205,13 @@ $doc_id_int         = (int)$Doc_Id;
                 <div class="flex items-center gap-3 w-full xl:w-auto justify-end">
 
                   <!-- Download Button -->
-                  <button onclick="downloadDocument()" class=" xl:flex-none bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition transform active:scale-95 font-semibold text-sm">
+                  <button onclick="downloadDocument()" class="eo-btn eo-btn--secondary xl:flex-none" aria-label="ดาวน์โหลดเอกสาร">
                       <i data-lucide="download" class="w-4 h-4"></i>
 
                   </button>
 
                     <!-- Save to Server Button -->
-                    <button onclick="saveToServer()" class=" xl:flex-none bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-sm transition transform active:scale-95 font-semibold text-sm">
+                    <button onclick="saveToServer()" class="eo-btn eo-btn--primary xl:flex-none">
                         <i data-lucide="cloud-upload" class="w-4 h-4"></i>
                         <span>บันทึก</span>
                     </button>
@@ -232,7 +233,7 @@ $doc_id_int         = (int)$Doc_Id;
         <div id="empty-state" class="text-center mt-20 hidden">
             <i data-lucide="file-warning" class="w-16 h-16 mx-auto text-gray-400 mb-4"></i>
             <p class="text-gray-500 text-lg">ไม่พบเอกสาร</p>
-            <button onclick="loadServerDocument()" class="mt-4 text-blue-600 underline">ลองใหม่อีกครั้ง</button>
+            <button onclick="loadServerDocument()" class="eo-btn eo-btn--secondary mt-4">ลองใหม่อีกครั้ง</button>
         </div>
 
 
@@ -285,8 +286,8 @@ $doc_id_int         = (int)$Doc_Id;
             </div>
 
             <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t flex-shrink-0">
-                <button onclick="closeStampModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition">ยกเลิก</button>
-                <button onclick="confirmStampData()" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium shadow-sm transition">ตกลง</button>
+                <button onclick="closeStampModal()" class="eo-btn eo-btn--secondary">ยกเลิก</button>
+                <button onclick="confirmStampData()" class="eo-btn eo-btn--primary">ตกลง</button>
             </div>
         </div>
     </div>

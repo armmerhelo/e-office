@@ -3,7 +3,7 @@ var pagination_html = `<nav class="flex items-center justify-center border-t bor
 
         <div class="p-4">
             <div class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                <a id="Pagination_PREV" data-page="" href="#" class="relative inline-flex items-center rounded-l-md px-3 py-2 text-sm font-medium text-gray-500 ring-1 ring-inset ring-gray-300 hover:bg-sky-50 transition">
+                <a id="Pagination_PREV" data-page="" href="#" class="eo-btn eo-btn--secondary eo-btn--sm">
                     <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L9.56 10l3.21 3.71a.75.75 0 11-1.04 1.08l-3.5-4a.75.75 0 010-1.08l3.5-4a.75.75 0 011.06-.02z" clip-rule="evenodd" />
                     </svg>
@@ -13,7 +13,7 @@ var pagination_html = `<nav class="flex items-center justify-center border-t bor
                 <div id= "Pagination">
 
                 </div>
-                <a  id="Pagination_NEXT" data-page="" href="#" class="relative inline-flex items-center rounded-r-md px-3 py-2 text-sm font-medium text-gray-500 ring-1 ring-inset ring-gray-300 hover:bg-sky-50 transition">
+                <a  id="Pagination_NEXT" data-page="" href="#" class="eo-btn eo-btn--secondary eo-btn--sm">
                     <span class="mr-1 ">NEXT</span>
                     <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                         <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L10.44 10 7.21 6.29a.75.75 0 111.04-1.08l3.5 4a.75.75 0 010 1.08l-3.5 4a.75.75 0 01-1.06.02z" clip-rule="evenodd" />
@@ -47,7 +47,7 @@ var doc_detail_html = `
               </span>
                 </div>
                 </td>
-                <td align="right"><button id="closeDocDetail" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></td>
+                <td align="right"><button id="closeDocDetail" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="ปิดรายละเอียด"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="m6 6 12 12M6 18 18 6"/></svg></button></td>
               </tr>
             </table>
           </div>
@@ -94,11 +94,11 @@ var add_new_doc_html = `<div id="document-modal" class="fixed inset-0 bg-gray-90
         <h3 id="doc-form-title" class="text-2xl font-bold text-indigo-700">เพิ่มเอกสารใหม่</h3>
 
         <div class="flex items-center gap-4">
-            <button id="delete_doc_btn" onclick="delete_doc();" type="button" class="text-red-500 hover:text-red-700 text-sm font-medium transition cursor-pointer">
+            <button id="delete_doc_btn" onclick="delete_doc();" type="button" class="eo-btn eo-btn--danger-text eo-btn--sm">
                 <u>ลบเอกสารนี้</u>
             </button>
 
-            <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 transition">
+            <button id="close-modal-btn" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="ปิดหน้าต่าง">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -220,7 +220,7 @@ var add_new_doc_html = `<div id="document-modal" class="fixed inset-0 bg-gray-90
                 </div>
 
                 <div align="center" class="p-1">
-                <button id="addNewLink_btn" type="button" onclick="addNewLink()" class="">
+                <button id="addNewLink_btn" type="button" onclick="addNewLink()" class="eo-btn eo-btn--secondary eo-btn--icon" aria-label="เพิ่มลิงก์แนบ">
                     <img src="img/add_user.png" class="w-8 h-8">
                 </button>
                 </div>
@@ -235,7 +235,7 @@ var add_new_doc_html = `<div id="document-modal" class="fixed inset-0 bg-gray-90
 
                     <div class="flex flex-col gap-1 p-1">
                       <div align="center">
-                      <button id="addNewInputFile_btn" type="button" onclick="addNewInputFile()" class="">
+                      <button id="addNewInputFile_btn" type="button" onclick="addNewInputFile()" class="eo-btn eo-btn--secondary eo-btn--icon" aria-label="เพิ่มไฟล์แนบ">
                           <img src="img/add_user.png" class="w-8 h-8">
                       </button>
                       </div>
@@ -294,7 +294,7 @@ var add_new_doc_html = `<div id="document-modal" class="fixed inset-0 bg-gray-90
             </div>
 
             <div class="pt-4 border-t flex justify-end">
-                <button  id="submit_add_doc" onclick=""  class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg transition duration-200">
+                <button  id="submit_add_doc" onclick=""  class="eo-btn eo-btn--primary">
                     บันทึกเอกสาร
                 </button>
                 <div style="display:none;" id="loading_save" class="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent "></div>
@@ -314,7 +314,7 @@ var login_html = `
 
       <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
         <h3 id="head_login" class=" flex-1 text-xl font-semibold text-gray-800 text-center">เข้าสู่ระบบ</h3>
-        <button id="closeIcon" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        <button id="closeIcon" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="ปิดหน้าต่าง"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
       </div>
       <div id="modal_body">
 
@@ -330,7 +330,7 @@ var login_html = `
   </div>
 <p id="login_status" class="text-red-500" role="alert" aria-live="polite"></p>
   <div class="px-6 py-2  flex justify-center gap-1 text-center">
-    <button type="submit" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md transition">เข้าสู่ระบบ</button>
+    <button type="submit" class="eo-btn eo-btn--primary">เข้าสู่ระบบ</button>
   </div>
 
 </form>
@@ -366,7 +366,7 @@ var login_html = `
       <input id="google_signup_consent" type="checkbox" required> ยอมรับข้อตกลงการสมัครสมาชิก
     </label>
     <p id="google_signup_status" class="text-red-500 pt-3" role="alert" aria-live="polite"></p>
-    <button id="google_signup_submit" type="submit" class="px-4 py-2 mt-3 bg-blue-600 text-white rounded-md">ยืนยันและเข้าสู่ระบบ</button>
+    <button id="google_signup_submit" type="submit" class="eo-btn eo-btn--primary mt-3">ยืนยันและเข้าสู่ระบบ</button>
     <a id="google_signup_change_account" href="api/auth_google.php" class="block pt-3">เปลี่ยนบัญชี Google</a>
   </form>
 </div>
@@ -406,7 +406,7 @@ var login_html = `
 
 
 <div class="px-6 py-4  flex justify-center gap-1 text-center">
-<button id="btn_submit_register" type="submit" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md transition">ยืนยัน</button>
+<button id="btn_submit_register" type="submit" class="eo-btn eo-btn--primary">ยืนยัน</button>
 </form>
 
 
@@ -418,7 +418,7 @@ var login_html = `
 
 
 <div class="pb-3  flex justify-center">
-  <button id="register_btn" type="button" onclick="register();" class=" flex-1 text-gray-700 hover:bg-gray-200   text-center">สมัครสมาชิก</button>
+  <button id="register_btn" type="button" onclick="register();" class="eo-btn eo-btn--secondary flex-1">สมัครสมาชิก</button>
 
 </div>
   </div>
@@ -455,7 +455,7 @@ var logout_html = `
 
       <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
         <h3 class=" flex-1 text-xl font-semibold text-gray-800 text-center">เข้าสู่ระบบ</h3>
-        <button id="closeIcon" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        <button id="closeIcon" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="ปิดหน้าต่าง"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
       </div>
       <div id="">
 
@@ -469,12 +469,12 @@ var logout_html = `
   </div>
 <p id="login_status" class="text-red-500"></p>
   <div class="px-6 py-2  flex justify-center gap-1 text-center">
-    <button type="submit" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md transition">เข้าสู่ระบบ</button>
+    <button type="submit" class="eo-btn eo-btn--primary">เข้าสู่ระบบ</button>
   </div>
 
 </form>
 <div class="py-2  ">
-  <button id="cancelBtn" class=" flex-1 text-gray-700 hover:bg-gray-200   text-center">ยกเลิก</button>
+  <button id="cancelBtn" class="eo-btn eo-btn--secondary flex-1">ยกเลิก</button>
   <br>
 </div>
   </div>
@@ -503,7 +503,7 @@ var report_modal = `<div id="exportModal" class="fixed inset-0 z-50 hidden items
 
     <button
       onclick="toggleExportModal()"
-      class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all focus:outline-none"
+      class="eo-btn eo-btn--ghost eo-btn--icon absolute top-4 right-4"
       aria-label="Close"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -537,7 +537,7 @@ var report_modal = `<div id="exportModal" class="fixed inset-0 z-50 hidden items
       </div>
 
       <div class="flex gap-3 ">
-        <button id="create_report_btn" type="button" onclick="get_data_api_report(); " class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition">
+        <button id="create_report_btn" type="button" onclick="get_data_api_report(); " class="eo-btn eo-btn--primary flex-1">
           สร้างเอกสาร
         </button>
       </div>
@@ -549,7 +549,7 @@ var report_modal = `<div id="exportModal" class="fixed inset-0 z-50 hidden items
     </div>
     <div class="flex justify-center" id="download_report_btn" style="display:none;" >
     <div class="flex gap-3 p-4 w-100">
-      <button type="button" onclick="openReportPage_path();" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition ">
+      <button type="button" onclick="openReportPage_path();" class="eo-btn eo-btn--secondary flex-1">
         พิมพ์เอกสาร
       </button>
     </div>

@@ -101,6 +101,38 @@ async function run() {
                 fs.writeFileSync(path.join(folder,`eoffice-spa-${view}.png`),Buffer.from(image.data,'base64'));
             }
         });
+    await check('shared button variants override email defaults in both dashboards',async()=>{
+        const variants=['primary','secondary','soft','ghost','danger','danger-text'];
+        const expected=['rgb(79, 70, 229)','rgb(255, 255, 255)','rgb(238, 242, 255)','rgba(0, 0, 0, 0)','rgb(220, 38, 38)','rgba(0, 0, 0, 0)'];
+        for(const view of ['send_email','ai_settings']) {
+            await moduleView(view);
+            const result=await evaluate(`(()=>{const s=${root},holder=document.createElement('div');holder.style.cssText='position:fixed;top:0;left:0;pointer-events:none';s.querySelector('.order-dashboard').append(holder);try{return ${JSON.stringify(variants)}.map(variant=>{const b=document.createElement('button');b.type='button';b.className='eo-btn eo-btn--'+variant;b.textContent=variant;holder.append(b);const style=getComputedStyle(b);return {background:style.backgroundColor,color:style.color};});}finally{holder.remove();}})()`);
+            assert.deepEqual(result.map(item=>item.background),expected,view+': explicit variants must beat legacy primary defaults');
+            assert.equal(result[4].color,'rgb(255, 255, 255)');
+            assert.equal(result[5].color,'rgb(185, 28, 28)');
+            assert.equal(await evaluate(`getComputedStyle(${root}.getElementById(${JSON.stringify(view==='send_email'?'search-button':'save')})).backgroundColor`),expected[0],'existing primary buttons must stay purple');
+        }
+    });
+    await check('shared icon dimensions and booking close typography override base styles',async()=>{
+        await moduleView('book');
+        const result=await evaluate(`(()=>{const s=${root},holder=document.createElement('div');holder.style.cssText='position:fixed;top:0;left:0;pointer-events:none';s.querySelector('.number-booking').append(holder);try{return ['eo-btn eo-btn--ghost eo-btn--icon','booking-close'].map(className=>{const b=document.createElement('button');b.type='button';b.className=className;b.textContent='×';holder.append(b);const style=getComputedStyle(b);return {width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height,padding:style.padding,font:style.fontSize};});}finally{holder.remove();}})()`);
+        for(const button of result){assert.equal(button.width,44);assert.equal(button.height,44);assert.equal(button.padding,'10px');}
+        assert.equal(result[1].font,'24px');
+    });
+    await check('calendar month controls stay on one line at narrow viewport and container widths',async()=>{
+        await moduleView('room_booking');
+        for(const width of [320,390,1440]) {
+            await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+            if(width===1440)await evaluate(`${root}.querySelector('.eoffice-module-content').style.width='320px'`);
+            try {
+                const layout=await evaluate(`(()=>{const s=${root},heading=s.querySelector('.calendar-heading'),group=s.querySelector('.calendar-heading__actions'),today=group.querySelectorAll('button')[1],h=heading.getBoundingClientRect(),g=group.getBoundingClientRect(),t=today.getBoundingClientRect();return {height:t.height,nowrap:getComputedStyle(group).whiteSpace,shrink:getComputedStyle(today).flexShrink,contained:g.left>=h.left&&g.right<=h.right,secondRow:g.top>=s.getElementById('current-month-display').getBoundingClientRect().bottom,pageFits:document.documentElement.scrollWidth<=innerWidth};})()`);
+                assert.equal(layout.height,44,'Today must remain a single-line 44px control');
+                assert.equal(layout.nowrap,'nowrap');assert.equal(layout.shrink,'0');
+                assert.equal(layout.contained,true);assert.equal(layout.secondRow,true);assert.equal(layout.pageFits,true);
+            } finally {await evaluate(`${root}.querySelector('.eoffice-module-content').style.removeProperty('width')`);}
+        }
+        await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+    });
     await check('booking management actions and request-form icons have local visible SVGs',async()=>{
         await moduleView('edit_room_booking');
         await until(root+".querySelectorAll('#tableBody button[title=\"แก้ไข\"]').length>0");

@@ -66,7 +66,7 @@
             const actions = row.querySelector('.actions');
             if (user.can_edit) actions.append(button('แก้ไข', () => editMember(user)));
             else { const note = document.createElement('span'); note.className = 'muted'; note.textContent = 'เฉพาะ Admin สูงสุด'; actions.append(note); }
-            if (state.canManage && user.User_Status !== 'Admin') actions.append(button('สิทธิ์', () => editPermissions(user), 'btn small primary'));
+            if (state.canManage && user.User_Status !== 'Admin') actions.append(button('สิทธิ์', () => editPermissions(user), 'btn small eo-btn--soft'));
             if (state.canManage) actions.append(button('ระดับ', () => editStatus(user)));
             tbody.append(row);
         });

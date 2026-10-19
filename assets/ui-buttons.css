@@ -1,0 +1,148 @@
+/* Shared action buttons. Load after page styles, including inside module shadows.
+   Legacy aliases keep dynamically generated actions on the same design system. */
+:root, :host {
+    --eo-primary: #4f46e5;
+    --eo-primary-hover: #4338ca;
+    --eo-soft: #eef2ff;
+    --eo-danger: #dc2626;
+    --eo-focus: #6366f1;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button) {
+    --eo-btn-bg: #fff;
+    --eo-btn-color: #475569;
+    --eo-btn-border: #cbd5e1;
+    --eo-btn-hover-bg: #f8fafc;
+    --eo-btn-hover-color: #334155;
+    --eo-btn-hover-border: #94a3b8;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    height: auto;
+    padding: 10px 16px;
+    border: 1px solid var(--eo-btn-border);
+    border-radius: 8px;
+    background: var(--eo-btn-bg);
+    color: var(--eo-btn-color);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-decoration: none;
+    box-shadow: none;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s, color .15s;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button):not([hidden]):not(.hidden) { display: inline-flex; }
+
+/* Legacy dashboard defaults must not override explicitly styled eo-btn actions.
+   :where keeps the fallback's exclusions from raising every primary's specificity. */
+:is(body, .eoffice-runtime-body) :is(.eo-btn--primary, .btn.primary, .booking-button--primary, .booking-primary, .submit-btn, .save-btn, .order-dashboard :where(button:not(.eo-btn):not(.button-secondary):not(.danger):not([data-state])), .my-orders .button-primary) {
+    --eo-btn-bg: var(--eo-primary);
+    --eo-btn-color: #fff;
+    --eo-btn-border: var(--eo-primary);
+    --eo-btn-hover-bg: var(--eo-primary-hover);
+    --eo-btn-hover-color: #fff;
+    --eo-btn-hover-border: var(--eo-primary-hover);
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn--soft, .manage-btn:not(.print-btn), .order-dashboard .quick-filters button[aria-pressed="true"], .my-orders .btn-page[aria-current="page"], .eo-btn[aria-pressed="true"], .eo-btn.active) {
+    --eo-btn-bg: var(--eo-soft);
+    --eo-btn-color: #4338ca;
+    --eo-btn-border: #c7d2fe;
+    --eo-btn-hover-bg: #e0e7ff;
+    --eo-btn-hover-color: #3730a3;
+    --eo-btn-hover-border: #a5b4fc;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn--ghost, .text-button, .booking-text-button, .booking-close, .my-orders .button-text) {
+    --eo-btn-bg: transparent;
+    --eo-btn-color: #4338ca;
+    --eo-btn-border: transparent;
+    --eo-btn-hover-bg: var(--eo-soft);
+    --eo-btn-hover-color: #3730a3;
+    --eo-btn-hover-border: transparent;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn--danger, .btn.danger, .order-dashboard button.danger) {
+    --eo-btn-bg: var(--eo-danger);
+    --eo-btn-color: #fff;
+    --eo-btn-border: var(--eo-danger);
+    --eo-btn-hover-bg: #b91c1c;
+    --eo-btn-hover-color: #fff;
+    --eo-btn-hover-border: #b91c1c;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn.eo-btn--danger-text, .booking-text-button.booking-delete) {
+    --eo-btn-bg: transparent;
+    --eo-btn-color: #b91c1c;
+    --eo-btn-border: transparent;
+    --eo-btn-hover-bg: #fef2f2;
+    --eo-btn-hover-color: #991b1b;
+    --eo-btn-hover-border: transparent;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button):hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    background: var(--eo-btn-hover-bg);
+    color: var(--eo-btn-hover-color);
+    border-color: var(--eo-btn-hover-border);
+    box-shadow: none;
+    transform: none;
+    text-decoration: none;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button):focus-visible {
+    outline: 3px solid var(--eo-focus);
+    outline-offset: 3px;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button):active:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) {
+    box-shadow: inset 0 1px 2px #0f172a24;
+    transform: none;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .booking-primary, .booking-secondary, .submit-btn, .reset-btn, .save-btn, .cancel-btn, .manage-btn, .back-btn, .text-button, .booking-text-button, .booking-close, .order-dashboard button, .my-orders button):is(:disabled, [aria-disabled="true"]) {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .submit-btn, .save-btn, .order-dashboard button, .my-orders button)[aria-busy="true"] { cursor: wait; }
+
+:is(body, .eoffice-runtime-body) :is(.eo-btn--sm, .btn.small, .manage-btn, .booking-text-button, .booking-pagination .booking-button, .my-orders .header-actions button, .my-orders .btn-page, .order-dashboard .quick-filters button, .order-dashboard .page-buttons button) { min-height: 36px; padding: 6px 10px; font-size: 13px; }
+/* Size overrides outrank the shared base, whose legacy aliases include type selectors. */
+:is(body, .eoffice-runtime-body) :is(.eo-btn.eo-btn--icon, .number-booking .booking-close) { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 10px; line-height: 1; flex-shrink: 0; }
+:is(body, .eoffice-runtime-body) .number-booking .booking-close { font-size: 24px; }
+:is(body, .eoffice-runtime-body) .eo-btn :is(svg, i) { flex-shrink: 0; }
+:is(body, .eoffice-runtime-body) .eo-btn svg { width: 18px; height: 18px; }
+:is(body, .eoffice-runtime-body) .eo-btn--icon img { width: 20px; height: 20px; object-fit: contain; }
+.number-booking { --booking-accent: var(--eo-primary-hover); }
+.number-booking .booking-row-actions { gap: 8px; }
+:is(body, .eoffice-runtime-body) .booking-text-button { padding-inline: 4px; white-space: nowrap; }
+.swal2-actions { gap: 12px; }
+/* Document filters retain their existing opacity classes as selection markers. */
+:is(body, .eoffice-runtime-body) .eo-doc-filter { opacity: 1; }
+:is(body, .eoffice-runtime-body) .eo-doc-filter.opacity-100 {
+    --eo-btn-bg: var(--eo-soft);
+    --eo-btn-color: #4338ca;
+    --eo-btn-border: #c7d2fe;
+    --eo-btn-hover-bg: #e0e7ff;
+    --eo-btn-hover-color: #3730a3;
+    --eo-btn-hover-border: #a5b4fc;
+}
+
+@media (max-width: 639px) {
+    :is(body, .eoffice-runtime-body) :is(.eo-btn--sm, .btn.small, .manage-btn, .booking-text-button, .booking-pagination .booking-button, .my-orders .header-actions button, .my-orders .btn-page, .order-dashboard .quick-filters button, .order-dashboard .page-buttons button) { min-height: 44px; }
+}
+@container eoffice-content (max-width: 639px) {
+    :is(body, .eoffice-runtime-body) :is(.eo-btn--sm, .btn.small, .manage-btn, .booking-text-button, .booking-pagination .booking-button, .my-orders .header-actions button, .my-orders .btn-page, .order-dashboard .quick-filters button, .order-dashboard .page-buttons button) { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    :is(body, .eoffice-runtime-body) :is(.eo-btn, .btn, .booking-button, .order-dashboard button, .my-orders button) { transition: none; }
+}
+@media print {
+    .eo-btn.no-print { display: none !important; }
+}

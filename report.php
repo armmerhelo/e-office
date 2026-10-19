@@ -29,10 +29,11 @@ $items = $data['reportData'] ?? [];
         tr { page-break-inside: avoid; }
         body { font-family: 'Sarabun', sans-serif; }
     </style>
+    <link rel="stylesheet" href="assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
 <body class="bg-slate-600 p-10 flex flex-col items-center">
 
-    <button onclick="window.print()" class="no-print fixed bottom-8 right-8 bg-blue-600 hover:bg-blue-900 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center z-50">
+    <button onclick="window.print()" aria-label="พิมพ์รายงาน" class="eo-btn eo-btn--primary eo-btn--icon no-print fixed bottom-8 right-8 z-50">
         <i class="fas fa-print text-2xl"></i>
     </button>
 

@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
 <body class="eoffice-module-page">
     <div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/maintenance_requests/admin.html">
@@ -103,11 +104,11 @@
         <section class="controls-card">
             <div class="section-toolbar"><div><h2>ค้นหาและติดตามงาน</h2><p>เลือกสถานะเพื่อดูงานที่ต้องการจัดการ</p></div><button type="button" class="text-button" id="resetFiltersBtn">ล้างตัวกรอง</button></div>
             <div class="quick-filters" role="group" aria-label="กรองสถานะงานด่วน">
-                <button type="button" data-queue="all" aria-pressed="true">ทั้งหมด</button>
-                <button type="button" data-queue="pending" aria-pressed="false">รอพิจารณา</button>
-                <button type="button" data-queue="active" aria-pressed="false">กำลังซ่อม</button>
-                <button type="button" data-queue="success" aria-pressed="false">ซ่อมเสร็จ</button>
-                <button type="button" data-queue="failed" aria-pressed="false">ดำเนินการไม่ได้</button>
+                <button type="button" class="eo-btn eo-btn--sm" data-queue="all" aria-pressed="true">ทั้งหมด</button>
+                <button type="button" class="eo-btn eo-btn--sm" data-queue="pending" aria-pressed="false">รอพิจารณา</button>
+                <button type="button" class="eo-btn eo-btn--sm" data-queue="active" aria-pressed="false">กำลังซ่อม</button>
+                <button type="button" class="eo-btn eo-btn--sm" data-queue="success" aria-pressed="false">ซ่อมเสร็จ</button>
+                <button type="button" class="eo-btn eo-btn--sm" data-queue="failed" aria-pressed="false">ดำเนินการไม่ได้</button>
             </div>
             <div class="controls-grid">
                 <div class="control-group search">
@@ -193,7 +194,7 @@
         <div class="modal-container" role="dialog" aria-modal="true" aria-labelledby="manageModalTitle" tabindex="-1">
             <div class="modal-header">
                 <h2 id="manageModalTitle">จัดการสถานะใบแจ้งซ่อม #<span id="modalRequestId">0</span></h2>
-                <button type="button" class="close-btn" id="closeModalBtn" aria-label="ปิดหน้าต่างจัดการ">
+                <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon close-btn" id="closeModalBtn" aria-label="ปิดหน้าต่างจัดการ">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
@@ -284,7 +285,7 @@
                                 <div class="materials-list-container" id="modalMaterialsList">
                                     <!-- Dynamic rows inserted here -->
                                 </div>
-                                <button type="button" class="add-material-btn" id="addMaterialBtn">
+                                <button type="button" class="eo-btn eo-btn--secondary eo-btn--sm add-material-btn" id="addMaterialBtn">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                                     เพิ่มวัสดุอุปกรณ์
                                 </button>

@@ -1129,10 +1129,10 @@ function pagination_create(Pagination, type, Page_number) {
 
                 // ใช้ data-page แทน onclick
                 const activeClass = (i == Page_number)
-                    ? "bg-sky-100 text-sky-700 border-t-2 border-sky-400 z-10"
-                    : "text-gray-700 hover:bg-sky-50 hover:text-sky-700";
+                    ? "eo-btn--soft"
+                    : "eo-btn--secondary";
 
-                Pagination_html += `<a href="#" data-page="${i}" data-send="${type}" class="relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 transition ${activeClass}">${i}</a>`;
+                Pagination_html += `<a href="#" data-page="${i}" data-send="${type}" ${i == Page_number ? 'aria-current="page"' : ''} class="eo-btn eo-btn--sm ${activeClass}">${i}</a>`;
             }
         }
 
@@ -1140,7 +1140,7 @@ function pagination_create(Pagination, type, Page_number) {
           console.log('Pagi   .... ');
             Pagination_html += `
                     <span class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300">...</span>
-                    <a href="#" data-page="${Pagination}" data-send="${type}" class="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-sky-50 hover:text-sky-700 transition">${Pagination}</a>`;
+                    <a href="#" data-page="${Pagination}" data-send="${type}" class="eo-btn eo-btn--secondary eo-btn--sm">${Pagination}</a>`;
         }
 
         pagination_element.innerHTML = Pagination_html;
@@ -1380,7 +1380,7 @@ function renderResults(data, container) {
         <div class="flex justify-between items-center border-b p-4 border-gray-400 hover:bg-gray-50">
             <p class="font-medium text-gray-800">${item.message}</p>
             <button onclick="add_user_send('${item.Department_Id}','${item.Department_Name}')"
-                    class="focus:outline-none transition-transform active:scale-90">
+                    class="eo-btn eo-btn--secondary eo-btn--icon" aria-label="เพิ่มกลุ่มงานผู้รับ">
                 <img style="width:25px;height:auto;" src="img/add_user.png" alt="add">
             </button>
         </div>

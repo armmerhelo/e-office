@@ -266,7 +266,7 @@
                 setTimeout(() => { button.title = 'คัดลอกเลขคำสั่ง ' + text; }, 2000);
             }
         } catch {
-            Swal.fire({icon: 'info', title: 'คัดลอกเลขคำสั่ง', text: 'คัดลอกเลข ' + text + ' ด้วยตนเองได้เลย', confirmButtonText: 'ปิด'});
+            Swal.fire({icon: 'info', title: 'คัดลอกเลขคำสั่ง', text: 'คัดลอกเลข ' + text + ' ด้วยตนเองได้เลย', confirmButtonText: 'ปิด', buttonsStyling: false, customClass: {confirmButton: 'eo-btn eo-btn--primary'}});
         }
     }
 
@@ -412,7 +412,8 @@
                 title: 'ลบการจอง ' + item.External_Number + '?',
                 text: 'รายการนี้จะถูกลบจากทะเบียน และไม่สามารถกู้คืนได้',
                 icon: 'warning', showCancelButton: true,
-                confirmButtonText: 'ลบการจอง', cancelButtonText: 'ยกเลิก', confirmButtonColor: '#b13e46'
+                confirmButtonText: 'ลบการจอง', cancelButtonText: 'ยกเลิก', buttonsStyling: false,
+                customClass: {confirmButton: 'eo-btn eo-btn--danger', cancelButton: 'eo-btn eo-btn--secondary'}
             });
             if (!result.isConfirmed) return;
             await api({method: 'DELETE', body: JSON.stringify({id: item.id})});
@@ -423,7 +424,7 @@
             await fetchBookings();
         } catch (error) {
             handleUnauthorized(error);
-            Swal.fire({icon: 'error', title: 'ลบการจองไม่สำเร็จ', text: error.message, confirmButtonText: 'ปิด'});
+            Swal.fire({icon: 'error', title: 'ลบการจองไม่สำเร็จ', text: error.message, confirmButtonText: 'ปิด', buttonsStyling: false, customClass: {confirmButton: 'eo-btn eo-btn--primary'}});
         } finally {
             deleting.delete(item.id);
             button.disabled = false;

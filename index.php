@@ -167,6 +167,7 @@ window.addEventListener('load', function() {
 
   <link rel="stylesheet" href="assets/style_main.css?v=<?php echo filemtime(__DIR__.'/assets/style_main.css'); ?>">
   <link rel="stylesheet" href="assets/sidebar.css?v=<?php echo filemtime(__DIR__.'/assets/sidebar.css'); ?>">
+  <link rel="stylesheet" href="assets/ui-buttons.css?v=<?php echo filemtime(__DIR__.'/assets/ui-buttons.css'); ?>">
 
 
   <style>
@@ -430,16 +431,16 @@ window.addEventListener('load', function() {
             <div id="doc_type_div" class="gap-2 flex" style="display:none;">
 
             <button id="internal_btn" onclick="setActiveButton('Internal');"
-                class="md:w-auto px-3 py-2 bg-blue-600 text-white font-medium rounded-lg transition duration-150 opacity-40">
+                class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 หนังสือ
             </button>
 
             <button id="external_btn" onclick="setActiveButton('External');"
-                class="md:w-auto  px-3 py-2 bg-blue-500 text-white font-medium rounded-lg transition duration-150 opacity-40">
+                class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 คำสั่ง
             </button>
             <button id="stamp_btn" onclick="setActiveButton('Stamp');"
-                class="md:w-auto  px-3 py-2 bg-blue-500 text-white font-medium rounded-lg transition duration-150 opacity-40">
+                class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 ประทับตรา
             </button>
           </div>
@@ -476,15 +477,15 @@ window.addEventListener('load', function() {
                  ?>
                 </select>
 
-                <button id="btn_search" onclick="search_find();" class=" md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition duration-150 ease-in-out">
+                <button id="btn_search" onclick="search_find();" class="eo-btn eo-btn--primary md:w-auto">
                   ค้นหา
                 </button>
-                <button style="display:none" id="add-doc-btn" onclick="open_create_doc();LinkIndex = 0;fileIndex = 0;" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg shadow-md transition duration-200 flex items-center">
+                <button style="display:none" id="add-doc-btn" onclick="open_create_doc();LinkIndex = 0;fileIndex = 0;" class="eo-btn eo-btn--primary">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
                   </svg>
                 </button>
-                <button id="btn_report" onclick="toggleExportModal()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-medium transition shadow-md">
+                <button id="btn_report" onclick="toggleExportModal()" class="eo-btn eo-btn--secondary">
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>

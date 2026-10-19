@@ -51,9 +51,19 @@
             scrollbar-width: thin;
             max-height: calc(100% - 28px);
         }
+        .calendar-heading { flex-wrap: wrap; gap: 12px; }
+        .calendar-heading__actions { flex-shrink: 0; white-space: nowrap; }
+        .calendar-heading__actions > button { flex-shrink: 0; }
+        @media (max-width: 479px) {
+            .calendar-heading__actions { width: 100%; justify-content: flex-end; }
+        }
+        @container eoffice-content (max-width: 479px) {
+            .calendar-heading__actions { width: 100%; justify-content: flex-end; }
+        }
     </style>
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
 
 <body class="bg-gray-50 text-gray-800 flex flex-col md:flex-row h-auto min-h-screen md:h-screen overflow-y-auto md:overflow-hidden eoffice-module-page">
@@ -62,20 +72,20 @@
 
     <main class="flex-1 flex flex-col bg-gray-50 p-3 md:p-6 min-w-0 order-1 md:order-2 border-b md:border-b-0 border-gray-200 min-h-[450px] md:h-full">
 
-        <header class="flex justify-between items-center mb-3 md:mb-6 bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex-shrink-0">
+        <header class="calendar-heading flex justify-between items-center mb-3 md:mb-6 bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex-shrink-0">
             <div>
                 <h2 class="text-lg md:text-2xl font-bold text-gray-800" id="current-month-display">กุมภาพันธ์ 2569</h2>
             </div>
-            <div class="flex items-center space-x-1.5 md:space-x-3">
-                <button onclick="changeMonth(-1)" class="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition">
+            <div class="calendar-heading__actions flex items-center space-x-1.5 md:space-x-3">
+                <button onclick="changeMonth(-1)" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="เดือนก่อนหน้า">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </button>
-                <button onclick="goToToday()" class="px-3 py-1.5 text-xs md:text-sm font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition border border-indigo-100">
+                <button onclick="goToToday()" class="eo-btn eo-btn--soft eo-btn--sm">
                     วันนี้
                 </button>
-                <button onclick="changeMonth(1)" class="p-1.5 rounded-full hover:bg-gray-100 text-gray-600 transition">
+                <button onclick="changeMonth(1)" class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="เดือนถัดไป">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
@@ -129,7 +139,7 @@
             </ul>
         </div>
 
-        <a href="new_room.html" class="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 md:py-4 rounded-xl font-semibold transition duration-200 shadow-md flex items-center justify-center gap-2 flex-shrink-0 text-sm md:text-base">
+        <a href="new_room.html" class="eo-btn eo-btn--primary mt-2 w-full flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 md:h-5 md:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
