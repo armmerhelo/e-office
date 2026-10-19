@@ -364,6 +364,13 @@ window.addEventListener('load', function() {
           </a>
         </li>
         <li class="eoffice-app-navigation__group">ผู้ใช้งาน</li>
+        <li id="group_menu_updates" style="display:none">
+          <a href="updates/index.html" id="menu-updates" onclick="showView('updates','','1'); return false;" class="menu-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1M12 8l1.2 2.8L16 12l-2.8 1.2L12 16l-1.2-2.8L8 12l2.8-1.2L12 8z"></path></svg>
+            <span>อัปเดตระบบ</span>
+            <span id="system-updates-badge" class="system-updates-badge" hidden>ใหม่</span>
+          </a>
+        </li>
         <li id="group_menu_logout" >
           <a href="#" id="menu-logout" onclick="logOut(); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150 " style="display:none">
             <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -574,6 +581,7 @@ window.addEventListener('load', function() {
   <script src="assets/document-file-state.js?v=<?php echo filemtime(__DIR__.'/assets/document-file-state.js'); ?>"></script>
   <script src="assets/module-router.js?v=<?php echo filemtime(__DIR__.'/assets/module-router.js'); ?>"></script>
   <script src="assets/main.js?v=<?php echo filemtime(__DIR__.'/assets/main.js'); ?>"></script>
+  <script src="assets/system-updates.js?v=<?php echo filemtime(__DIR__.'/assets/system-updates.js'); ?>"></script>
   <script src="assets/modal.js?v=<?php echo filemtime(__DIR__.'/assets/modal.js'); ?>"></script>
   <!-- <script src="room_booking/main-room.js?v=<?php echo time(); ?>"></script> -->
   <doc-detail></doc-detail>

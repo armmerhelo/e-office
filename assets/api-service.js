@@ -59,7 +59,8 @@ async function logOut() {
                 return;
             }
             // 2. ล้างค่าในหน่วยความจำของ Browser ทั้งหมด (LocalStorage และ SessionStorage)
-            localStorage.clear(); // ล้างข้อมูลทั้งหมดใน LocalStorage (รวมถึง User_Token และข้อมูลอื่นๆ)
+            if (window.eofficeSystemUpdates) window.eofficeSystemUpdates.clearSessionStorage();
+            else localStorage.clear(); // Clear session data while retaining release-read markers when available.
             sessionStorage.clear(); // ล้าง SessionStorage
 
             // 3. สั่งลบ Cookie ฝั่ง JavaScript ย้ำอีกรอบเพื่อความชัวร์ 100%

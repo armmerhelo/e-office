@@ -66,6 +66,7 @@
 :is(#sidebar, .eoffice-app-navigation) .eoffice-app-navigation__footer { position: static; width: auto; margin: 0; padding: 24px 8px 8px; color: #a5b4fc; white-space: pre-line; text-align: center; font: 400 11px/1.5 'Prompt', sans-serif; }
 #sidebar .eoffice-app-navigation__footer { white-space: normal; }
 #sidebar .eoffice-app-navigation__footer p { margin: 0; padding: 0; font: inherit; }
+#sidebar .system-updates-badge { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 11px; font-weight: 600; }
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar { width: 6px; height: 6px; }
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar-track { background: transparent; }
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }

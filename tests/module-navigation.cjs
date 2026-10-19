@@ -60,7 +60,8 @@ const routes = {
     room_booking: ['menu-bookingroom', 'room_booking/index.html'],
     edit_room_booking: ['menu-edit-room-booking', 'room_booking/edit_room_booking.html'],
     maintenance: ['menu-maintenance', 'maintenance_requests/index.html'],
-    maintenance_admin: ['menu-maintenance-admin', 'maintenance_requests/admin.html']
+    maintenance_admin: ['menu-maintenance-admin', 'maintenance_requests/admin.html'],
+    updates: ['menu-updates', 'updates/index.html']
 };
 
 const main = fs.readFileSync('assets/main.js', 'utf8');

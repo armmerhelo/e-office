@@ -83,7 +83,8 @@ const MODULE_ROUTES = Object.freeze({
     my_public: 'email_send/my_dashboard.html',
     maintenance: 'maintenance_requests/index.html',
     maintenance_admin: 'maintenance_requests/admin.html',
-    ai_settings: 'email_send/ai_settings.html'
+    ai_settings: 'email_send/ai_settings.html',
+    updates: 'updates/index.html'
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];

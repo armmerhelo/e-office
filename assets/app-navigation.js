@@ -11,7 +11,7 @@
         'email_send/doc_send_email.html':'send_email','email_send/ai_settings.html':'ai_settings',
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
         'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
-        'maintenance_requests/admin.html':'maintenance_admin'
+        'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates'
     };
     const entry=Object.keys(entryViews).find(path=>new URL(path,appRoot).pathname===location.pathname);
     if(entry && typeof location.replace==='function') {
@@ -270,7 +270,9 @@
             if (!approveLeaving(true)) {
                 return;
             }
-            localStorage.clear();sessionStorage.clear();location.assign(brand.href);
+            if (window.eofficeSystemUpdates) window.eofficeSystemUpdates.clearSessionStorage();
+            else localStorage.clear();
+            sessionStorage.clear();location.assign(brand.href);
         } catch(error){approvedNavigation=false;window.dispatchEvent(new Event('eoffice:leaving-cancelled'));window.alert(error.message || 'ไม่สามารถออกจากระบบได้');}
         finally {logout.disabled=false;}
     });
