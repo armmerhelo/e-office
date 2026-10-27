@@ -602,6 +602,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const condText = req.consideration_status === 'pending' ? 'รอดำเนินการ' : (req.consideration_status === 'can_proceed' ? 'อนุมัติแล้ว' : 'ไม่อนุมัติ');
         const resText = req.action_result === 'pending' ? 'รอตรวจ/กำลังซ่อม' : (req.action_result === 'fixed' ? 'ซ่อมสำเร็จ' : 'ซ่อมไม่ได้');
+        const images = Array.isArray(source.images) ? source.images.filter(url => typeof url === 'string' && url.trim()) : [];
 
         let html = `
         <!DOCTYPE html>
@@ -611,27 +612,47 @@ document.addEventListener('DOMContentLoaded', () => {
             <title>ใบแจ้งซ่อม #${req.id}</title>
             <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
             <style>
-                body { font-family: 'Sarabun', sans-serif; padding: 20px; line-height: 1.5; color: #000; }
-                h2 { text-align: center; font-weight: 600; margin-bottom: 30px; }
-                .section { margin-bottom: 20px; border: 1px solid #ccc; padding: 15px; border-radius: 8px; }
-                .section-title { font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; font-size: 1.1em; }
-                .row { display: flex; margin-bottom: 8px; }
-                .label { width: 160px; font-weight: bold; }
-                .value { flex: 1; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                th { background-color: #f9fafb; }
-                .print-btn-container { text-align: center; margin-top: 30px; }
-                .print-btn-container button { padding: 10px 24px; font-size: 16px; cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 4px; font-family: 'Sarabun'; }
+                * { box-sizing: border-box; }
+                body { font-family: 'Sarabun', sans-serif; margin: 0; background: #edf1f5; color: #172b3a; line-height: 1.5; }
+                .report { max-width: 210mm; margin: 24px auto; padding: 18mm; background: white; box-shadow: 0 4px 20px #182b3a1a; }
+                .report-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; border-bottom: 2px solid #234f65; padding-bottom: 16px; margin-bottom: 24px; }
+                .eyebrow { color: #557485; font-size: 12px; font-weight: 600; letter-spacing: .04em; }
+                h2 { font-size: 24px; margin: 3px 0 0; }
+                .report-number { text-align: right; color: #557485; font-size: 13px; white-space: nowrap; }
+                .report-number strong { display: block; color: #234f65; font-size: 20px; }
+                .section { margin-bottom: 22px; }
+                .section-title { font-weight: 600; margin-bottom: 10px; border-bottom: 1px solid #d9e2e7; padding-bottom: 7px; font-size: 16px; color: #234f65; }
+                .row { display: flex; gap: 12px; margin-bottom: 5px; font-size: 14px; }
+                .label { flex: 0 0 145px; color: #526675; font-weight: 600; }
+                .value { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+                table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+                th, td { border: 1px solid #d9e2e7; padding: 7px 10px; text-align: left; }
+                th { background: #f1f5f7; }
+                .image-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+                .image-card { margin: 0; border: 1px solid #d9e2e7; padding: 6px; break-inside: avoid; page-break-inside: avoid; }
+                .image-card img { display: block; width: 100%; height: 55mm; object-fit: contain; }
+                .image-card figcaption { color: #526675; font-size: 12px; padding-top: 4px; }
+                .image-error { display: none; min-height: 25mm; padding: 10px; color: #884c42; font-size: 13px; }
+                .image-card.failed img { display: none; }
+                .image-card.failed .image-error { display: block; }
+                .print-btn-container { text-align: center; padding: 0 0 24px; }
+                .print-btn-container button { padding: 10px 24px; font-size: 16px; cursor: pointer; background: #234f65; color: white; border: none; border-radius: 6px; font-family: inherit; }
+                @page { size: A4; margin: 15mm; }
                 @media print {
-                    body { padding: 0; }
-                    .section { border: none; padding: 0; border-radius: 0; margin-bottom: 30px; }
+                    body { background: white; color: #000; }
+                    .report { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+                    .section-title { break-after: avoid; page-break-after: avoid; }
+                    tr { break-inside: avoid; page-break-inside: avoid; }
                     .print-btn-container { display: none; }
                 }
             </style>
         </head>
         <body>
-            <h2>รายงานใบแจ้งซ่อม #${req.id}</h2>
+            <main class="report">
+            <header class="report-header">
+                <div><div class="eyebrow">ระบบแจ้งซ่อม</div><h2>รายงานใบแจ้งซ่อม</h2></div>
+                <div class="report-number">เลขที่ใบแจ้งซ่อม<strong>#${req.id}</strong></div>
+            </header>
             
             <div class="section">
                 <div class="section-title">ข้อมูลผู้แจ้ง</div>
@@ -677,14 +698,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         html += `
             </div>
+            ${images.length ? `
+            <div class="section">
+                <div class="section-title">ภาพประกอบการแจ้งซ่อม</div>
+                <div class="image-grid">
+                    ${images.map((url, index) => `<figure class="image-card"><img src="${escapeHTML(driveUrlToThumbnail(url, 1200))}" alt="ภาพประกอบการแจ้งซ่อม ${index + 1}" onload="this.parentElement.classList.remove('failed')" onerror="this.parentElement.classList.add('failed')"><div class="image-error">ไม่สามารถโหลดภาพได้</div><figcaption>ภาพที่ ${index + 1}</figcaption></figure>`).join('')}
+                </div>
+            </div>` : ''}
+            </main>
             <div class="print-btn-container">
                 <button onclick="window.print()">พิมพ์เอกสารรายงาน</button>
             </div>
             <script>
-                // Auto print dialog after page fully loaded
-                window.onload = function() {
-                    setTimeout(function() { window.print(); }, 500);
-                }
+                // Wait for images and fonts, but don't block printing indefinitely on a slow connection.
+                const imagesReady = Array.from(document.images, img => img.complete ? Promise.resolve() : new Promise(resolve => {
+                    img.addEventListener('load', resolve, { once: true });
+                    img.addEventListener('error', resolve, { once: true });
+                }));
+                const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
+                Promise.race([Promise.all([...imagesReady, fontsReady]), new Promise(resolve => setTimeout(resolve, 12000))])
+                    .then(() => {
+                        Array.from(document.images).filter(img => !img.complete).forEach(img => img.parentElement.classList.add('failed'));
+                        window.print();
+                    });
             </script>
         </body>
         </html>
@@ -847,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // แปลง Google Drive URL ให้เป็น URL ที่สามารถใช้แสดงรูปภาพใน <img> ได้
     // URL แบบ /file/d/FILE_ID/view ไม่สามารถใช้ <img src> ได้ ต้องแปลงเป็น thumbnail URL
-    function driveUrlToThumbnail(url) {
+    function driveUrlToThumbnail(url, width = 400) {
         if (!url) return '';
 
         // ดึง File ID จาก URL แบบต่างๆ ของ Google Drive
@@ -869,7 +905,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (fileId) {
             // ใช้ thumbnail endpoint ของ Google Drive ที่แสดงภาพจริงได้
-            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`;
         }
 
         // ถ้าไม่ใช่ Google Drive URL ให้ใช้ URL เดิม

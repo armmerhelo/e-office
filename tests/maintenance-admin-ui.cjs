@@ -36,7 +36,8 @@ async function setup(recordCount=2) {
     for(const type of ['input','change','eoffice:form-dirty'])form.addEventListener(type,()=>{dirty=true;});
     form.addEventListener('eoffice:form-saved',()=>{dirty=false;});
     const records=Array.from({length:recordCount},(_,i)=>({id:i+1,requester_name:'QA',request_date:'2026-10-13',repair_types:'ไฟฟ้า',consideration_status:'can_proceed',action_result:'pending',materials:[{name:'Saved material',qty:'1'}]}));
-    const requests=[],window={};
+    let printHtml='';
+    const requests=[],window={open:()=>({document:{write:html=>{printHtml=html;},close(){}}})};
     vm.runInNewContext(fs.readFileSync('maintenance_requests/admin.js','utf8'),{document,window,Event,Date,console,
         escapeHTML:value=>String(value??''),escapeRecord:value=>value,Chart:class{destroy(){}},setTimeout(){},requestAnimationFrame:fn=>fn(),
         fetch:(url,options)=>options?new Promise(resolve=>requests.push({resolve,payload:JSON.parse(options.body)})):Promise.resolve({ok:true,json:async()=>({status:'success',data:records})})});
@@ -45,7 +46,7 @@ async function setup(recordCount=2) {
     const submit=()=>form.dispatchEvent(new Event('submit',{cancelable:true}));
     const finish=async(ok=true,status='success')=>{requests.shift().resolve({ok,json:async()=>({status,message:'saved'})});await tick();};
     const edit=value=>{el('assignedTo').value=value;form.dispatchEvent(new Event('input'));};
-    return {el,form,requests,open,submit,finish,edit,dirty:()=>dirty};
+    return {el,form,requests,open,submit,finish,edit,records,print:id=>{window.printRequest(id);return printHtml;},dirty:()=>dirty};
 }
 
 async function run() {
@@ -64,6 +65,13 @@ async function run() {
     list.el('sortOrder').value='oldest';list.el('sortOrder').dispatchEvent(new Event('change'));
     assert.ok(list.el('requestsTableBody').html.indexOf('data-id="1"')<list.el('requestsTableBody').html.indexOf('data-id="2"'),'oldest order works');
     const page=await setup();page.open(1);assert.equal(page.dirty(),false,'snapshot initialization stays clean');
+    assert.ok(!page.print(1).includes('ภาพประกอบการแจ้งซ่อม'),'requests without images have no image section');
+    page.records[0].images=['https://drive.google.com/file/d/abc123/view','https://drive.google.com/open?id=def456'];
+    const report=page.print(1);
+    assert.ok(report.includes('https://drive.google.com/thumbnail?id=abc123&sz=w1200'));
+    assert.ok(report.includes('https://drive.google.com/thumbnail?id=def456&sz=w1200'));
+    assert.ok(report.includes('ภาพที่ 2') && report.includes('ไม่สามารถโหลดภาพได้'));
+    assert.ok(report.includes('Promise.all([...imagesReady, fontsReady])'),'printing waits for images and fonts');
     page.el('modalMaterialsList').children[0].querySelector('.remove-row-btn').dispatchEvent(new Event('click'));
     assert.equal(page.dirty(),true,'removing an existing material must notify the navigation guard');
     page.open(1);assert.equal(page.dirty(),false,'opening a fresh snapshot clears previous dirty state');
