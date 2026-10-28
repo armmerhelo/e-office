@@ -12,6 +12,20 @@ function app_order_job(int $docId): ?array {
     $q=app_pdo()->prepare('SELECT * FROM eoffice_order_jobs WHERE doc_id=?');$q->execute([$docId]);return $q->fetch()?:null;
 }
 
+// Both HTTP enqueue routes call this under the same advisory/document locks
+// after rechecking the actor. Keep historical consent and idempotency identical.
+function app_order_enqueue_manual(int $docId,int $actor,bool $confirmed=false): void {
+    $pdo=app_pdo();if(!$pdo->inTransaction())throw new LogicException('Manual enqueue requires a document transaction');
+    $job=app_order_job($docId);
+    if($job){
+        if(in_array($job['status'],['waiting_files','analyzing','sending','queued'],true))return;
+        throw new DomainException('มีงานอยู่แล้ว กรุณาดูรายละเอียดและเลือกจัดการรายการ');
+    }
+    $q=$pdo->prepare('SELECT 1 FROM email_logs WHERE doc_id=? LIMIT 1');$q->execute([(string)$docId]);
+    if($q->fetchColumn()&&!$confirmed)throw new DomainException('คำสั่งนี้มีประวัติส่งอีเมลแล้ว กรุณาดูประวัติและยืนยันก่อนนำเข้าคิว');
+    $pdo->prepare("INSERT INTO eoffice_order_jobs (doc_id,source,status,created_by) VALUES (?,'manual','queued',?)")->execute([$docId,$actor]);
+}
+
 function app_order_update(int $jobId,string $status,?string $error=null): void {
     app_pdo()->prepare('UPDATE eoffice_order_jobs SET status=?,error_code=?,updated_at=NOW() WHERE id=?')->execute([$status,$error,$jobId]);
 }
@@ -125,7 +139,9 @@ function app_order_add_recipient(array $job,array $user,string $source='ai'): vo
         if($source==='manual'||($source==='document'&&$existing['source']==='ai'))$pdo->prepare('UPDATE eoffice_order_recipients SET source=? WHERE id=?')->execute([$source,$existing['id']]);
         return;
     }
-    $q=$pdo->prepare('SELECT delivery_status FROM email_logs WHERE doc_id=? AND LOWER(recipient_email)=?');$q->execute([(string)$job['doc_id'],$email]);$history=$q->fetchAll(PDO::FETCH_COLUMN);
+    // Match the history dashboard's normalization before creating AI/document/
+    // manual recipients; legacy imports run later and must not lose to pending.
+    $q=$pdo->prepare("SELECT delivery_status FROM email_logs WHERE doc_id=? AND LOWER(TRIM(COALESCE(recipient_email,'')))=?");$q->execute([(string)$job['doc_id'],$email]);$history=$q->fetchAll(PDO::FETCH_COLUMN);
     $status=!$valid?'skipped':(in_array('success',$history,true)?'success':($history?'uncertain':'pending'));
     $pdo->prepare('INSERT IGNORE INTO eoffice_order_recipients (job_id,user_id,recipient_name,recipient_email,email_key,source,status,error_code) VALUES (?,?,?,?,?,?,?,?)')->execute([
         $job['id'],$user['User_Id'],$user['User_Name'],$email,$key,$source,$status,!$valid?'invalid_email':($status==='uncertain'?'legacy_delivery_unconfirmed':null)]);

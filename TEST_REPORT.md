@@ -1,5 +1,17 @@
 # ผลการแก้ไขและทดสอบ E-Office
 
+## UX/UI และ workflow ตั้งค่า AI/อีเมล — 28 ตุลาคม 2026
+
+- ตรวจชุดรวมก่อน commit: `npm.cmd test` ผ่านครบ รวม regression หน้าตั้งค่า/ประวัติอีเมล 8 กลุ่ม, order HTTP 43 และ behavior 89 กรณี พร้อม syntax PHP 146 / JS-CJS 75 / inline 23; ครอบคลุมประวัติเดิม การยืนยันนำเข้าคิวทั้งสอง endpoint และอีเมลเดิมที่มีช่องว่าง/ตัวพิมพ์ต่างกัน
+- Follow-up หลังรีวิว: ล้าง SMTP trial ในหน่วยความจำเมื่อรับ saved snapshot เพื่อไม่ใช้ผลผ่านของรหัสผ่านเดิมกับรหัสผ่านใหม่; ใช้ผลยืนยันจากเซิร์ฟเวอร์หลังบันทึก และอัปเดต heartbeat/การ์ด Cron/แบนเนอร์พร้อม diagnostics โดยรักษาแบบร่างและป้องกัน revision conflict
+- เพิ่ม regression สำหรับเปลี่ยนรหัสผ่านขณะหยุดระบบ, ทดสอบรหัสใหม่ก่อน/หลังบันทึก, บันทึกแม่แบบโดยไม่ทำให้ผลผ่านที่ยังใช้ได้หาย, Cron healthy/offline และ external revision; `npm.cmd run test:order-ui` ผ่าน 8 กลุ่ม, `npm.cmd run test:syntax`, `node tests/module-navigation.cjs` และ `git diff --check` ผ่าน
+- จัดลำดับ AI → SMTP → ทดลอง PDF → โหมดทำงาน; รวมโหมดหยุด/วิเคราะห์/รอตรวจผู้รับ/ส่งอัตโนมัติไว้จุดเดียว พร้อมยืนยันผลกระทบเมื่อเปิดทางให้ส่งงานค้าง
+- แยก validation ของบันทึก/SMTP/preview/PDF; ค่า SMTP Admin ที่ไม่ได้เลือกและอีเมลทดสอบไม่ขวางการบันทึกส่วนอื่น ฝั่ง API คงค่าและรหัสผ่าน Admin เดิมเมื่อใช้ SMTP เซิร์ฟเวอร์
+- Checklist อยู่เหนือฟอร์มและผูกกับค่าที่กรอก ผลทดสอบอัปเดตทันทีพร้อมเวลา/อายุ 24 ชม.; refresh diagnostics รักษาแบบร่างและ revision ของผู้แก้ไข ควบคุม cooldown SMTP ร่วมกันพร้อมนับถอยหลัง
+- คลัง Key เป็นฟอร์มแยกแบบยุบได้ บันทึกเฉพาะส่วน รักษาแบบร่างข้ามส่วนและอัปเดตข้อมูลคลังหลังบันทึกหลัก; เพิ่มปุ่มบันทึกด้านบนและแก้แบนเนอร์มือถือให้ข้อความมีพื้นที่อ่าน
+- `npm.cmd test` ผ่านครบ รวม syntax PHP 146 / JS-CJS 75 / inline 23, order HTTP 36 และ behavior 77; `npm.cmd run test:spa` ผ่าน 47 กรณี รวม regression ใน application shell สำหรับ validation, draft preservation, checklist, cooldown, policy confirmation และมือถือ 390/320px
+- ใช้ local MySQL 3307, ฐาน `_test` และ mock services; ไม่เรียก Gemini หรือส่ง SMTP จริง
+
 ## ตรวจรอบสุดท้ายก่อน commit ชุด AI/อีเมล — 15 ตุลาคม 2026
 
 - รีวิว diff ครบทั้ง migration, Key vault/rotation, SMTP, policy holds, approval snapshot, UI และ regression tests ไม่พบข้อผิดพลาดใหม่ที่ยืนยันได้ในขอบเขตที่ตรวจ

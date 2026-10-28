@@ -94,6 +94,7 @@
 .order-dashboard .count-success { color: #047857; }
 .order-dashboard .count-pending { color: #475569; }
 .order-dashboard .count-attention { color: #92400e; }
+.order-dashboard .history-summary { font-size: .74rem; margin-top: 5px; }
 .order-dashboard .delivery-progress { height: 5px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 9px; max-width: 210px; }
 .order-dashboard .delivery-progress span { display: block; height: 100%; background: #10b981; border-radius: inherit; }
 .order-dashboard .row-action { padding: 8px 12px; font-size: .78rem; white-space: nowrap; }

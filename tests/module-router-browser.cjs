@@ -113,6 +113,71 @@ async function run() {
             assert.equal(await evaluate(`getComputedStyle(${root}.getElementById(${JSON.stringify(view==='send_email'?'search-button':'save')})).backgroundColor`),expected[0],'existing primary buttons must stay purple');
         }
     });
+    await check('AI settings saves isolate test fields, preserve vault drafts and confirm delivery policy releases',async()=>{
+        await moduleView('ai_settings');
+        await until(root+".getElementById('settings-fields').disabled===false");
+        await evaluate(`(async()=>{
+            const response=await window.fetch('/email_send/ai_settings.php');const initial=(await response.json()).settings;
+            window.__qaSettings=structuredClone(initial);Object.assign(window.__qaSettings,{enabled:false,key_configured:true,key_usable:true,encryption_ready:true,model:'gemini-test'});
+            Object.assign(window.__qaSettings.options,{smtp_source:'server',analysis_only:false,require_approval:false});
+            window.__qaSettingsTransport=window.fetch;window.__qaSettingsWrites=[];window.__qaSettingsConfirm=[];window.__qaSettingsAccept=true;window.__qaOriginalConfirm=window.confirm;
+            window.confirm=message=>{window.__qaSettingsConfirm.push(message);return window.__qaSettingsAccept;};
+            window.fetch=(url,options={})=>{
+                if(new URL(String(url),location.href).pathname!=='/email_send/ai_settings.php')return window.__qaSettingsTransport(url,options);
+                const data=options.body?JSON.parse(options.body):null;let payload;
+                if(data){window.__qaSettingsWrites.push(data);
+                    if(data.action==='save'){Object.assign(window.__qaSettings,{options:data.options,model:data.model,enabled:data.enabled,revision:window.__qaSettings.revision+1});payload={settings:window.__qaSettings,message:'QA saved'};}
+                    else if(data.action==='key_add'){window.__qaSettings.revision++;payload={settings:window.__qaSettings,message:'QA vault saved'};}
+                    else payload={message:'QA test passed',tested_at:new Date().toISOString(),expires_at:new Date(Date.now()+86400000).toISOString(),cooldown_seconds:30};
+                }else payload={settings:window.__qaSettings};
+                return Promise.resolve(new Response(JSON.stringify({status:'success',...payload}),{headers:{'Content-Type':'application/json'}}));
+            };
+            ${root}.getElementById('refresh-settings').click();
+        })()`);
+        const set=async(id,value)=>evaluate(`(()=>{const field=${root}.getElementById(${JSON.stringify(id)});field.value=${JSON.stringify(value)};field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+        const click=async id=>evaluate(`${root}.getElementById(${JSON.stringify(id)}).click()`);
+        const saved=()=>until(root+".getElementById('save-state').textContent==='การตั้งค่าเป็นปัจจุบัน'");
+        try{
+            await saved();await set('smtp_source','admin');await set('smtp_from','invalid');await set('smtp_source','server');
+            await set('test-email','invalid');await set('smtp_name','QA sender');await click('save-top');await saved();
+            assert.equal(await evaluate("window.__qaSettingsWrites.filter(d=>d.action==='save').length"),1,'invalid hidden SMTP/test-only email do not block a valid save');
+            assert.equal(await evaluate('window.eofficeModuleHasChanges()'),false,'test-only input does not leave a phantom dirty form after saving');
+            await set('smtp_source','admin');await set('smtp_from','invalid');await click('save-top');
+            assert.equal(await evaluate("window.__qaSettingsWrites.filter(d=>d.action==='save').length"),1,'visible invalid SMTP still prevents saving');
+            await click('discard');await set('keyring-label','QA vault draft');await set('smtp_name','QA main saved');await click('save-top');await saved();
+            assert.equal(await evaluate(root+".getElementById('keyring-label').value"),'QA vault draft');
+            await set('model','gemini-draft');await set('keyring-secret','synthetic-browser-vault-secret');await click('keyring-add');
+            await until(root+".getElementById('keyring-secret').value===''");
+            assert.equal(await evaluate(root+".getElementById('model').value"),'gemini-draft');
+            assert.equal(await evaluate('window.eofficeModuleHasChanges()'),true,'main draft stays guarded after the separate vault save');
+            await click('test-ai');await until(root+".getElementById('test-result').textContent.includes('สำเร็จ')");
+            assert.match(await evaluate(root+".getElementById('readiness-checks').textContent"),/✓ AI: ทดสอบผ่าน/);
+            assert.equal(await evaluate(root+".getElementById('model').value"),'gemini-draft');
+            await set('model','gemini-other');assert.match(await evaluate(root+".getElementById('readiness-checks').textContent"),/! AI:/);
+            await set('test-email','qa@example.test');await click('smtp-test');await until(root+".getElementById('smtp-result').textContent==='QA test passed'");
+            assert.match(await evaluate(root+".getElementById('readiness-checks').textContent"),/✓ SMTP: ส่งทดสอบผ่าน/);
+            assert.equal(await evaluate(root+".getElementById('smtp-check').disabled"),true);
+            await click('discard');await set('delivery-mode','approval');await click('save-top');await saved();
+            await evaluate('window.__qaSettingsConfirm=[];window.__qaSettingsAccept=false');
+            await set('delivery-mode','automatic');const before=await evaluate('window.__qaSettingsWrites.length');await click('save-top');
+            assert.equal(await evaluate('window.__qaSettingsWrites.length'),before);assert.match(await evaluate('window.__qaSettingsConfirm[0]'),/พักตามนโยบาย/);
+            await evaluate('window.__qaSettingsAccept=true');await click('save-top');await saved();
+            assert.equal(await evaluate('window.__qaSettings.options.require_approval'),false);
+            for(const width of [390,320]){
+                await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:false});
+                const layout=await evaluate(`(()=>{const s=${root},banner=s.querySelector('.readiness-banner'),text=banner.querySelector('div').getBoundingClientRect(),action=s.getElementById('readiness-action').getBoundingClientRect();return {fits:document.documentElement.scrollWidth<=innerWidth,textWidth:text.width,actionBelow:action.top>=text.bottom,readinessBefore:s.querySelector('.readiness-panel').compareDocumentPosition(s.getElementById('settings-form'))&Node.DOCUMENT_POSITION_FOLLOWING};})()`);
+                assert.equal(layout.fits,true);assert.ok(layout.textWidth>=160,'mobile banner text has a readable column');assert.equal(layout.actionBelow,true);assert.ok(layout.readinessBefore,'readiness stays above the long form');
+                if(process.env.EOFFICE_QA_SCREENSHOTS==='1'&&width===390){await evaluate('window.scrollTo(0,0);document.getElementById("main_div").scrollTop=0');const image=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(folder,'eoffice-ai-settings-mobile.png'),Buffer.from(image.data,'base64'));}
+            }
+            if(process.env.EOFFICE_QA_SCREENSHOTS==='1'){
+                await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});await evaluate('window.scrollTo(0,0);document.getElementById("main_div").scrollTop=0');
+                const image=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(folder,'eoffice-ai-settings-desktop.png'),Buffer.from(image.data,'base64'));
+            }
+        }finally{
+            await evaluate(`window.fetch=window.__qaSettingsTransport;window.confirm=window.__qaOriginalConfirm;${root}.getElementById('refresh-settings').click()`);
+            await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});await saved();
+        }
+    });
     await check('shared icon dimensions and booking close typography override base styles',async()=>{
         await moduleView('book');
         const result=await evaluate(`(()=>{const s=${root},holder=document.createElement('div');holder.style.cssText='position:fixed;top:0;left:0;pointer-events:none';s.querySelector('.number-booking').append(holder);try{return ['eo-btn eo-btn--ghost eo-btn--icon','booking-close'].map(className=>{const b=document.createElement('button');b.type='button';b.className=className;b.textContent='×';holder.append(b);const style=getComputedStyle(b);return {width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height,padding:style.padding,font:style.fontSize};});}finally{holder.remove();}})()`);

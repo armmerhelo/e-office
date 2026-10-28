@@ -1,16 +1,85 @@
 window.OrderSettingsControls = (() => {
     const el=id=>document.getElementById(id), U=OrderUI;
     const fields=[...document.querySelectorAll('[data-option]')];
+    const adminFields=['smtp_host','smtp_port','smtp_security','smtp_username','smtp_from'];
+    let current=null, aiTrial=null, smtpTrial=null, smtpUntil=0;
+    function reveal(target){
+        for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+        target.scrollIntoView?.({block:'center'});
+    }
     document.querySelectorAll('[data-settings-section]').forEach(button=>button.addEventListener('click',()=>{
-        const target=el(button.dataset.settingsSection);target.setAttribute('tabindex','-1');target.focus({preventScroll:true});target.scrollIntoView({block:'start',behavior:'smooth'});
+        const target=el(button.dataset.settingsSection);reveal(target);target.setAttribute('tabindex','-1');target.focus({preventScroll:true});target.scrollIntoView({block:'start',behavior:'smooth'});
     }));
-    function values(){return Object.fromEntries(fields.map(f=>[f.id,f.type==='checkbox'?f.checked:f.type==='number'?Number(f.value):f.value.trim()]));}
-    function dirty(saved){return Boolean(saved&&(el('smtp-password').value||JSON.stringify(values())!==JSON.stringify(Object.fromEntries(fields.map(f=>[f.id,saved.options[f.id]])))));}
-    function render(saved,dateTime){
-        for(const f of fields){if(f.type==='checkbox')f.checked=Boolean(saved.options[f.id]);else f.value=saved.options[f.id];}
-        el('smtp-password').value='';el('smtp-password-state').textContent=saved.smtp_password_configured?'มีรหัสผ่านที่บันทึกแล้ว เว้นว่างเพื่อใช้ค่าเดิม':'ยังไม่มีรหัสผ่าน SMTP ที่บันทึกผ่าน Admin';
+    function values(){
+        const options=Object.fromEntries(fields.map(f=>[f.id,f.type==='checkbox'?f.checked:f.type==='number'?Number(f.value):f.value.trim()]));
+        if(options.smtp_source==='server'&&current)for(const id of adminFields)options[id]=current.options[id];
+        return options;
+    }
+    function optionsFor(action){
+        const options=values();
+        if(action==='save')return options;
+        const keys=action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to']:action==='preview'?['subject','intro','signature']:[];
+        return Object.fromEntries(keys.map(id=>[id,options[id]]));
+    }
+    function password(){return el('smtp_source').value==='admin'?el('smtp-password').value:'';}
+    function dirty(saved){return Boolean(saved&&(password()||JSON.stringify(values())!==JSON.stringify(Object.fromEntries(fields.map(f=>[f.id,saved.options[f.id]])))));}
+    function validate(action){
+        const ids=action==='save'?['model','api-key',...fields.filter(f=>f.type!=='checkbox').map(f=>f.id),'smtp-password']:action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to','smtp-password',...(action==='smtp_test'?['test-email']:[])]:action==='preview'?['subject','intro','signature']:['model'];
+        for(const id of ids){
+            if(el('smtp_source').value!=='admin'&&[...adminFields,'smtp-password'].includes(id))continue;
+            const field=el(id);
+            if(id==='test-email')field.required=true;
+            if(field.checkValidity&&!field.checkValidity()){reveal(field);field.reportValidity();return false;}
+        }
+        return true;
+    }
+    function aiIdentity(data,saved){return JSON.stringify([data.model,data.api_key||'',data.api_key?'draft':saved.keyring.keys.find(k=>k.active)?.reference||saved.key_source]);}
+    function smtpIdentity(data,saved){
+        const o=data.options;
+        return JSON.stringify([o.smtp_source,o.smtp_name,o.smtp_reply_to,o.smtp_source==='admin'?[...adminFields.map(id=>o[id]),data.smtp_password||'']:saved.diagnostics.smtp.effective]);
+    }
+    function noteTest(action,data,result,saved){
+        const at=result.tested_at||new Date().toISOString(),until=result.expires_at?Date.parse(result.expires_at):Date.now()+86400000;
+        if(action==='test')aiTrial={identity:aiIdentity(data,saved),at,until};
+        if(action==='smtp_test')smtpTrial={identity:smtpIdentity(data,saved),at,until};
+        if(action==='smtp_test'||action==='smtp_check')cooldown(result.cooldown_seconds??30);
+    }
+    function cooldown(seconds){smtpUntil=Math.max(smtpUntil,Date.now()+seconds*1000);}
+    const cooldownRemaining=()=>Math.max(0,Math.ceil((smtpUntil-Date.now())/1000));
+    function readiness(saved,dateTime,data){
+        const d=saved.diagnostics,options=data.options;
+        const baseline={model:saved.model,api_key:'',options:saved.options,smtp_password:''};
+        const sameAI=aiIdentity(data,saved)===aiIdentity(baseline,saved),sameSMTP=smtpIdentity(data,saved)===smtpIdentity(baseline,saved);
+        const ai=aiTrial?.identity===aiIdentity(data,saved)&&aiTrial.until>Date.now()?aiTrial:null;
+        const smtp=smtpTrial?.identity===smtpIdentity(data,saved)&&smtpTrial.until>Date.now()?smtpTrial:null;
+        const aiOK=Boolean(ai||(sameAI&&d.ai_tested&&(!d.ai_test_expires_at||Date.parse(d.ai_test_expires_at)>Date.now())));
+        const smtpOK=Boolean(smtp||(sameSMTP&&d.smtp_tested&&(!d.smtp_test_expires_at||Date.parse(d.smtp_test_expires_at)>Date.now())));
+        const analysis=options.analysis_only,stopped=!data.enabled;
+        el('readiness-context').textContent='ตรวจค่าที่กรอกอยู่ · '+(stopped?'ระบบจะหยุดทำงาน':analysis?'วิเคราะห์อย่างเดียว ไม่ต้องทดสอบ SMTP':options.require_approval?'รอเจ้าหน้าที่ตรวจผู้รับก่อนส่ง':'ส่งอัตโนมัติตามรอบ Cron')+' · มีผลเมื่อบันทึก';
+        const aiWhen=ai?.at||(sameAI?d.ai_tested_at:null),smtpWhen=smtp?.at||(sameSMTP?d.smtp_tested_at:null);
+        const checks=[['AI: '+(aiOK?'ทดสอบผ่าน'+(aiWhen?' · '+dateTime(aiWhen,''): '')+' (ใช้ได้ 24 ชม.)':'ยังไม่มีผลทดสอบผ่านของ Key/โมเดลชุดนี้'),aiOK],
+            [analysis?'SMTP: ไม่จำเป็นสำหรับโหมดวิเคราะห์อย่างเดียว':'SMTP: '+(smtpOK?'ส่งทดสอบผ่าน'+(smtpWhen?' · '+dateTime(smtpWhen,''):'')+' (ใช้ได้ 24 ชม.)':'ต้องส่งอีเมลทดสอบชุดนี้ให้ผ่าน'),analysis||smtpOK],
+            ['Cron: '+(d.cron.state==='healthy'?'ทำงานตามรอบ':d.cron.state==='late'?'ล่าช้าเกิน 7 นาที':d.cron.state==='offline'?'ขาดการติดต่อเกิน 15 นาที':'ยังไม่พบการทำงาน'),d.cron.state==='healthy'],
+            ['URL เอกสาร: '+(d.base_url.startsWith('https://')?'HTTPS':'ตรวจ URL และสิทธิ์เปิดเอกสารก่อนส่งจริง'),d.base_url.startsWith('https://')]];
+        el('readiness-checks').replaceChildren();
+        for(const [text,ok] of checks)el('readiness-checks').append(U.node('li',(ok?'✓ ':'! ')+text,ok?'status-good':'status-warning'));
+        if(d.mock)el('readiness-checks').append(U.node('li','โหมดจำลอง: การทดสอบไม่เรียกบริการจริง','status-warning'));
+        el('save-summary').textContent=`เมื่อบันทึก: ${stopped?'หยุดระบบ':analysis?'วิเคราะห์อย่างเดียว':options.require_approval?'วิเคราะห์และรอตรวจผู้รับ':'วิเคราะห์และส่งอัตโนมัติ'} · โมเดล ${data.model||'—'} · ผู้ส่ง ${options.smtp_source==='admin'?options.smtp_from||'ยังไม่กำหนด':d.smtp.effective.from||'ยังไม่กำหนด'}`;
+    }
+    function render(saved,dateTime,preserveInputs=false){
+        current=saved;
+        if(!preserveInputs){
+            // Once a saved snapshot is applied, its server-confirmed result is
+            // authoritative. An empty password now refers to the stored secret,
+            // which may have changed since the in-memory trial was recorded.
+            smtpTrial=null;
+            for(const f of fields){if(f.type==='checkbox')f.checked=Boolean(saved.options[f.id]);else f.value=saved.options[f.id];}
+            el('smtp-password').value='';
+            U.message('smtp-result','');el('mail-preview').hidden=true;el('preview-subject').textContent='';el('pdf-mentions').replaceChildren();U.message('pdf-result','');
+        }
+        el('smtp-password-state').textContent=saved.smtp_password_configured?'มีรหัสผ่านที่บันทึกแล้ว เว้นว่างเพื่อใช้ค่าเดิม':'ยังไม่มีรหัสผ่าน SMTP ที่บันทึกผ่าน Admin';
         const d=saved.diagnostics;
-        el('smtp-admin').hidden=saved.options.smtp_source!=='admin';
+        el('smtp-admin').hidden=el('smtp_source').value!=='admin';
         el('effective-smtp').textContent=d.smtp.effective.host?`SMTP ที่บันทึก: ${d.smtp.effective.host}:${d.smtp.effective.port} · ${d.smtp.effective.security} · ผู้ส่ง ${d.smtp.effective.from} · ${d.smtp.configured?'ตั้งค่าครบ (ยังไม่ยืนยันผลส่ง)':'ตั้งค่ายังไม่ครบ'}`:'ยังไม่มี SMTP พร้อมใช้งาน';
         el('base-url').textContent=`ลิงก์ในอีเมลใช้ ${d.base_url} · การเปิดเอกสารใช้สิทธิ์และการเข้าสู่ระบบตามระบบเอกสาร ควรทดสอบลิงก์ด้วยบัญชีผู้รับจริง`;
         const active=['waiting_files','analyzing','sending','queued','awaiting_approval'].reduce((n,k)=>n+(d.counts[k]||0),0);
@@ -18,9 +87,6 @@ window.OrderSettingsControls = (() => {
         el('last-editor').textContent=`แก้ไขล่าสุด: ${d.updated_by||'—'} · ${dateTime(saved.updated_at,'ยังไม่เคยบันทึก')}`;
         const cronNames={healthy:'ปกติ',late:'ล่าช้าเกิน 7 นาที',offline:'ขาดการติดต่อเกิน 15 นาที',missing:'ยังไม่พบ'};
         el('worker-detail').textContent=`Cron: ${cronNames[d.cron.state]} · จบสำเร็จล่าสุด ${dateTime(d.cron.finished_at,'—')}${d.cron.result?` · ประมวลผล ${d.cron.result.processed} งาน / ขัดข้อง ${d.cron.result.failed} งาน`:''}`;
-        el('readiness-checks').replaceChildren();
-        for(const [text,ok] of [['API key ถอดรหัสได้',saved.key_usable],['AI ชุดปัจจุบันทดสอบผ่านใน 24 ชม.',d.ai_tested],['SMTP ตั้งค่าครบ',d.smtp.configured],['SMTP ชุดปัจจุบันส่งทดสอบผ่านใน 24 ชม.',d.smtp_tested],['Cron ตามรอบ',d.cron.state==='healthy'],['URL ระบบเป็น HTTPS',d.base_url.startsWith('https://')]])el('readiness-checks').append(U.node('li',(ok?'✓ ':'! ')+text,ok?'status-good':'status-warning'));
-        if(d.mock)el('readiness-checks').append(U.node('li','โหมดจำลอง: การทดสอบไม่เรียกบริการจริง','status-warning'));
         el('ai-usage').replaceChildren();
         for(const u of d.usage)el('ai-usage').append(U.node('p',`${u.model}: ${Number(u.requests).toLocaleString()} คำขอ · Input ${Number(u.input_tokens).toLocaleString()} / Output+Thinking ${Number(u.output_tokens).toLocaleString()} / รวม ${Number(u.total_tokens).toLocaleString()} tokens · ประมาณ $${u.estimated_usd}`));
         if(!d.usage.length)el('ai-usage').append(U.node('p','ยังไม่มีข้อมูลการใช้งาน','muted'));
@@ -57,6 +123,7 @@ window.OrderSettingsControls = (() => {
             for(const m of result.mentions)el('pdf-mentions').append(U.node('li',`${m.name} → ${m.matched_name||'ไม่พบ/ไม่มั่นใจ ต้องตรวจสอบ'}`,m.user_id?'status-good':'status-warning'));
             if(!result.mentions.length)el('pdf-mentions').append(U.node('li','ไม่พบรายชื่อในเอกสาร'));
         }else U.message('smtp-result',result.message);
+        return result;
     }
     const invalidate=event=>{
         const id=event.target.id;
@@ -65,5 +132,5 @@ window.OrderSettingsControls = (() => {
         if(['test-pdf','api-key','model','model-options'].includes(id)){el('pdf-mentions').replaceChildren();U.message('pdf-result','');}
     };
     el('settings-form').addEventListener('input',invalidate);el('settings-form').addEventListener('change',invalidate);
-    return {values,dirty,render,run};
+    return {values,optionsFor,password,validate,dirty,render,run,noteTest,readiness,cooldown,cooldownRemaining};
 })();

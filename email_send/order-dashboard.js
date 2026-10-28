@@ -40,6 +40,7 @@
             el(id).disabled = busy || !detailReady;
         });
         el('refresh-detail').disabled = busy || detailLoading || !activeDoc;
+        el('enqueue-history').disabled = busy || detailLoading || !activeDoc;
         if (activeDoc?.status === 'cancelled') el('cancel-job').disabled = true;
     }
 
@@ -47,10 +48,22 @@
         quickFilters.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.state === filters.state)));
     }
 
+    function historyBadge(sent) {
+        return U.node('span', sent ? 'เคยส่งแล้ว (ระบบเดิม)' : 'มีประวัติเดิม · ต้องตรวจสอบผลส่ง', 'badge ' + (sent ? 'success' : 'uncertain'));
+    }
+
+    function renderHistorySummary(cell, item) {
+        const success = Number(item.history_success_count || 0), attention = Number(item.history_count || 0) - success;
+        cell.append(U.node('p', `ประวัติส่งสำเร็จ ${number(success)} คน` + (attention ? ` · ต้องตรวจสอบ ${number(attention)} คน` : ''), 'history-summary'));
+        if (item.history_sent_at) cell.append(U.node('p', 'ส่งสำเร็จล่าสุด ' + dateTime(item.history_sent_at), 'muted history-summary'));
+    }
+
     function renderCounts(cell, item) {
+        if (!item.status && Number(item.history_count)) { renderHistorySummary(cell, item); return; }
         const success = Number(item.success_count || 0), pending = Number(item.pending_count || 0), attention = Number(item.attention_count || 0);
         if (!success && !pending && !attention) {
             cell.append(U.node('span', item.status ? 'ยังไม่มีผลส่ง' : 'ยังไม่ได้รวบรวมผู้รับ', 'muted'));
+            if (Number(item.history_count)) renderHistorySummary(cell, item);
             return;
         }
         const counts = U.node('div', undefined, 'recipient-counts');
@@ -59,6 +72,7 @@
         progress.setAttribute('aria-hidden', 'true');
         fill.style.width = (success / (success + pending + attention) * 100) + '%';
         progress.append(fill); cell.append(counts, progress);
+        if (item.source === 'manual' && Number(item.history_count)) renderHistorySummary(cell, item);
     }
 
     async function load(background = false) {
@@ -90,15 +104,17 @@
             for (const item of result.data) {
                 const tr = U.node('tr'), doc = U.node('td'), status = U.node('td'), counts = U.node('td'), actions = U.node('td');
                 doc.append(U.node('strong', `${item.doc_number} / ${item.doc_year}`, 'doc-number'), U.node('p', item.doc_name, 'doc-name'));
-                status.append(U.badge(item.status));
+                const hasHistory = Number(item.history_count) > 0;
+                status.append(!item.status && hasHistory ? historyBadge(Number(item.history_success_count) > 0) : U.badge(item.status));
                 if (item.error_code) status.append(U.node('p', U.error(item.error_code), 'status-error'));
                 renderCounts(counts, item);
-                const button = U.button(item.status ? 'ดูรายละเอียด' : 'นำเข้าคิว', () => {
-                    if (item.status) openDetail(item);
+                const label = item.status ? 'ดูรายละเอียด' : hasHistory ? 'ดูประวัติการส่ง' : 'นำเข้าคิว';
+                const button = U.button(label, () => {
+                    if (item.status || hasHistory) openDetail(item);
                     else if (confirm(`นำคำสั่ง ${item.doc_number} / ${item.doc_year} เข้าคิวส่งอีเมล?\n${item.doc_name}\nระบบจะวิเคราะห์ PDF และส่งถึงผู้รับในรอบถัดไป`)) action(item.doc_id, 'enqueue');
                 });
-                button.className = 'row-action' + (item.status ? ' button-secondary' : '');
-                button.setAttribute('aria-label', `${item.status ? 'ดูรายละเอียด' : 'นำเข้าคิว'} คำสั่ง ${item.doc_number} / ${item.doc_year}`);
+                button.className = 'row-action' + (item.status || hasHistory ? ' button-secondary' : '');
+                button.setAttribute('aria-label', `${label} คำสั่ง ${item.doc_number} / ${item.doc_year}`);
                 actions.append(button); tr.append(doc, status, counts, actions); el('rows').append(tr);
             }
             if (!result.data.length) placeholder('rows', 4, 'ไม่พบคำสั่งตามเงื่อนไข', 'ลองเปลี่ยนคำค้น ปี หรือสถานะ หรือกดล้างตัวกรองเพื่อดูทั้งหมด');
@@ -165,6 +181,7 @@
         const requestId = ++detailRequest, docId = activeDoc.doc_id;
         detailReady = false; detailLoading = true; updateControls();
         el('detail-status').textContent = 'กำลังโหลดรายละเอียด…';
+        ['files-section', 'recipients-section', 'job-danger-zone', 'history-section', 'enqueue-history'].forEach(id => { el(id).hidden = true; });
         el('file-count').textContent = '—'; el('recipient-count').textContent = '—';
         placeholder('file-rows', 3, 'กำลังโหลดเอกสาร…');
         placeholder('recipient-rows', 4, 'กำลังโหลดผู้รับ…');
@@ -173,7 +190,22 @@
             if (requestId !== detailRequest || activeDoc?.doc_id !== docId || !el('detail').open) return;
             if (el('detail-message').classList.contains('error')) U.message('detail-message', '');
             activeDoc.status = result.job?.status;
-            el('detail-status').replaceChildren(U.badge(result.job?.status));
+            const history = result.history || [], sent = history.some(row => Number(row.sent));
+            el('detail-status').replaceChildren(!result.job && history.length ? historyBadge(sent) : U.badge(result.job?.status));
+            ['files-section', 'recipients-section', 'job-danger-zone'].forEach(id => { el(id).hidden = !result.job; });
+            el('history-section').hidden = !history.length;
+            el('enqueue-history').hidden = Boolean(result.job) || !history.length;
+            el('enqueue-history').disabled = busy;
+            el('history-count').textContent = number(history.length) + ' คน';
+            el('history-rows').replaceChildren();
+            for (const row of history) {
+                const tr = U.node('tr'), name = U.node('td'), status = U.node('td'), info = U.node('td');
+                name.append(U.node('strong', row.recipient_name), U.node('div', row.recipient_email || 'ไม่ระบุอีเมล', 'muted recipient-email'));
+                status.dataset.label = 'ผลส่ง'; info.dataset.label = 'เวลา / ประวัติ';
+                status.append(U.node('span', Number(row.sent) ? 'เคยส่งสำเร็จ' : 'ยังไม่ยืนยันผลส่ง', 'badge ' + (Number(row.sent) ? 'success' : 'uncertain')));
+                info.append(U.node('div', dateTime(Number(row.sent) ? row.sent_at : row.attempted_at, 'ไม่ระบุเวลา')), U.node('p', `ประวัติ ${number(row.log_count)} รายการ (รวมทุกไฟล์)`, 'muted'));
+                tr.append(name, status, info); el('history-rows').append(tr);
+            }
             if(result.job?.status==='awaiting_approval'&&result.review_token)el('detail-status').append(U.button('ยืนยันรายชื่อและอนุมัติส่ง',()=>{
                 if(confirm('ตรวจสอบรายชื่อผู้รับและ PDF ครบแล้ว ยืนยันส่งถึงผู้รับที่รอดำเนินการ?'))action(docId,'approve',{confirmed:true,review_token:result.review_token});
             }));
@@ -234,6 +266,9 @@
     el('close-detail').onclick = () => el('detail').close();
     el('detail').addEventListener('close', () => { if(el('detail').open)return;detailRequest++; activeDoc = null; detailReady = false; detailLoading = false; });
     el('refresh-detail').onclick = () => { U.message('detail-message', ''); detail(); };
+    el('enqueue-history').onclick = () => {
+        if (activeDoc && !activeDoc.status && !detailLoading && !busy && confirm('คำสั่งนี้มีประวัติส่งอีเมลแล้ว ต้องการนำเข้าคิวอีกครั้งหรือไม่?\nระบบจะวิเคราะห์ PDF เพื่อรวบรวมผู้รับ โดยไม่ส่งซ้ำให้อีเมลที่มีประวัติสำเร็จ และพักรายการผลส่งไม่ชัดเจนไว้ให้ตรวจสอบ')) action(activeDoc.doc_id, 'enqueue', {confirmed: true});
+    };
     el('reanalyze').onclick = () => {
         if (activeDoc && detailReady && confirm('อ่าน PDF ทุกไฟล์ใหม่ โดยไม่ส่งซ้ำให้ผู้ที่สำเร็จแล้ว และคงรายการผลส่งไม่แน่ชัดไว้ให้ตรวจสอบ')) action(activeDoc.doc_id, 'reanalyze', {confirmed: true});
     };

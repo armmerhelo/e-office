@@ -32,6 +32,32 @@ if(in_array($action,['seed','drop'],true)){
     echo json_encode(['users'=>$users,'pdf'=>base64_encode($pdf)]);exit;
 }
 $pdo=app_pdo();
+if($action==='history-seed'){
+    $ids=[];
+    foreach(['sent','review','empty'] as $kind){
+        $pdo->prepare("INSERT INTO t_document (Doc_Number,Doc_Name,Doc_Type,Doc_Year) VALUES (?,?,'External','2568')")->execute(['HISTORY-QA-'.$kind,'Historical order '.$kind]);$ids[$kind]=(int)$pdo->lastInsertId();
+    }
+    $q=$pdo->prepare('INSERT INTO email_logs (doc_id,file_name,recipient_name,recipient_email,delivery_status,created_at) VALUES (?,?,?,?,?,?)');
+    foreach([
+        ['sent','one.pdf','Alice','Alice@example.test','success','2025-10-01 09:00:00'],
+        ['sent','two.pdf','Alice',' alice@example.test ','success','2025-10-02 10:00:00'],
+        ['sent','two.pdf','Alice','alice@example.test','failed','2025-10-03 11:00:00'],
+        ['sent','one.pdf','Bob','bob@example.test','pending','2025-10-03 12:00:00'],
+        ['review','one.pdf','Unknown result','bob@example.test',null,'2025-10-01 09:00:00'],
+        ['review','two.pdf','Unknown result','bob@example.test','failed','2025-10-02 10:00:00'],
+    ] as [$kind,$file,$name,$email,$status,$time])$q->execute([(string)$ids[$kind],$file,$name,$email,$status,$time]);
+    echo json_encode($ids);exit;
+}
+if($action==='history-cleanup'){
+    $ids=$pdo->query("SELECT Doc_Id FROM t_document WHERE Doc_Number LIKE 'HISTORY-QA-%'")->fetchAll(PDO::FETCH_COLUMN);
+    foreach($ids as $id){
+        $pdo->prepare('DELETE FROM email_logs WHERE doc_id=?')->execute([(string)$id]);
+        $pdo->prepare('DELETE FROM eoffice_order_jobs WHERE doc_id=?')->execute([$id]);
+        $pdo->prepare('DELETE FROM eoffice_order_audit WHERE doc_id=?')->execute([$id]);
+        $pdo->prepare('DELETE FROM t_document WHERE Doc_Id=?')->execute([$id]);
+    }
+    exit;
+}
 if($action==='corrupt-key'){$pdo->exec("UPDATE eoffice_order_settings SET api_key_cipher='synthetic-corrupted-cipher' WHERE id=1");$pdo->exec("UPDATE eoffice_order_api_keys SET cipher='synthetic-corrupted-cipher' WHERE id=(SELECT active_key_id FROM eoffice_order_settings WHERE id=1)");exit;}
 if($action==='pause-lock'){
     $pdo->beginTransaction();$pdo->query('SELECT id FROM eoffice_order_settings WHERE id=1 FOR UPDATE');echo "LOCKED\n";flush();fgets(STDIN);

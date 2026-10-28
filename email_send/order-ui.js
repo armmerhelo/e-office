@@ -5,7 +5,7 @@ window.OrderUI = (() => {
     function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);if(className)el.className=className;return el;}
     function badge(status){return node('span',labels[status]||status||'ยังไม่เข้าคิว','badge '+(status||''));}
     function button(text,callback,danger=false){const el=node('button',text,danger?'danger':'');el.type='button';el.addEventListener('click',callback);return el;}
-    async function request(url,data){const response=await fetch(url,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok||result.status==='error')throw new Error(errors[result.code]||result.message||'ดำเนินการไม่สำเร็จ');return result;}
+    async function request(url,data){const response=await fetch(url,{method:data?'POST':'GET',headers:data?{'Content-Type':'application/json'}:{},body:data?JSON.stringify(data):undefined});const result=await response.json();if(!response.ok||result.status==='error'){const error=new Error(errors[result.code]||result.message||'ดำเนินการไม่สำเร็จ');error.retryAfter=Number(result.retry_after)||0;throw error;}return result;}
     function message(id,text,error=false){const el=document.getElementById(id);el.textContent=text;el.classList.toggle('error',error);el.classList.toggle('ok',!error);}
     errors.smtp_configuration_required='SMTP ยังตั้งค่าไม่ครบ กรุณาตรวจสอบการตั้งค่าบนเซิร์ฟเวอร์';
     labels.awaiting_approval='รอตรวจผู้รับก่อนส่ง';

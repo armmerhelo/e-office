@@ -77,6 +77,9 @@ function app_order_hold_for_policy(array $job): bool {
 
 function app_order_validate_options(array $input,array $before): array {
     $o=array_replace($before,array_intersect_key($input,$before));
+    // Inactive Admin SMTP drafts must neither overwrite stored credentials nor
+    // prevent saving/testing the selected server transport.
+    if($o['smtp_source']==='server')foreach(['smtp_host','smtp_port','smtp_security','smtp_username','smtp_from'] as $k)$o[$k]=$before[$k];
     foreach(['analysis_only','require_approval'] as $k)if(!is_bool($o[$k]))app_fail('ข้อมูลนโยบายไม่ถูกต้อง');
     if(!in_array($o['smtp_source'],['server','admin'],true)||!in_array($o['smtp_security'],['starttls','tls'],true))app_fail('รูปแบบ SMTP ไม่ถูกต้อง');
     if(!is_int($o['smtp_port'])||$o['smtp_port']<1||$o['smtp_port']>65535)app_fail('SMTP Port ไม่ถูกต้อง');

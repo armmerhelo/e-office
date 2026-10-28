@@ -3,25 +3,26 @@
 function order_candidate(array $input): array {
     if(isset($input['options'])&&(!is_array($input['options'])||array_is_list($input['options'])&&$input['options']!==[]))app_fail('ข้อมูลตัวเลือกไม่ถูกต้อง');
     $row=app_order_settings();$options=app_order_validate_options($input['options']??[],app_order_options($row));
-    $password=app_text($input,'smtp_password',512);
+    $password=$options['smtp_source']==='admin'?app_text($input,'smtp_password',512):'';
     return [$row,$options,$password];
 }
 function order_smtp_fingerprint(array $config): string {
     return hash_hmac('sha256',json_encode($config,JSON_THROW_ON_ERROR),(string)app_env('EOFFICE_SETTINGS_KEY',app_env('SMTP_PASSWORD')));
 }
 function order_smtp_tested(array $config): bool {
-    $q=app_pdo()->query("SELECT details FROM eoffice_order_events WHERE event='smtp_test' AND created_at>=DATE_SUB(NOW(),INTERVAL 1 DAY) ORDER BY id DESC LIMIT 100");
-    foreach($q as $event){$d=json_decode($event['details'],true);if(($d['success']??false)&&hash_equals($d['fingerprint']??'',order_smtp_fingerprint($config)))return true;}
-    return false;
+    return order_tested_at('smtp_test',order_smtp_fingerprint($config))!==null;
 }
 function order_ai_fingerprint(array $config): string {
     unset($config['key_id']);
     return hash_hmac('sha256',json_encode($config,JSON_THROW_ON_ERROR),(string)app_env('EOFFICE_SETTINGS_KEY',app_env('GEMINI_API_KEY')));
 }
 function order_ai_tested(array $config): bool {
-    $q=app_pdo()->query("SELECT details FROM eoffice_order_events WHERE event='ai_test' AND created_at>=DATE_SUB(NOW(),INTERVAL 1 DAY) ORDER BY id DESC LIMIT 100");
-    foreach($q as $event){$d=json_decode($event['details'],true);if(($d['success']??false)&&hash_equals($d['fingerprint']??'',order_ai_fingerprint($config)))return true;}
-    return false;
+    return order_tested_at('ai_test',order_ai_fingerprint($config))!==null;
+}
+function order_tested_at(string $event,string $fingerprint): ?string {
+    $q=app_pdo()->prepare("SELECT details,created_at FROM eoffice_order_events WHERE event=? AND created_at>=DATE_SUB(NOW(),INTERVAL 1 DAY) ORDER BY id DESC LIMIT 100");$q->execute([$event]);
+    foreach($q as $row){$d=json_decode($row['details'],true);if(($d['success']??false)&&hash_equals($d['fingerprint']??'',$fingerprint))return $row['created_at'];}
+    return null;
 }
 function order_extended_action(string $action,array $input,array $actor): void {
     if(!in_array($action,['smtp_check','smtp_test','preview','pdf_test'],true))return;
@@ -37,8 +38,8 @@ function order_extended_action(string $action,array $input,array $actor): void {
         $email=app_text($input,'test_email',255);
         if($action==='smtp_test'&&!filter_var($email,FILTER_VALIDATE_EMAIL))app_fail('กรุณากรอกอีเมลทดสอบให้ถูกต้อง');
         // Avoid accidental double clicks/repeated sends from this account.
-        $q=app_pdo()->prepare("SELECT COUNT(*) FROM eoffice_order_events WHERE actor_id=? AND event IN ('smtp_test','smtp_check') AND created_at>DATE_SUB(NOW(),INTERVAL 30 SECOND)");$q->execute([$actor['User_Id']]);
-        if($q->fetchColumn())app_fail('กรุณารอ 30 วินาทีก่อนทดสอบ SMTP อีกครั้ง',429);
+        $q=app_pdo()->prepare("SELECT MAX(created_at) FROM eoffice_order_events WHERE actor_id=? AND event IN ('smtp_test','smtp_check') AND created_at>DATE_SUB(NOW(),INTERVAL 30 SECOND)");$q->execute([$actor['User_Id']]);
+        if($last=$q->fetchColumn()){$wait=max(1,30-(time()-strtotime($last)));app_json(['status'=>'error','message'=>'กรุณารอ '.$wait.' วินาทีก่อนทดสอบ SMTP อีกครั้ง','retry_after'=>$wait],429);}
         $success=false;$reason=null;
         try{
             if(!app_settings()['mock']){
@@ -48,8 +49,8 @@ function order_extended_action(string $action,array $input,array $actor): void {
             $success=true;
         }catch(Throwable $e){$reason=$e instanceof AppOrderAIException?$e->reason:'smtp_connection_failed';}
         app_order_event($action,['success'=>$success,'code'=>$reason,'fingerprint'=>order_smtp_fingerprint($smtp),'duration_ms'=>(int)((microtime(true)-$started)*1000)],(int)$actor['User_Id']);
-        if(!$success)app_json(['status'=>'error','code'=>$reason,'message'=>'ทดสอบ SMTP ไม่สำเร็จ'],400);
-        app_json(['status'=>'success','message'=>app_settings()['mock']?'ทดสอบในโหมดจำลอง ไม่มีการส่งอีเมลจริง':($action==='smtp_check'?'เชื่อมต่อและยืนยันตัวตน SMTP สำเร็จ':'SMTP รับอีเมลทดสอบแล้ว กรุณาตรวจกล่องจดหมายและสแปม')]);
+        if(!$success)app_json(['status'=>'error','code'=>$reason,'message'=>'ทดสอบ SMTP ไม่สำเร็จ','retry_after'=>30],400);
+        app_json(['status'=>'success','tested_at'=>date(DATE_ATOM),'expires_at'=>date(DATE_ATOM,time()+86400),'cooldown_seconds'=>30,'message'=>app_settings()['mock']?'ทดสอบในโหมดจำลอง ไม่มีการส่งอีเมลจริง':($action==='smtp_check'?'เชื่อมต่อและยืนยันตัวตน SMTP สำเร็จ':'SMTP รับอีเมลทดสอบแล้ว กรุณาตรวจกล่องจดหมายและสแปม')]);
     }
     $encoded=app_text($input,'pdf_base64',8*1024*1024,true);$pdf=base64_decode($encoded,true);
     if($pdf===false||strlen($pdf)>5*1024*1024||!str_starts_with($pdf,'%PDF-')||(new finfo(FILEINFO_MIME_TYPE))->buffer($pdf)!=='application/pdf')app_fail('รองรับ PDF ไม่เกิน 5 MB');

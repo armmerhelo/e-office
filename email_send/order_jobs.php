@@ -12,20 +12,36 @@ if($_SERVER['REQUEST_METHOD']==='GET'){
             $q=$pdo->prepare('SELECT id,user_id,recipient_name,recipient_email,source,status,attempts,error_code,attempted_at,sent_at FROM eoffice_order_recipients WHERE job_id=? ORDER BY id');$q->execute([$job['id']]);$recipients=$q->fetchAll();
             $afterToken=app_order_approval_hash((int)$job['id']);if(hash_equals($beforeToken,$afterToken))$reviewToken=$afterToken;
         }
-        app_json(['status'=>'success','job'=>$job,'files'=>$files,'recipients'=>$recipients,'review_token'=>$reviewToken]);
+        // Historical logs are read-only: viewing an old order never creates a job.
+        $q=$pdo->prepare("SELECT MAX(recipient_name) recipient_name,LOWER(TRIM(COALESCE(recipient_email,''))) recipient_email,
+            COUNT(*) log_count,MAX(delivery_status='success') sent,
+            MAX(CASE WHEN delivery_status='success' THEN created_at END) sent_at,MAX(created_at) attempted_at
+            FROM email_logs WHERE doc_id=? GROUP BY LOWER(TRIM(COALESCE(recipient_email,''))) ORDER BY recipient_email");
+        $q->execute([(string)$docId]);$history=$q->fetchAll();
+        app_json(['status'=>'success','job'=>$job,'files'=>$files,'recipients'=>$recipients,'history'=>$history,'review_token'=>$reviewToken]);
     }
     $page=max(1,(int)($_GET['page']??1));$limit=20;$offset=($page-1)*$limit;
     $where="d.Doc_Type='External' AND d.Is_Delete='active'";$params=[];
     $year=app_text($_GET,'year',10);$search=app_text($_GET,'search',200);$status=app_text($_GET,'state',30);
     if($year!==''&&$year!=='all'){$where.=' AND TRIM(d.Doc_Year)=?';$params[]=$year;}
     if($search!==''){$where.=' AND (d.Doc_Name LIKE ? OR d.Doc_Number LIKE ?)';$params[]='%'.$search.'%';$params[]='%'.$search.'%';}
-    if($status==='not_queued')$where.=' AND j.id IS NULL';elseif($status!==''){$where.=' AND j.status=?';$params[]=$status;}
+    // Explicit collation also supports legacy log tables with a different default.
+    $historyDoc='l.doc_id=CAST(d.Doc_Id AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci';
+    $historyExists="EXISTS (SELECT 1 FROM email_logs l WHERE $historyDoc)";
+    $historySent="EXISTS (SELECT 1 FROM email_logs l WHERE $historyDoc AND l.delivery_status='success')";
+    if($status==='not_queued')$where.=" AND j.id IS NULL AND NOT $historyExists";
+    elseif($status==='legacy_sent')$where.=" AND j.id IS NULL AND $historySent";
+    elseif($status==='legacy_review')$where.=" AND j.id IS NULL AND $historyExists AND NOT $historySent";
+    elseif($status!==''){$where.=' AND j.status=?';$params[]=$status;}
     $from="FROM t_document d LEFT JOIN eoffice_order_jobs j ON j.doc_id=d.Doc_Id WHERE $where";
     $q=$pdo->prepare("SELECT COUNT(*) $from");$q->execute($params);$total=(int)$q->fetchColumn();
     $q=$pdo->prepare("SELECT d.Doc_Id doc_id,d.Doc_Number doc_number,d.Doc_Name doc_name,d.Doc_Year doc_year,j.status,j.source,j.error_code,j.updated_at,
         (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status='success') success_count,
         (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status='pending') pending_count,
-        (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status IN ('uncertain','failed','skipped','sending')) attention_count
+        (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status IN ('uncertain','failed','skipped','sending')) attention_count,
+        (SELECT COUNT(DISTINCT LOWER(TRIM(COALESCE(l.recipient_email,'')))) FROM email_logs l WHERE $historyDoc) history_count,
+        (SELECT COUNT(DISTINCT LOWER(TRIM(COALESCE(l.recipient_email,'')))) FROM email_logs l WHERE $historyDoc AND l.delivery_status='success') history_success_count,
+        (SELECT MAX(l.created_at) FROM email_logs l WHERE $historyDoc AND l.delivery_status='success') history_sent_at
         $from ORDER BY d.Doc_Id DESC LIMIT $limit OFFSET $offset");$q->execute($params);$rows=$q->fetchAll();
     $years=$pdo->query("SELECT DISTINCT TRIM(Doc_Year) year FROM t_document WHERE Doc_Type='External' AND Is_Delete='active' ORDER BY year DESC")->fetchAll(PDO::FETCH_COLUMN);
     $settings=app_order_settings();
@@ -48,9 +64,7 @@ try{
     $current=app_user(true,true);if(!app_can($current,'email'))throw new DomainException('คุณไม่มีสิทธิ์ทำรายการนี้');
     $job=app_order_job($docId);
     if($action==='enqueue'){
-        if(!$job){$pdo->prepare("INSERT INTO eoffice_order_jobs (doc_id,source,status,created_by) VALUES (?,'manual','queued',?)")->execute([$docId,$actor['User_Id']]);}
-        elseif(in_array($job['status'],['waiting_files','analyzing','sending','queued'],true)){/* Idempotent click. */}
-        else throw new DomainException('มีงานอยู่แล้ว กรุณาดูรายละเอียดและเลือกจัดการรายการ');
+        app_order_enqueue_manual($docId,(int)$actor['User_Id'],($input['confirmed']??false)===true);
     }else{
         if(!$job)throw new DomainException('กรุณานำคำสั่งเข้าคิวก่อน');
         if($action==='approve'){

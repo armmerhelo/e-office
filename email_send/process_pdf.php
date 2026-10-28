@@ -12,9 +12,10 @@ try{
     else{
         $current=app_user(true,true);
         if(!app_can($current,'email')){$pdo->rollBack();$error='คุณไม่มีสิทธิ์ทำรายการนี้';}
-        else{$pdo->prepare("INSERT IGNORE INTO eoffice_order_jobs (doc_id,source,status,created_by) VALUES (?,'manual','queued',?)")->execute([$id,$actor['User_Id']]);app_order_audit('enqueue_legacy',(int)$actor['User_Id'],$id);$pdo->commit();}
+        else{app_order_enqueue_manual($id,(int)$actor['User_Id'],($input['confirmed']??false)===true);app_order_audit('enqueue_legacy',(int)$actor['User_Id'],$id);$pdo->commit();}
     }
-}catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+}catch(DomainException $e){if($pdo->inTransaction())$pdo->rollBack();$error=$e->getMessage();}
+catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 finally{$pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]);}
 if($error!==null)app_fail($error,409);
 header('Content-Type: text/event-stream; charset=utf-8');header('Cache-Control: no-store');

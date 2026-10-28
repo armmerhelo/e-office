@@ -8,8 +8,9 @@ function order_settings_public(): array {
     $configured=!empty($row['active_key_id'])||($row['api_key_cipher']!==null?strlen(base64_decode($row['api_key_cipher'],true)?:'')>28:app_env('GEMINI_API_KEY')!=='');
     $usable=$configured;try{if($configured)app_order_ai_config($row);}catch(AppOrderAIException $e){$usable=false;}
     $diagnostics=app_order_diagnostics($row);
-    $diagnostics['ai_tested']=$usable&&order_ai_tested(app_order_ai_config($row));
-    try{$diagnostics['smtp_tested']=order_smtp_tested(app_order_smtp($row));}catch(AppOrderAIException $e){$diagnostics['smtp_tested']=false;}
+    $aiAt=$usable?order_tested_at('ai_test',order_ai_fingerprint(app_order_ai_config($row))):null;
+    try{$smtpAt=order_tested_at('smtp_test',order_smtp_fingerprint(app_order_smtp($row)));}catch(AppOrderAIException $e){$smtpAt=null;}
+    foreach(['ai'=>$aiAt,'smtp'=>$smtpAt] as $kind=>$at){$diagnostics[$kind.'_tested']=$at!==null;$diagnostics[$kind.'_tested_at']=$at;$diagnostics[$kind.'_test_expires_at']=$at!==null?date(DATE_ATOM,strtotime($at)+86400):null;}
     foreach($diagnostics['events'] as &$event)unset($event['details']['fingerprint']);unset($event);
     return ['enabled'=>(bool)$row['enabled'],'activated_at'=>$row['activated_at'],'worker_at'=>$row['worker_at'],
         'key_usable'=>$usable,'options'=>app_order_options($row),'diagnostics'=>$diagnostics,'smtp_password_configured'=>!empty($row['smtp_password_cipher']),
@@ -30,7 +31,7 @@ try{
         $started=microtime(true);
         try{app_order_ai_test($config);app_order_event('ai_test',['success'=>true,'model'=>$config['model'],'fingerprint'=>order_ai_fingerprint($config),'duration_ms'=>(int)((microtime(true)-$started)*1000)],(int)$actor['User_Id']);}
         catch(AppOrderAIException $e){app_order_event('ai_test',['success'=>false,'model'=>$config['model'],'code'=>$e->reason],(int)$actor['User_Id']);throw $e;}
-        app_json(['status'=>'success','message'=>'เชื่อมต่อและทดสอบโมเดลสำเร็จ']);
+        app_json(['status'=>'success','message'=>'เชื่อมต่อและทดสอบโมเดลสำเร็จ','tested_at'=>date(DATE_ATOM),'expires_at'=>date(DATE_ATOM,time()+86400)]);
     }
     if($action!=='save')app_fail('คำสั่งไม่ถูกต้อง');
     $key=app_text($input,'api_key',512);$clear=$input['clear_key']??false;$enabled=$input['enabled']??null;
@@ -44,7 +45,7 @@ try{
     $before=app_order_settings();
     if(isset($input['options'])&&!is_array($input['options']))app_fail('ข้อมูลตัวเลือกไม่ถูกต้อง');
     $oldOptions=app_order_options($before);$options=app_order_validate_options($input['options']??[],$oldOptions);
-    $smtpPassword=app_text($input,'smtp_password',512);$smtpCipher=$smtpPassword!==''?app_order_encrypt($smtpPassword):null;
+    $smtpPassword=$options['smtp_source']==='admin'?app_text($input,'smtp_password',512):'';$smtpCipher=$smtpPassword!==''?app_order_encrypt($smtpPassword):null;
     $smtp=[];
     if($enabled&&!$options['analysis_only'])$smtp=app_order_smtp($before,$options,$smtpPassword!==''?$smtpPassword:null);
     if((int)$before['revision']!==$revision)app_fail('การตั้งค่าถูกแก้ไขแล้ว กรุณาโหลดใหม่',409);

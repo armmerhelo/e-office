@@ -51,6 +51,22 @@ $job6=order_fixture_doc(['behavior-deleted.pdf']);$pdo->prepare("UPDATE t_docume
 $job7=order_fixture_doc(['behavior-no-targets.pdf']);app_order_worker(90,['ai'=>static fn()=>[],'mail'=>static fn()=>true]);order_verify(app_order_job((int)$job7['doc_id'])['error_code']==='no_recipients','no recipients is review rather than success');
 $job8=order_fixture_doc(['behavior-legacy.pdf']);$pdo->prepare("INSERT INTO email_logs (doc_id,file_name,recipient_name,recipient_email,delivery_status) VALUES (?,?,?,'alice@example.test','success')")->execute([(string)$job8['doc_id'],'behavior-legacy.pdf','alice']);$legacyMail=0;
 app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use(&$legacyMail){$legacyMail++;return true;}]);order_verify($legacyMail===0,'existing successful legacy logs prevent automatic duplicates');
+// Importing an old order builds document/AI recipients before legacy-only rows.
+// Padded history must already protect those recipients when INSERT IGNORE runs.
+foreach(['ai','document','manual'] as $source)foreach(['success',null] as $recorded){
+    $name='behavior-padded-'.$source.'-'.($recorded??'unknown').'.pdf';$paddedJob=order_fixture_doc([$name]);
+    $pdo->prepare("UPDATE eoffice_order_jobs SET source='manual' WHERE id=?")->execute([$paddedJob['id']]);$paddedJob=app_order_job((int)$paddedJob['doc_id']);
+    $pdo->prepare('INSERT INTO email_logs (doc_id,file_name,recipient_name,recipient_email,delivery_status) VALUES (?,?,?,?,?)')->execute([(string)$paddedJob['doc_id'],$name,'Alice',' ALICE@EXAMPLE.TEST ',$recorded]);
+    if($source==='document')$pdo->prepare('INSERT INTO t_access_rights (User_Id,Doc_Id) VALUES (?,?)')->execute([$alice,$paddedJob['doc_id']]);
+    if($source==='manual'){
+        $user=$pdo->query("SELECT * FROM t_user WHERE User_Name='alice'")->fetch();app_order_add_recipient($paddedJob,$user,'manual');
+    }
+    $paddedMail=0;app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use(&$paddedMail){$paddedMail++;return true;}]);
+    $paddedRecipients=order_fixture_recipients($paddedJob);$expected=$recorded==='success'?'success':'uncertain';
+    order_verify($paddedMail===0&&count($paddedRecipients)===1&&$paddedRecipients[0]['recipient_email']==='alice@example.test'&&$paddedRecipients[0]['status']===$expected&&$paddedRecipients[0]['source']===$source,'padded '.($recorded??'unconfirmed').' history protects '.$source.' recipients through import and SMTP');
+    app_order_worker(90,['ai'=>static fn()=>[$alice],'mail'=>static function()use(&$paddedMail){$paddedMail++;return true;}]);
+    order_verify($paddedMail===0,'later cron does not resend padded '.($recorded??'unconfirmed').' '.$source.' history');
+}
 $pdo->exec('UPDATE eoffice_order_settings SET enabled=0');$job9=order_fixture_doc(['behavior-paused.pdf']);order_verify(app_order_worker(90,$transports)===0&&app_order_job((int)$job9['doc_id'])['status']==='queued','paused worker retains queued work');
 // A second connection holding the worker lock simulates an overlapping cron.
 $other=new PDO("mysql:host={$settings['host']};port={$settings['port']};dbname={$settings['database']};charset=utf8mb4",$settings['username'],$settings['password']);$other->query("SELECT GET_LOCK('eoffice:orders',0)");

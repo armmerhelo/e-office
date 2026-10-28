@@ -37,6 +37,7 @@ class Element {
     getAttribute(name) { return this.attributes[name] ?? null; }
     focus() {}
     reportValidity() { return !this.required || Boolean(this.value.trim()); }
+    checkValidity() { return this.reportValidity(); }
     reset() {}
     showModal() { this.open = true; }
     close() { this.open = false; this.dispatch('close'); }
@@ -155,8 +156,58 @@ async function testRecipientFormLifecycle() {
     assert.equal(input.value, '');
 }
 
+async function testHistoricalOrderDisplay() {
+    const document = makeDocument(), calls = [], confirmations = [];
+    const items = [
+        {doc_id: 21, doc_number: '21', doc_year: '2568', doc_name: '<script>old order</script>', status: null, history_count: 2, history_success_count: 1, history_sent_at: '2025-10-02 10:00:00'},
+        {doc_id: 22, doc_number: '22', doc_year: '2568', doc_name: 'Unconfirmed history', status: null, history_count: 1, history_success_count: 0},
+        {doc_id: 23, doc_number: '23', doc_year: '2568', doc_name: 'No history', status: null},
+        {doc_id: 24, doc_number: '24', doc_year: '2568', doc_name: 'Imported history', status: 'queued', source: 'manual', history_count: 2, history_success_count: 1},
+    ];
+    const history = [{recipient_name: '<img src=x onerror=alert(1)>', recipient_email: 'alice@example.test', sent: 1, log_count: 3, sent_at: '2025-10-02 10:00:00'}, {recipient_name: 'Bob', recipient_email: 'bob@example.test', sent: 0, log_count: 1, attempted_at: '2025-10-03 12:00:00'}];
+    let accept = false;
+    const request = async (url, data) => {
+        calls.push({url, data});
+        if (data) { items[0].status = 'queued'; return {message: 'บันทึกงานแล้ว'}; }
+        if (url.includes('doc_id=')) return {job: items[0].status ? {status: items[0].status} : null, files: [], recipients: [], history};
+        return {total: items.length, years: [], is_admin: false, worker: {enabled: false}, data: items};
+    };
+    vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js', 'utf8'), {
+        OrderUI: uiFor(document, request), document, window: {}, URLSearchParams, Event,
+        Option: class {}, setInterval() {}, confirm: text => { confirmations.push(text); return accept; },
+    });
+    await settle();
+    const rows = document.getElementById('rows').children;
+    assert.match(rows[0].textContent, /เคยส่งแล้ว \(ระบบเดิม\)/);
+    assert.match(rows[0].textContent, /ประวัติส่งสำเร็จ 1 คน · ต้องตรวจสอบ 1 คน/);
+    assert.ok(!rows[0].textContent.includes('ยังไม่ได้รวบรวมผู้รับ'));
+    assert.match(rows[1].textContent, /มีประวัติเดิม · ต้องตรวจสอบผลส่ง/);
+    assert.match(rows[2].textContent, /ยังไม่ได้รวบรวมผู้รับ/);
+    assert.match(rows[3].textContent, /queued.*ประวัติส่งสำเร็จ 1 คน/);
+    const button = rows[0].children[3].children[0];
+    assert.equal(button.textContent, 'ดูประวัติการส่ง');button.click();await settle();
+    assert.equal(calls.filter(call => call.data).length, 0);
+    assert.equal(document.getElementById('history-section').hidden, false);
+    assert.equal(document.getElementById('files-section').hidden, true);
+    assert.equal(document.getElementById('recipients-section').hidden, true);
+    assert.equal(document.getElementById('job-danger-zone').hidden, true);
+    assert.equal(document.getElementById('history-count').textContent, '2 คน');
+    assert.match(document.getElementById('history-rows').textContent, /เคยส่งสำเร็จ.*ยังไม่ยืนยันผลส่ง/);
+    assert.equal(document.getElementById('history-rows').children[0].children[0].children[0].textContent, history[0].recipient_name);
+    assert.equal(document.getElementById('reanalyze').disabled, true);
+    document.getElementById('enqueue-history').click();await settle();
+    assert.equal(calls.filter(call => call.data).length, 0, 'cancelling the confirmation cannot enqueue');
+    assert.match(confirmations[0], /มีประวัติส่งอีเมลแล้ว/);
+    accept = true;document.getElementById('enqueue-history').click();await settle();
+    const write = calls.find(call => call.data);
+    assert.equal(write.data.action, 'enqueue');assert.equal(write.data.confirmed, true);
+    assert.equal(document.getElementById('enqueue-history').hidden, true);
+    assert.equal(document.getElementById('files-section').hidden, false);
+    assert.equal(document.getElementById('history-section').hidden, false);
+}
+
 async function testSettingsDraftActions() {
-    const document = makeDocument(), requests = [];
+    const document = makeDocument(), requests = [], confirmations=[];let acceptConfirmation=true;
     let settings = {keyring:{keys:[],server:{configured:false}},enabled: true, model: 'gemini-test', key_configured: true, key_usable:true, key_source: 'admin', encryption_ready: true, activated_at: null, worker_at: null, revision:7,
         options:{analysis_only:false,require_approval:false,smtp_source:'server',smtp_host:'',smtp_port:587,smtp_security:'starttls',smtp_username:'',smtp_from:'',smtp_name:'E-Office',smtp_reply_to:'',subject:'คำสั่ง {doc_number}',intro:'เรียน {recipient_name}',signature:'E-Office',input_price:0,output_price:0},diagnostics:{smtp:{effective:{},configured:false},cron:{state:'missing'},counts:{},pending_recipients:0,usage:[],events:[],base_url:'http://localhost',mock:true}};
     const request = async (url, data) => {
@@ -164,9 +215,11 @@ async function testSettingsDraftActions() {
         if (!data) return {settings};
         if (data.action === 'test') return {message: 'ทดสอบผ่าน'};
         if (data.action === 'save') {
-            settings = {...settings, enabled: data.enabled, model: data.model, key_configured: data.clear_key ? false : settings.key_configured};
+            settings = {...settings, enabled: data.enabled, model: data.model,options:data.options, key_configured: data.clear_key ? false : settings.key_configured};
             return {message: 'บันทึกแล้ว', settings};
         }
+        if(data.action==='smtp_test')return {message:'SMTP รับอีเมลทดสอบแล้ว'};
+        if(data.action==='key_add'){settings={...settings,revision:settings.revision+1};return {message:'เพิ่ม Key แล้ว',settings};}
         throw new Error('unexpected settings action');
     };
     const modelOptions = document.getElementById('model-options');
@@ -175,6 +228,7 @@ async function testSettingsDraftActions() {
     const windowEvents={};const window = {addEventListener(type,callback) {(windowEvents[type] ||= []).push(callback);}};
     const context=vm.createContext({
         OrderUI: uiFor(document, request), document, window, Event,
+        setInterval(){},confirm:message=>{confirmations.push(message);return acceptConfirmation;},
         Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     });
     vm.runInContext(fs.readFileSync('email_send/settings-controls.js','utf8'),context);
@@ -202,8 +256,8 @@ async function testSettingsDraftActions() {
     document.getElementById('settings-form').dispatch('input');assert.equal(warns(),true,'new settings edits must revoke confirmed departure');
     windowEvents['eoffice:leaving-confirmed'][0]();windowEvents['eoffice:leaving-cancelled'][0]();assert.equal(warns(),true,'a cancelled/failed departure must restore the AI guard');
     testButton.click(); await settle();
-    assert.equal(requests.at(-1).action, 'test');
-    assert.equal(requests.at(-1).model, 'gemini-candidate');
+    assert.equal(requests.filter(r=>r.action).at(-1).action, 'test');
+    assert.equal(requests.filter(r=>r.action).at(-1).model, 'gemini-candidate');
     assert.equal(document.getElementById('test-result').classList.contains('ok'), true);
     model.value = 'gemini-edited'; model.dispatch('input');
     assert.equal(document.getElementById('test-result').textContent, 'ยังไม่ได้ทดสอบค่าชุดนี้', 'editing a tested model invalidates its previous result');
@@ -245,7 +299,123 @@ async function testSettingsDraftActions() {
     assert.equal(warns(),true);
     document.getElementById('discard').click();assert.equal(document.getElementById('smtp_name').value,'E-Office');assert.equal(warns(),false);
     document.getElementById('keyring-label').value='Draft backup';document.getElementById('settings-form').dispatch('input');assert.equal(warns(),true,'unfinished key additions participate in the leave guard');
-    document.getElementById('discard').click();assert.equal(document.getElementById('keyring-label').value,'');assert.equal(warns(),false);
+    assert.equal(document.getElementById('save').disabled,true,'vault-only drafts do not enable the settings save');
+    document.getElementById('keyring-discard').click();assert.equal(document.getElementById('keyring-label').value,'');assert.equal(warns(),false);
+
+    const field=id=>document.getElementById(id),change=id=>field(id).dispatch('change');
+    const submit=async()=>{field('settings-form').onsubmit({preventDefault(){}});await settle();};
+    field('smtp_source').value='admin';field('smtp_from').value='bad-email';field('smtp_from').checkValidity=()=>false;
+    field('smtp_source').value='server';change('smtp_source');field('smtp_name').value='New sender';change('smtp_name');
+    field('test-email').value='bad';field('test-email').checkValidity=()=>false;
+    await submit();assert.equal(requests.at(-1).action,'save','inactive SMTP and test-only email must not block unrelated save');
+    assert.equal(requests.at(-1).options.smtp_from,'','inactive SMTP drafts are excluded from the save');
+    field('smtp_source').value='admin';change('smtp_source');const beforeInvalid=requests.length;await submit();assert.equal(requests.length,beforeInvalid,'active malformed SMTP is validated');
+    field('discard').click();
+
+    field('api-key').value='synthetic-candidate-key';field('api-key').dispatch('input');field('model').value='candidate-checklist';field('model').dispatch('input');field('test-ai').click();await settle();
+    assert.match(field('readiness-checks').textContent,/✓ AI: ทดสอบผ่าน/,'candidate AI success immediately updates readiness');
+    assert.equal(field('model').value,'candidate-checklist','diagnostic refresh preserves the tested draft');
+    field('model').value='different-candidate';field('model').dispatch('input');field('settings-form').dispatch('input');
+    assert.match(field('readiness-checks').textContent,/! AI:/,'editing a tested identity invalidates readiness');
+    field('discard').click();field('test-email').value='admin@example.test';field('test-email').checkValidity=()=>true;
+    field('smtp_name').value='SMTP candidate';field('smtp_name').dispatch('input');field('settings-form').dispatch('input');
+    field('smtp-test').click();await settle();assert.match(field('readiness-checks').textContent,/✓ SMTP: ส่งทดสอบผ่าน/);
+    assert.equal(field('smtp-check').disabled,true,'both SMTP actions respect shared cooldown');assert.match(field('smtp-test').textContent,/รอ/);
+    assert.equal(field('smtp_name').value,'SMTP candidate','SMTP diagnostics preserve the candidate');field('discard').click();
+
+    field('delivery-mode').value='approval';change('delivery-mode');await submit();
+    assert.equal(settings.enabled,true);assert.equal(settings.options.require_approval,true);
+    confirmations.length=0;field('delivery-mode').value='automatic';change('delivery-mode');acceptConfirmation=false;
+    const beforeCancel=requests.length;await submit();assert.equal(requests.length,beforeCancel,'cancelled release of approval-held jobs does not write');
+    assert.match(confirmations[0],/พักตามนโยบาย/);assert.equal(field('delivery-mode').value,'automatic','cancel preserves mode draft');
+    acceptConfirmation=true;await submit();assert.equal(settings.options.require_approval,false);
+    field('delivery-mode').value='analysis';change('delivery-mode');await submit();confirmations.length=0;
+    field('delivery-mode').value='automatic';change('delivery-mode');await submit();assert.equal(confirmations.length,1,'leaving analysis-only confirms potential delivery even while enabled');
+    confirmations.length=0;field('smtp_name').value='Unrelated';change('smtp_name');await submit();assert.equal(confirmations.length,0,'ordinary changes do not repeatedly confirm delivery');
+
+    field('keyring-label').value='Keep vault draft';field('smtp_name').value='Saved main';change('smtp_name');await submit();
+    assert.equal(field('keyring-label').value,'Keep vault draft','settings save preserves vault drafts');assert.equal(warns(),true);
+    field('model').value='Unsaved main model';field('model').dispatch('input');field('keyring-secret').value='synthetic-vault-secret';field('keyring-add').click();await settle();
+    assert.equal(field('model').value,'Unsaved main model','immediate vault write preserves main draft');assert.equal(field('keyring-secret').value,'');
+    assert.equal(warns(),true,'main draft remains guarded after a vault write');field('discard').click();assert.equal(warns(),false);
+}
+
+async function settingsRefreshHarness() {
+    const document=makeDocument(),window={addEventListener() {}},requests=[];
+    const backend={clock:0,smtpPassword:'synthetic-original-password',testedPassword:null,settings:{
+        keyring:{keys:[],server:{configured:true,active:true}},enabled:false,model:'gemini-test',key_configured:true,key_usable:true,key_source:'server',encryption_ready:true,activated_at:null,worker_at:null,revision:10,
+        options:{analysis_only:false,require_approval:false,smtp_source:'admin',smtp_host:'smtp.example.test',smtp_port:587,smtp_security:'starttls',smtp_username:'office@example.test',smtp_from:'office@example.test',smtp_name:'E-Office',smtp_reply_to:'',subject:'คำสั่ง {doc_number}',intro:'เรียน {recipient_name}',signature:'E-Office',input_price:0,output_price:0},
+        diagnostics:{smtp:{effective:{host:'smtp.example.test',port:587,security:'starttls',from:'office@example.test'},configured:true},cron:{state:'missing'},counts:{},pending_recipients:0,usage:[],events:[],base_url:'https://example.test',mock:false}}};
+    const snapshot=()=>{
+        const settings=structuredClone(backend.settings);
+        settings.smtp_password_configured=true;
+        settings.diagnostics.smtp_tested=backend.testedPassword===backend.smtpPassword;
+        return settings;
+    };
+    const request=async(url,data)=>{
+        requests.push(data||{method:'GET'});
+        if(!data)return {settings:snapshot()};
+        if(data.action==='smtp_test'){
+            backend.testedPassword=data.smtp_password||backend.smtpPassword;
+            return {message:'SMTP รับอีเมลทดสอบแล้ว',cooldown_seconds:30};
+        }
+        if(data.action==='test')return {message:'ทดสอบ AI ผ่าน'};
+        if(data.action==='save'){
+            if(data.revision!==backend.settings.revision)throw Error('การตั้งค่าถูกแก้ไขแล้ว กรุณาโหลดใหม่');
+            if(data.smtp_password)backend.smtpPassword=data.smtp_password;
+            Object.assign(backend.settings,{enabled:data.enabled,model:data.model,options:data.options,revision:backend.settings.revision+1});
+            return {message:'บันทึกแล้ว',settings:snapshot()};
+        }
+        throw Error('Unexpected settings action');
+    };
+    const RealDate=Date;
+    class ClockDate extends RealDate { static now(){return RealDate.now()+backend.clock;} }
+    const context=vm.createContext({OrderUI:uiFor(document,request),document,window,Event,Date:ClockDate,setInterval(){},confirm:()=>true,
+        Option:class {constructor(text,value){this.text=text;this.value=value;}}});
+    vm.runInContext(fs.readFileSync('email_send/settings-controls.js','utf8'),context);context.OrderSettingsControls=window.OrderSettingsControls;
+    vm.runInContext(fs.readFileSync('email_send/keyring-controls.js','utf8'),context);context.OrderKeyring=window.OrderKeyring;
+    vm.runInContext(fs.readFileSync('email_send/ai-settings.js','utf8'),context);await settle();
+    const field=id=>document.getElementById(id);
+    const set=(id,value)=>{field(id).value=value;field(id).dispatch('input');field('settings-form').dispatch('input');};
+    const save=async()=>{field('settings-form').onsubmit({preventDefault(){}});await settle();};
+    set('test-email','qa@example.test');
+    return {backend,requests,field,set,save};
+}
+
+async function testSettingsDiagnosticsRefresh(){
+    const {backend,requests,field,set,save}=await settingsRefreshHarness();
+    set('model','gemini-draft');set('intro','แม่แบบที่ยังไม่บันทึก');set('keyring-label','Key draft');set('keyring-secret','synthetic-unsaved-key');set('smtp-password','synthetic-unsaved-password');
+    field('delivery-mode').value='analysis';field('delivery-mode').dispatch('change');
+    let cleanEvents=0;field('settings-form').addEventListener('eoffice:form-saved',()=>cleanEvents++);
+    backend.settings.worker_at='2026-10-28 12:34:00';backend.settings.diagnostics.cron={state:'healthy',finished_at:'2026-10-28 12:35:00',result:{processed:2,failed:0}};
+    field('test-ai').click();await settle();
+    assert.match(field('saved-worker').textContent,/12:34/,'latest heartbeat updates the status tile');
+    assert.equal(field('saved-worker').className,'status-good');
+    assert.match(field('readiness-title').textContent,/ปิดอยู่/,'banner describes saved mode rather than a pending mode');
+    assert.equal(field('readiness-action').href,'#delivery-title');
+    assert.match(field('readiness-checks').textContent,/✓ Cron: ทำงานตามรอบ/);
+    assert.match(field('worker-detail').textContent,/12:35/);
+    assert.equal(field('model').value,'gemini-draft');assert.equal(field('intro').value,'แม่แบบที่ยังไม่บันทึก');
+    assert.equal(field('smtp-password').value,'synthetic-unsaved-password');assert.equal(field('keyring-label').value,'Key draft');assert.equal(field('keyring-secret').value,'synthetic-unsaved-key');
+    assert.equal(field('delivery-mode').value,'analysis');assert.equal(field('save').disabled,false);assert.equal(cleanEvents,0,'diagnostic refresh must not mark drafts saved');
+    backend.settings.worker_at='2026-10-28 12:40:00';backend.settings.diagnostics.cron.state='offline';field('test-ai').click();await settle();
+    assert.match(field('saved-worker').textContent,/12:40/);assert.equal(field('saved-worker').className,'status-warning');assert.match(field('readiness-title').textContent,/Cron/);
+    backend.settings.revision++;backend.settings.worker_at='2026-10-28 13:00:00';backend.settings.diagnostics.cron.state='healthy';field('test-ai').click();await settle();
+    assert.match(field('message').textContent,/ถูกแก้ไขจากที่อื่น/);assert.match(field('saved-worker').textContent,/12:40/,'conflicting snapshots must not replace the accepted status');
+    await save();assert.equal(requests.filter(r=>r.action==='save').at(-1).revision,10,'diagnostic conflicts never adopt an external revision');assert.match(field('save-state').textContent,/บันทึกไม่สำเร็จ/);
+}
+
+async function testSmtpTestAfterPasswordSave(){
+    const {backend,field,set,save}=await settingsRefreshHarness();
+    field('smtp-test').click();await settle();assert.match(field('readiness-checks').textContent,/✓ SMTP:/);
+    set('smtp-password','synthetic-replacement-password');await save();
+    assert.equal(backend.settings.enabled,false);assert.equal(field('smtp-password').value,'');
+    assert.match(field('readiness-checks').textContent,/! SMTP:/,'an old successful trial cannot validate the newly stored password');
+    backend.clock+=31000;field('settings-form').dispatch('input');field('smtp-test').click();await settle();
+    assert.match(field('readiness-checks').textContent,/✓ SMTP:/,'testing the newly stored password restores readiness');
+    set('intro','Unrelated template update');await save();assert.match(field('readiness-checks').textContent,/✓ SMTP:/,'an unrelated save retains server-confirmed SMTP readiness');
+    set('smtp-password','synthetic-tested-before-save');backend.clock+=31000;field('settings-form').dispatch('input');field('smtp-test').click();await settle();
+    assert.match(field('readiness-checks').textContent,/✓ SMTP:/);await save();assert.match(field('readiness-checks').textContent,/✓ SMTP:/,'a tested candidate password remains valid after saving');
 }
 
 function testSaveBarDoesNotOverlay() {
@@ -269,6 +439,9 @@ function testKeyringControls(){
     buttons(cards[1]).find(b=>b.textContent==='ทดสอบและเลือกเป็นตัวหลัก').click();assert.equal(calls.at(-1).action,'key_activate');assert.equal(calls.at(-1).data.confirmed,true);
     const input=cards[1].children.find(n=>n.tagName==='INPUT');input.value='Renamed reserve';assert.equal(window.OrderKeyring.dirty(),true);
     buttons(cards[1]).find(b=>b.textContent==='บันทึกชื่อ/รอบเตือน').click();assert.equal(calls.at(-1).data.label,'Renamed reserve');
+    window.OrderKeyring.render({...settings,keyring:{...settings.keyring,keys:[...settings.keyring.keys,{...base,id:3,reference:'key_c',label:'New primary',active:false}]}},()=> '—',(action,data)=>calls.push({action,data}),true);
+    assert.equal(document.getElementById('keyring-list').children.length,3,'updated vault metadata renders after a settings save');
+    assert.equal(document.getElementById('keyring-list').children[1].children.find(n=>n.tagName==='INPUT').value,'Renamed reserve','existing row drafts survive metadata refresh');
     document.getElementById('keyring-server').click();assert.equal(calls.at(-1).action,'key_server');
     document.getElementById('keyring-label').value='New';document.getElementById('keyring-secret').value='synthetic-ui-only-secret';document.getElementById('keyring-add').click();assert.equal(calls.at(-1).action,'key_add');
     window.OrderKeyring.render(settings,()=> '—',()=>{});assert.equal(document.getElementById('keyring-secret').value,'');assert.equal(window.OrderKeyring.dirty(),false);
@@ -279,8 +452,14 @@ function testKeyringControls(){
     console.log('PASS an action failure remains visible after a successful automatic refresh');
     await testRecipientFormLifecycle();
     console.log('PASS recipient form: successful save, reopen, rejected write and failed post-save refresh synchronize the shared guard');
+    await testHistoricalOrderDisplay();
+    console.log('PASS historical orders show sent/review badges, safe read-only history and explicit enqueue confirmation');
     await testSettingsDraftActions();
     console.log('PASS AI test invalidation and clearing the key pauses delivery without sending a new key');
+    await testSettingsDiagnosticsRefresh();
+    console.log('PASS diagnostics refresh synchronizes Cron tile/banner/checklist, preserves drafts and rejects external revisions');
+    await testSmtpTestAfterPasswordSave();
+    console.log('PASS SMTP password changes discard stale trials while server-confirmed and pretested credentials remain ready');
     testSaveBarDoesNotOverlay();
     console.log('PASS settings save bar stays in normal document flow');
     testKeyringControls();console.log('PASS key vault cards protect the primary key, bind confirmations and clear sensitive drafts');

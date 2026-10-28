@@ -3,7 +3,9 @@ window.OrderKeyring = (()=>{
     let saved=null,runAction=null;
     const drafts=new Map();
     const dirty=()=>Boolean(el('keyring-label').value||el('keyring-secret').value||el('keyring-days').value!=='90'||[...drafts.values()].some(d=>d.label.value.trim()!==d.original.label||Number(d.days.value)!==d.original.remind_days));
-    function render(settings,dateTime,callback){
+    function render(settings,dateTime,callback,preserveDrafts=false){
+        const addition=preserveDrafts?[el('keyring-label').value,el('keyring-secret').value,el('keyring-days').value]:null;
+        const pending=preserveDrafts?[...drafts].map(([id,d])=>[id,{label:d.label.value.trim()!==d.original.label?d.label.value:null,days:Number(d.days.value)!==d.original.remind_days?d.days.value:null}]):[];
         saved=settings;runAction=callback;drafts.clear();
         el('keyring-label').value='';el('keyring-secret').value='';el('keyring-days').value='90';
         const ring=settings.keyring;
@@ -37,9 +39,12 @@ window.OrderKeyring = (()=>{
         if(ring.server.usage)el('keyring-list').append(U.node('p',`Key เซิร์ฟเวอร์ · 30 วัน: ${ring.server.usage.requests} คำขอ / ${ring.server.usage.total_tokens} tokens`,'field-help'));
         if(ring.server.health)el('keyring-list').append(U.node('p',`Key เซิร์ฟเวอร์ · สำเร็จล่าสุด ${dateTime(ring.server.health.last_success_at,'—')} · ผิดพลาด ${dateTime(ring.server.health.last_error_at,'—')}${ring.server.health.last_error_code?' · '+U.error(ring.server.health.last_error_code):''}`,'field-help'));
         if(ring.unattributed_usage)el('keyring-list').append(U.node('p',`ข้อมูลเก่า/Key ทดลองที่ยังไม่จัดเก็บ: ${ring.unattributed_usage.requests} คำขอ (ไม่ระบุ Key)`,'field-help'));
+        if(addition)[el('keyring-label').value,el('keyring-secret').value,el('keyring-days').value]=addition;
+        for(const [id,values] of pending){const entry=drafts.get(id);if(entry){if(values.label!==null)entry.label.value=values.label;if(values.days!==null)entry.days.value=values.days;}}
     }
     el('keyring-add').onclick=()=>{
         if(!el('keyring-label').value.trim()||!el('keyring-secret').value.trim()){U.message('keyring-message','กรุณากรอกชื่อและ API Key',true);return;}
+        if(!el('keyring-days').reportValidity())return;
         runAction('key_add',{label:el('keyring-label').value.trim(),api_key:el('keyring-secret').value.trim(),remind_days:Number(el('keyring-days').value)});
     };
     el('keyring-server').onclick=()=>{if(confirm('ทดสอบแล้วกลับไปใช้ GEMINI_API_KEY จากเซิร์ฟเวอร์?\nKey ในคลังจะคงไว้ และไม่มีการสลับกลับอัตโนมัติ'))runAction('key_server',{confirmed:true});};

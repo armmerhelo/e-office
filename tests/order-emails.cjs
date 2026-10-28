@@ -9,7 +9,7 @@ const env={...process.env,DB_DATABASE:`eoffice_orders_${process.pid}_test`,APP_U
 let servers=[],created=false,users,pdf,passed=0;
 function fixture(action){const r=cp.spawnSync(php,['tests/order-email-fixture.php',action],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}
 function snapshot(){return JSON.parse(fixture('snapshot'));}
-async function request(route,{as='admin',data,form,status=200,headers={}}={}){const r=await fetch(base+route,{method:data||form?'POST':'GET',headers:{...headers,...(as?{Cookie:users[as].cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:form||(data?JSON.stringify(data):undefined)});const text=await r.text();assert.equal(r.status,status,`${route}: ${text}`);return JSON.parse(text);}
+async function request(route,{as='admin',data,form,status=200,headers={},raw=false}={}){const r=await fetch(base+route,{method:data||form?'POST':'GET',headers:{...headers,...(as?{Cookie:users[as].cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:form||(data?JSON.stringify(data):undefined)});const text=await r.text();assert.equal(r.status,status,`${route}: ${text}`);return raw?text:JSON.parse(text);}
 async function test(name,fn){await fn();passed++;console.log('PASS '+name);}
 function race(action){const r=cp.spawnSync(php,['tests/order-email-races.php',action],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}
 function raceProcess(...args){return cp.spawn(php,['tests/order-email-races.php',...args],{env,stdio:['pipe','pipe','pipe']});}
@@ -27,6 +27,79 @@ async function run(){
     await test('only highest Admin can read or change AI settings',async()=>{await request('/email_send/ai_settings.php',{as:null,status:401});await request('/email_send/ai_settings.php',{as:'staff',status:403});await request('/email_send/ai_settings.php',{as:'owner',status:403});await request('/email_send/ai_settings.php',{as:'staff',data:{action:'save',model:'gemini-test',enabled:true},status:403});});
     await test('same-origin protection applies to AI settings',async()=>{await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:true},headers:{Origin:'https://foreign.example'},status:403});});
     await test('order before first activation never auto-queues',async()=>{old=await create([pdf]);assert.equal(snapshot().eoffice_order_jobs.length,0);});
+    const historical=JSON.parse(fixture('history-seed'));
+    await test('historical list deduplicates recipients across files and preserves last successful send time',async()=>{
+        const list=await request('/email_send/order_jobs.php?year=2568&search=HISTORY-QA',{as:'staff'});
+        assert.equal(list.total,3);
+        const sent=list.data.find(row=>row.doc_id===historical.sent);
+        assert.equal(sent.status,null);assert.equal(Number(sent.history_count),2);assert.equal(Number(sent.history_success_count),1);
+        assert.equal(sent.history_sent_at,'2025-10-02 10:00:00');
+        const review=list.data.find(row=>row.doc_id===historical.review);
+        assert.equal(Number(review.history_count),1);assert.equal(Number(review.history_success_count),0);assert.equal(review.history_sent_at,null);
+    });
+    await test('historical filters exclude previous attempts from unqueued orders and respect year/search/page counts',async()=>{
+        for(const [state,kind] of [['legacy_sent','sent'],['legacy_review','review'],['not_queued','empty']]){
+            const list=await request('/email_send/order_jobs.php?year=2568&search=HISTORY-QA&state='+state);
+            assert.equal(list.total,1);assert.equal(list.data[0].doc_id,historical[kind]);
+            const next=await request('/email_send/order_jobs.php?year=2568&search=HISTORY-QA&state='+state+'&page=2');
+            assert.equal(next.total,1);assert.deepEqual(next.data,[]);
+        }
+        assert.equal((await request('/email_send/order_jobs.php?year=2569&state=legacy_sent')).total,0);
+    });
+    await test('viewing historical recipients is authorized and read-only, with unknown results kept unconfirmed',async()=>{
+        const before=snapshot();
+        const sent=await request('/email_send/order_jobs.php?doc_id='+historical.sent,{as:'staff'});
+        assert.equal(sent.job,null);assert.deepEqual(sent.recipients,[]);assert.equal(sent.history.length,2);
+        const alice=sent.history.find(row=>row.recipient_email==='alice@example.test');
+        assert.equal(Number(alice.sent),1);assert.equal(Number(alice.log_count),3);assert.equal(alice.sent_at,'2025-10-02 10:00:00');
+        const review=await request('/email_send/order_jobs.php?doc_id='+historical.review);
+        assert.equal(Number(review.history[0].sent),0);assert.equal(review.history[0].sent_at,null);
+        assert.deepEqual(snapshot(),before,'GET history must not create jobs, recipients, audit events or mail');
+        await request('/email_send/order_jobs.php?doc_id='+historical.sent,{as:'owner',status:403});
+        await request('/email_send/order_jobs.php?doc_id='+historical.sent,{as:null,status:401});
+    });
+    await test('both enqueue routes require boolean confirmation for successful and unconfirmed history without writes',async()=>{
+        const before=snapshot();
+        for(const route of ['/email_send/order_jobs.php','/email_send/process_pdf.php'])for(const docId of [historical.sent,historical.review])for(const confirmed of [undefined,false,'true',1]){
+            const result=await request(route,{as:'staff',data:{doc_id:docId,action:'enqueue',confirmed},status:409});
+            assert.match(result.message,/มีประวัติส่งอีเมลแล้ว/);
+        }
+        assert.deepEqual(snapshot(),before,'rejected consent cannot enqueue, audit or send mail');
+    });
+    await test('historical enqueue requires explicit confirmation and retains current queue status with history',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:historical.sent,action:'enqueue'},status:409});
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+historical.sent)).job,null);
+        await request('/email_send/order_jobs.php',{data:{doc_id:historical.sent,action:'enqueue',confirmed:true}});
+        const list=await request('/email_send/order_jobs.php?search=HISTORY-QA-sent');
+        assert.equal(list.data[0].status,'queued');assert.equal(Number(list.data[0].history_success_count),1);
+        assert.equal((await request('/email_send/order_jobs.php?state=legacy_sent&search=HISTORY-QA')).total,0);
+        assert.equal((await request('/email_send/order_jobs.php?state=queued&search=HISTORY-QA')).total,1);
+    });
+    await test('compatibility enqueue accepts confirmed history, preserves SSE and is idempotent with the new route',async()=>{
+        const beforeMail=snapshot().eoffice_outbox;
+        for(const docId of [historical.sent,historical.review,historical.empty]){
+            const text=await request('/email_send/process_pdf.php',{as:'staff',data:{doc_id:docId,...(docId===historical.empty?{}:{confirmed:true})},raw:true});
+            const event=JSON.parse(text.trim().replace(/^data: /,''));assert.equal(event.summary.queued,true);assert.equal(event.summary.doc_id,docId);
+            const first=(await request('/email_send/order_jobs.php?doc_id='+docId)).job;
+            assert.equal(first.status,'queued');
+            await request('/email_send/order_jobs.php',{data:{doc_id:docId,action:'enqueue'}});
+            await request('/email_send/process_pdf.php',{data:{doc_id:docId},raw:true});
+            assert.equal((await request('/email_send/order_jobs.php?doc_id='+docId)).job.id,first.id);
+        }
+        assert.deepEqual(snapshot().eoffice_outbox,beforeMail,'neither route submits SMTP from HTTP');
+    });
+    await test('compatibility enqueue cannot restart cancelled work and retains permission/origin checks',async()=>{
+        await request('/email_send/order_jobs.php',{data:{doc_id:historical.review,action:'cancel_job'}});
+        const before=snapshot();
+        for(const route of ['/email_send/order_jobs.php','/email_send/process_pdf.php']){
+            await request(route,{data:{doc_id:historical.review,action:'enqueue',confirmed:true},status:409});
+            await request(route,{as:'owner',data:{doc_id:historical.sent,action:'enqueue',confirmed:true},status:403});
+            await request(route,{as:null,data:{doc_id:historical.sent,action:'enqueue',confirmed:true},status:401});
+            await request(route,{data:{doc_id:historical.sent,action:'enqueue',confirmed:true},headers:{Origin:'https://foreign.example'},status:403});
+        }
+        assert.deepEqual(snapshot(),before);
+    });
+    fixture('history-cleanup');
     const testKey='synthetic-test-key-not-a-real-credential';
     await test('extended settings protect secrets, validate templates and preview escaped content',async()=>{
         const r=await setting({enabled:false,options:{smtp_source:'admin',smtp_host:'smtp.example.test',smtp_port:465,smtp_security:'tls',smtp_username:'qa@example.test',smtp_from:'qa@example.test',intro:'<script>alert(1)</script> {doc_name}'},smtp_password:'synthetic-smtp-password'});
@@ -35,8 +108,16 @@ async function run(){
         const preview=await request('/email_send/ai_settings.php',{data:{action:'preview'}});assert.ok(preview.body.includes('&lt;script&gt;'));
         const s=await request('/email_send/ai_settings.php');
         await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:false,revision:s.settings.revision,options:{subject:'{unknown}'}},status:400});
-        await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:false,revision:s.settings.revision,options:{smtp_port:0}},status:400});
+        await request('/email_send/ai_settings.php',{data:{action:'save',model:'gemini-test',enabled:false,revision:s.settings.revision,options:{smtp_source:'admin',smtp_port:0}},status:400});
         await setting({enabled:false,options:{smtp_source:'server',intro:'เรียน {recipient_name}\nแจ้งคำสั่ง: {doc_name}'}});
+    });
+    await test('inactive Admin SMTP drafts cannot block server-mode saves or replace stored secrets',async()=>{
+        const before=(await request('/email_send/ai_settings.php')).settings;
+        const cipher=snapshot().eoffice_order_settings[0].smtp_password_cipher;
+        const result=await setting({enabled:false,options:{smtp_source:'server',smtp_port:0,smtp_security:'invalid',smtp_from:'bad-email',smtp_host:'bad host'},smtp_password:'ignored-inactive-secret'});
+        for(const key of ['smtp_host','smtp_port','smtp_security','smtp_username','smtp_from'])assert.equal(result.settings.options[key],before.options[key]);
+        assert.equal(snapshot().eoffice_order_settings[0].smtp_password_cipher,cipher,'inactive draft cannot replace the encrypted password');
+        assert.ok(!JSON.stringify(result).includes('ignored-inactive-secret'));
     });
     await test('Admin stores encrypted key and public API never returns it',async()=>{const result=await setting({api_key:testKey});assert.ok(result.settings.activated_at);assert.equal(result.settings.key_configured,true);assert.ok(!JSON.stringify(result).includes(testKey));const cipher=snapshot().eoffice_order_settings[0].api_key_cipher;assert.ok(cipher&&!cipher.includes(testKey));const get=await request('/email_send/ai_settings.php');assert.ok(!JSON.stringify(get).includes(cipher));});
     await test('model list and test use protected Admin endpoints',async()=>{assert.equal((await request('/email_send/ai_settings.php',{data:{action:'models'}})).models[0].id,'gemini-test');await request('/email_send/ai_settings.php',{data:{action:'test',model:'gemini-test'}});await request('/email_send/ai_settings.php',{data:{action:'save',model:'../../bad',enabled:true},status:400});});
@@ -44,11 +125,12 @@ async function run(){
         const before=snapshot().eoffice_order_jobs.length;
         await request('/email_send/ai_settings.php',{data:{action:'smtp_test',test_email:'not-email'},status:400});
         const smtp=await request('/email_send/ai_settings.php',{data:{action:'smtp_test',test_email:'qa@example.test'}});assert.match(smtp.message,/จำลอง/);
-        await request('/email_send/ai_settings.php',{data:{action:'smtp_check'},status:429});
+        const cooldown=await request('/email_send/ai_settings.php',{data:{action:'smtp_check'},status:429});assert.ok(cooldown.retry_after>0&&cooldown.retry_after<=30);
         await request('/email_send/ai_settings.php',{data:{action:'pdf_test',model:'gemini-test',pdf_base64:Buffer.from('not PDF').toString('base64')},status:400});
         const result=await request('/email_send/ai_settings.php',{data:{action:'pdf_test',model:'gemini-test',pdf_base64:pdf.toString('base64')}});
         assert.equal(result.mentions[0].user_id,0);assert.equal(snapshot().eoffice_order_jobs.length,before);
         const get=await request('/email_send/ai_settings.php');assert.ok(get.settings.diagnostics.events.some(e=>e.event==='smtp_test'));
+        assert.ok(get.settings.diagnostics.smtp_tested_at);assert.ok(Date.parse(get.settings.diagnostics.smtp_test_expires_at)>Date.now());
         assert.ok(!JSON.stringify(get).includes('fingerprint'));
     });
     await test('new order queues explicit recipients without sending from web request',async()=>{newDoc=await create([pdf,pdf],{send_to:[users.alice.id],doc_name:'Synthetic order แต่งตั้งคณะกรรมการ'});const s=snapshot();assert.equal(s.eoffice_order_jobs.length,1);assert.equal(s.eoffice_order_jobs[0].doc_id,newDoc.doc_id);assert.equal(s.eoffice_order_recipients.length,1);assert.equal(s.eoffice_order_recipients[0].source,'document');assert.equal(s.eoffice_order_recipients[0].status,'pending');const notification=s.eoffice_outbox.map(row=>JSON.parse(row.payload)).find(p=>p.type==='document_notification');assert.equal(notification.delivery.mail.status,'skipped');});

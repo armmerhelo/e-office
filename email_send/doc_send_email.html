@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="order-email.css">
-    <link rel="stylesheet" href="order-dashboard.css">
+    <link rel="stylesheet" href="order-dashboard.css?v=20261028-history">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
     <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
@@ -31,13 +31,13 @@
         <div class="worker-meta"><span class="field-label">เปิดใช้งานครั้งแรก</span><p id="worker-activated">—</p><span class="muted">คำสั่งใหม่หลังเวลานี้จะเข้าคิวอัตโนมัติ</span></div>
     </section>
 
-    <aside class="queue-note"><span class="note-icon" aria-hidden="true">i</span><p><strong>ต้องการส่งคำสั่งเก่า?</strong> เลือก “นำเข้าคิว” ที่รายการ ระบบจะวิเคราะห์ PDF และส่งในรอบถัดไป</p></aside>
+    <aside class="queue-note"><span class="note-icon" aria-hidden="true">i</span><p><strong>คำสั่งเก่าที่เคยส่งแล้ว</strong> จะแสดงประวัติส่งเดิมให้ตรวจสอบได้ทันที หากยังไม่มีประวัติ เลือก “นำเข้าคิว” เพื่อวิเคราะห์ PDF และส่งในรอบถัดไป</p></aside>
 
     <section class="card filter-card" aria-label="ค้นหาและกรองคำสั่ง">
         <form id="filters" class="filters">
             <label class="search-field" for="search">ค้นหาคำสั่ง<input id="search" type="search" maxlength="200" placeholder="พิมพ์เลขที่หรือชื่อคำสั่ง" autocomplete="off"></label>
             <label for="year">ปีคำสั่ง<select id="year"><option value="all">ทุกปี</option></select></label>
-            <label for="state">สถานะงาน<select id="state"><option value="">ทุกสถานะ</option><option value="not_queued">ยังไม่เข้าคิว</option><option value="waiting_files">รอ PDF</option><option value="analyzing">รอ / กำลังวิเคราะห์</option><option value="awaiting_approval">รอตรวจผู้รับ / พักการส่ง</option><option value="sending">รอ / กำลังส่ง</option><option value="queued">เข้าคิวแล้ว</option><option value="success">สำเร็จ</option><option value="partial">สำเร็จบางส่วน / ต้องตรวจสอบ</option><option value="review">ต้องตรวจสอบงาน</option><option value="cancelled">ยกเลิก</option></select></label>
+            <label for="state">สถานะงาน<select id="state"><option value="">ทุกสถานะ</option><option value="not_queued">ยังไม่เข้าคิว / ไม่มีประวัติ</option><option value="legacy_sent">เคยส่งแล้ว (ระบบเดิม)</option><option value="legacy_review">ประวัติเดิมต้องตรวจสอบผลส่ง</option><option value="waiting_files">รอ PDF</option><option value="analyzing">รอ / กำลังวิเคราะห์</option><option value="awaiting_approval">รอตรวจผู้รับ / พักการส่ง</option><option value="sending">รอ / กำลังส่ง</option><option value="queued">เข้าคิวแล้ว</option><option value="success">สำเร็จ</option><option value="partial">สำเร็จบางส่วน / ต้องตรวจสอบ</option><option value="review">ต้องตรวจสอบงาน</option><option value="cancelled">ยกเลิก</option></select></label>
             <button id="search-button" type="submit">ค้นหา</button>
             <button id="reset-filters" class="button-secondary" type="button">ล้างตัวกรอง</button>
         </form>
@@ -45,6 +45,8 @@
             <span class="muted">ดูเฉพาะ</span>
             <button type="button" data-state="" aria-pressed="true">ทั้งหมด</button>
             <button type="button" data-state="not_queued" aria-pressed="false">ยังไม่เข้าคิว</button>
+            <button type="button" data-state="legacy_sent" aria-pressed="false">เคยส่งแล้ว (ระบบเดิม)</button>
+            <button type="button" data-state="legacy_review" aria-pressed="false">ประวัติเดิมต้องตรวจสอบ</button>
             <button type="button" data-state="review" aria-pressed="false">ต้องตรวจสอบงาน</button>
             <button type="button" data-state="awaiting_approval" aria-pressed="false">รอตรวจผู้รับ</button>
             <button type="button" data-state="partial" aria-pressed="false">ตรวจสอบผลส่ง</button>
@@ -69,13 +71,15 @@
     <div class="detail-body">
         <div class="detail-toolbar"><p id="detail-status" role="status">กำลังโหลดรายละเอียด…</p><button id="refresh-detail" class="button-secondary" type="button">รีเฟรชรายละเอียด</button></div>
         <p id="detail-message" class="feedback" role="status" aria-live="polite"></p>
-        <section class="detail-section" aria-labelledby="files-title"><div class="section-heading"><h3 id="files-title">เอกสาร PDF <span id="file-count" class="result-count">—</span></h3><button id="reanalyze" class="button-secondary" type="button" disabled>วิเคราะห์ PDF ใหม่</button></div><p class="muted section-description">ระบบอ่านทุกไฟล์เพื่อรวบรวมผู้รับ โดยไม่ส่งซ้ำให้ผู้ที่สำเร็จแล้ว</p><div class="table-scroll"><table><thead><tr><th scope="col">ไฟล์</th><th scope="col">สถานะ</th><th scope="col">การประมวลผล / ปัญหา</th></tr></thead><tbody id="file-rows"></tbody></table></div></section>
-        <section class="detail-section" aria-labelledby="recipients-title"><div class="section-heading"><h3 id="recipients-title">ผู้รับอีเมล <span id="recipient-count" class="result-count">—</span></h3></div><p class="muted section-description">หากผลส่งไม่แน่ชัด ให้ตรวจสอบกับผู้ให้บริการอีเมลก่อนสั่งส่งใหม่</p><form id="add-recipient" class="recipient-form"><label for="recipient-email">เพิ่มผู้รับที่มีบัญชีในระบบ<input id="recipient-email" type="email" maxlength="255" required placeholder="อีเมลบุคลากร" aria-describedby="recipient-help" disabled></label><button id="add-recipient-button" type="submit" disabled>เพิ่มผู้รับเข้าคิว</button><span id="recipient-help" class="muted">ใช้ได้เฉพาะอีเมลที่ลงทะเบียนในระบบ</span></form><div class="table-scroll"><table><thead><tr><th scope="col">ผู้รับ</th><th scope="col">ผลส่ง</th><th scope="col">เวลา / ปัญหา</th><th scope="col">จัดการ</th></tr></thead><tbody id="recipient-rows"></tbody></table></div></section>
-        <div class="detail-danger-zone"><p class="muted">ยกเลิกได้เฉพาะงานที่ยังไม่ส่ง อีเมลที่ส่งแล้วเรียกคืนไม่ได้</p><button id="cancel-job" class="danger" type="button" disabled>ยกเลิกงานที่ยังไม่ส่ง</button></div>
+        <section id="history-section" class="detail-section" aria-labelledby="history-title" hidden><div class="section-heading"><h3 id="history-title">ประวัติการส่งที่บันทึกไว้ <span id="history-count" class="result-count">—</span></h3></div><p class="muted section-description">รวมประวัติทุกไฟล์ตามอีเมลผู้รับ หากมีอย่างน้อยหนึ่งรายการสำเร็จจะแสดงว่าเคยส่งสำเร็จ การเปิดดูประวัติไม่เข้าคิวส่งอีเมล</p><div class="table-scroll"><table><thead><tr><th scope="col">ผู้รับ</th><th scope="col">ผลส่งที่บันทึกไว้</th><th scope="col">เวลาสำเร็จล่าสุด / ประวัติ</th></tr></thead><tbody id="history-rows"></tbody></table></div></section>
+        <section id="files-section" class="detail-section" aria-labelledby="files-title"><div class="section-heading"><h3 id="files-title">เอกสาร PDF <span id="file-count" class="result-count">—</span></h3><button id="reanalyze" class="button-secondary" type="button" disabled>วิเคราะห์ PDF ใหม่</button></div><p class="muted section-description">ระบบอ่านทุกไฟล์เพื่อรวบรวมผู้รับ โดยไม่ส่งซ้ำให้ผู้ที่สำเร็จแล้ว</p><div class="table-scroll"><table><thead><tr><th scope="col">ไฟล์</th><th scope="col">สถานะ</th><th scope="col">การประมวลผล / ปัญหา</th></tr></thead><tbody id="file-rows"></tbody></table></div></section>
+        <section id="recipients-section" class="detail-section" aria-labelledby="recipients-title"><div class="section-heading"><h3 id="recipients-title">ผู้รับอีเมล <span id="recipient-count" class="result-count">—</span></h3></div><p class="muted section-description">หากผลส่งไม่แน่ชัด ให้ตรวจสอบกับผู้ให้บริการอีเมลก่อนสั่งส่งใหม่</p><form id="add-recipient" class="recipient-form"><label for="recipient-email">เพิ่มผู้รับที่มีบัญชีในระบบ<input id="recipient-email" type="email" maxlength="255" required placeholder="อีเมลบุคลากร" aria-describedby="recipient-help" disabled></label><button id="add-recipient-button" type="submit" disabled>เพิ่มผู้รับเข้าคิว</button><span id="recipient-help" class="muted">ใช้ได้เฉพาะอีเมลที่ลงทะเบียนในระบบ</span></form><div class="table-scroll"><table><thead><tr><th scope="col">ผู้รับ</th><th scope="col">ผลส่ง</th><th scope="col">เวลา / ปัญหา</th><th scope="col">จัดการ</th></tr></thead><tbody id="recipient-rows"></tbody></table></div></section>
+        <div id="job-danger-zone" class="detail-danger-zone"><p class="muted">ยกเลิกได้เฉพาะงานที่ยังไม่ส่ง อีเมลที่ส่งแล้วเรียกคืนไม่ได้</p><button id="cancel-job" class="danger" type="button" disabled>ยกเลิกงานที่ยังไม่ส่ง</button></div>
+        <button id="enqueue-history" class="button-secondary" type="button" hidden>นำคำสั่งที่มีประวัติแล้วเข้าคิว…</button>
     </div>
 </dialog>
 <script src="order-ui.js?v=20261015-approval"></script>
-<script src="order-dashboard.js?v=20261015-controls"></script>
+<script src="order-dashboard.js?v=20261028-history"></script>
     </div></div>
 </body>
 </html>
