@@ -2,7 +2,8 @@
     const el = id => document.getElementById(id);
     const number = value => Number(value).toLocaleString('th-TH');
     const itemsPerPage = 10;
-    let currentPage = 1, totalItems = 0, documentsRequest = 0, loading = false, hasResult = false;
+    let currentPage = 1, totalItems = 0, documentsRequest = 0, loading = false, exporting = false, hasResult = false;
+    let xlsxPromise = null;
     // Refresh follows the latest navigation intent, even before it has rendered.
     let requestedPage = 1;
     let filters = {year: 'all', search: ''};
@@ -37,6 +38,8 @@
     function updateControls() {
         // Refresh remains available: a newer request always supersedes an older one.
         el('refreshOrders').querySelector('span').textContent = loading ? 'กำลังอัปเดต…' : 'อัปเดต';
+        el('exportOrders').disabled = loading || exporting || !hasResult || totalItems === 0;
+        el('exportLabel').textContent = exporting ? 'กำลังเตรียม Excel…' : 'ส่งออก Excel';
         el('listContent').setAttribute('aria-busy', String(loading));
         el('resetFilters').hidden = !filtered() && !el('orderSearch').value && el('yearSelect').value === 'all';
         el('paginationBtns').querySelectorAll('button').forEach(control => {
@@ -145,6 +148,7 @@
         const retain = background && hasResult && sameFilters() && page === currentPage;
         loading = true; updateControls();
         el('listFeedback').hidden = true;
+        el('exportStatus').textContent = ''; el('exportStatus').hidden = true;
         el('listStatus').textContent = retain ? 'กำลังอัปเดตรายการ…' : 'กำลังโหลดคำสั่ง…';
         if (!retain) { hasResult = false; skeleton(); el('resultCount').textContent = '—'; el('lastUpdated').textContent = ''; }
         try {
@@ -194,10 +198,89 @@
         el('filters').reset(); filters = {year: 'all', search: ''};
         el('orderSearch').focus(); load(1);
     }
+    function loadXlsx() {
+        if (window.XLSX?.utils?.book_new && window.XLSX?.writeFile) return Promise.resolve(window.XLSX);
+        if (!xlsxPromise) xlsxPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+            const cleanup = () => { clearTimeout(timer); script.onload = null; script.onerror = null; };
+            const fail = () => { cleanup(); script.remove(); xlsxPromise = null; reject(new Error('โหลดเครื่องมือสร้างไฟล์ Excel ไม่สำเร็จ กรุณาลองอีกครั้ง')); };
+            const timer = setTimeout(fail, 30000);
+            script.onload = () => {
+                if (!window.XLSX?.utils?.book_new || !window.XLSX?.writeFile) return fail();
+                cleanup(); resolve(window.XLSX);
+            };
+            script.onerror = fail;
+            document.head.append(script);
+        });
+        return xlsxPromise;
+    }
+    async function exportSnapshot(query) {
+        const controller = new AbortController();
+        let timer;
+        const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error('โหลดข้อมูลสำหรับส่งออกหมดเวลา กรุณาลองอีกครั้ง'));
+                controller.abort();
+            }, 30000);
+        });
+        try {
+            return await Promise.race([timeout, (async () => {
+                const response = await fetch('api_get_my_docs.php?' + query, {credentials: 'same-origin', signal: controller.signal});
+                const result = await response.json();
+                if (!response.ok || result.status !== 'success' || !Array.isArray(result.data)) throw new Error(result.message || 'โหลดข้อมูลสำหรับส่งออกไม่สำเร็จ');
+                return result;
+            })()]);
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+    async function exportOrders() {
+        if (loading || exporting || !hasResult || totalItems === 0 || !displayedFilters) return;
+        const exportFilters = {...displayedFilters};
+        exporting = true; updateControls();
+        el('exportStatus').textContent = ''; el('exportStatus').hidden = true;
+        el('listFeedback').hidden = true;
+        try {
+            const XLSX = await loadXlsx();
+            const query = new URLSearchParams({export: '1', ...exportFilters});
+            const result = await exportSnapshot(query);
+            const all = result.data;
+            const ids = new Set();
+            const expectedTotal = Number(result.pagination?.total_items);
+            if (!Number.isSafeInteger(expectedTotal) || expectedTotal < 0 || all.length !== expectedTotal) throw new Error('ข้อมูลคำสั่งไม่ครบถ้วน กรุณาลองส่งออกอีกครั้ง');
+            for (const item of all) {
+                const id = Number(item.doc_id);
+                if (!Number.isSafeInteger(id) || id <= 0 || ids.has(id)) throw new Error('รายการคำสั่งไม่สอดคล้องกันระหว่างส่งออก กรุณาอัปเดตรายการแล้วลองอีกครั้ง');
+                ids.add(id);
+            }
+            const rows = [['เลขที่คำสั่ง', 'เรื่อง', 'วันที่ได้รับ', 'เอกสาร']];
+            for (const item of all) {
+                const orderNumber = `${item.external_number ?? '—'}/${item.doc_year || '—'}`;
+                const files = [...new Set((Array.isArray(item.files) ? item.files : [item.file_name]).filter(name => typeof name === 'string' && name.trim()))];
+                rows.push([orderNumber, item.doc_name || 'ไม่ระบุชื่อคำสั่ง', item.date_received || '', files.map(file => file.split(/[\\/]/).pop()).join(', ')]);
+            }
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.aoa_to_sheet(rows);
+            worksheet['!cols'] = [{wch: 22}, {wch: 55}, {wch: 22}, {wch: 48}];
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'คำสั่งของฉัน');
+            XLSX.writeFile(workbook, `คำสั่งของฉัน-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            el('exportStatus').textContent = `ส่งออกคำสั่ง ${number(all.length)} รายการเรียบร้อยแล้ว`;
+            el('exportStatus').hidden = false;
+        } catch (error) {
+            el('listFeedback').textContent = error.message || 'ส่งออกไฟล์ Excel ไม่สำเร็จ กรุณาลองอีกครั้ง';
+            el('listFeedback').hidden = false;
+            el('exportStatus').textContent = 'ส่งออกไฟล์ Excel ไม่สำเร็จ';
+            el('exportStatus').hidden = false;
+        } finally {
+            exporting = false; updateControls();
+        }
+    }
     el('filters').addEventListener('submit', event => { event.preventDefault(); applyFilters(); });
     el('yearSelect').addEventListener('change', applyFilters);
     el('orderSearch').addEventListener('input', updateControls);
     el('resetFilters').addEventListener('click', resetFilters);
+    el('exportOrders').addEventListener('click', exportOrders);
     el('refreshOrders').addEventListener('click', () => load(requestedPage, true));
     if (window.eofficeRegisterModuleRefresh) window.eofficeRegisterModuleRefresh(() => load(requestedPage, true));
     else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => load());

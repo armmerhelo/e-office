@@ -53,6 +53,9 @@ async function run() {
     console.log('PASS real booking edit: success/failures, duplicate submit, later/silent/same-text edits, reopened form and stale close timer');
 
     const dashboardProgram=fs.readFileSync('email_send/my-dashboard.js','utf8');
+    const dashboardHtml=fs.readFileSync('email_send/my_dashboard.html','utf8');
+    assert.match(dashboardHtml,/id="exportOrders"/,'personal orders must expose an Excel export action');
+    assert.match(dashboardHtml,/โปรดตรวจสอบความถูกต้องของคำสั่งอีกครั้งก่อนนำไปใช้งาน/,'personal orders must remind users to verify orders before use');
     class Element extends EventTarget {
         constructor(tag='div') {super();this.tagName=tag.toUpperCase();this.children=[];this.dataset={};this.attributes={};this.value='';this.hidden=false;this._text='';}
         append(...nodes){this.children.push(...nodes);}
@@ -69,11 +72,15 @@ async function run() {
         const nodes=new Map(),get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
         get('yearSelect').value='all';get('refreshOrders').append(new Element('span'));
         let refresh,transport;
+        const xlsxWritten=[];
+        const exportTimers=new Map();let timerId=0;
+        const XLSX={utils:{book_new:()=>({sheets:[]}),aoa_to_sheet:data=>({data}),book_append_sheet:(book,sheet,name)=>book.sheets.push({sheet,name})},writeFile:(book,name)=>xlsxWritten.push({book,name})};
         const result={status:'success',user_name:'QA',user_email:'qa@example.test',years:['2569'],data:[{doc_id:1,doc_year:'2569',file_name:'a #.pdf',files:['a #.pdf','b.pdf']}],pagination:{total_items:1,total_pages:1}};
         const response=data=>({ok:true,json:async()=>data});
         transport=async()=>response(result);
-        const context=vm.createContext({URL,URLSearchParams,console,
-            window:{eofficeRegisterModuleRefresh:fn=>{refresh=fn;}},
+        const context=vm.createContext({URL,URLSearchParams,console,AbortController,
+            setTimeout:fn=>{exportTimers.set(++timerId,fn);return timerId;},clearTimeout:id=>exportTimers.delete(id),
+            window:{eofficeRegisterModuleRefresh:fn=>{refresh=fn;},XLSX},
             document:{baseURI:`https://example.test${prefix}email_send/my_dashboard.html`,getElementById:get,createElement:tag=>new Element(tag),createElementNS:(_,tag)=>new Element(tag)},
             fetch:(...args)=>transport(...args)});
         vm.runInContext(dashboardProgram,context);await refresh();
@@ -148,8 +155,68 @@ async function run() {
             assert.equal(get('listFeedback').hidden,true);
             assert.equal(get('listContent').attributes['aria-busy'],'false');
         }
+        const exportRows=Array.from({length:201},(_,index)=>({doc_id:index+1,doc_year:'2569',external_number:String(index+1),doc_name:`คำสั่ง ${index+1}`,date_received:'2026-10-28',files:[`order-${index+1}.pdf`]}));
+        const exportReads=[];
+        transport=async url=>{
+            const query=new URL(url,'https://example.test').searchParams;
+            if(query.get('export')==='1') {
+                exportReads.push(query);
+                return response({status:'success',data:exportRows,pagination:{total_items:201,total_pages:1}});
+            }
+            return response({...result,data:exportRows.slice(0,10),pagination:{total_items:201,total_pages:21}});
+        };
+        get('filters').dispatchEvent(new Event('submit',{cancelable:true}));await settle();
+        assert.equal(get('exportOrders').disabled,false,'Excel export is enabled when results are available');
+        get('exportOrders').click();await settle();
+        assert.equal(exportReads.length,1,'export must fetch one server snapshot, not separate pages');
+        assert.equal(exportReads[0].has('page'),false);
+        assert.ok(exportReads.every(query=>query.get('year')==='2569'&&query.get('search')==='แต่งตั้ง'),'export must preserve the displayed filters');
+        assert.equal(xlsxWritten.length,1,'export must write one Excel workbook');
+        assert.equal(xlsxWritten[0].book.sheets[0].name,'คำสั่งของฉัน');
+        assert.equal(xlsxWritten[0].book.sheets[0].sheet.data.length,202,'workbook must contain all rows and a header');
+        assert.deepEqual(Array.from(xlsxWritten[0].book.sheets[0].sheet.data[0]),['เลขที่คำสั่ง','เรื่อง','วันที่ได้รับ','เอกสาร']);
+        assert.match(xlsxWritten[0].name,/^คำสั่งของฉัน-\d{4}-\d{2}-\d{2}\.xlsx$/);
+        transport=async()=>response({status:'success',data:[...exportRows.slice(0,200),exportRows[0]],pagination:{total_items:201}});
+        get('exportOrders').click();await settle();
+        assert.equal(xlsxWritten.length,1,'duplicate IDs must prevent download even when the count matches');
+        assert.match(get('listFeedback').textContent,/ไม่สอดคล้อง/);
+        assert.equal(get('exportOrders').disabled,false);
+        for(const stalled of ['fetch','body']) {
+            let signal;
+            transport=async (_,options)=>{signal=options.signal;return stalled==='fetch'?new Promise(()=>{}):{ok:true,json:()=>new Promise(()=>{})};};
+            get('exportOrders').click();await settle();
+            for(const fn of [...exportTimers.values()])fn();await settle();
+            assert.equal(signal.aborted,true);
+            assert.equal(get('exportOrders').disabled,false,'timeout must restore the export button');
+            assert.match(get('listFeedback').textContent,/หมดเวลา/);
+            assert.equal(xlsxWritten.length,1);
+        }
+        // Exercise the lazy loader rather than relying only on preloaded XLSX.
+        let pendingScript;
+        context.window.XLSX=undefined;
+        context.document.head={append:script=>{pendingScript=script;}};
+        get('exportOrders').click();await settle();
+        pendingScript.remove=()=>{};
+        for(const fn of [...exportTimers.values()])fn();await settle();
+        assert.equal(get('exportOrders').disabled,false,'library timeout must restore the export button');
+        assert.match(get('listFeedback').textContent,/เครื่องมือ/);
+        const failedScript=pendingScript;
+        get('exportOrders').click();await settle();
+        assert.notEqual(pendingScript,failedScript,'library load must be retried after timeout');
+        pendingScript.remove=()=>{};
+        pendingScript.onerror();await settle();
+        assert.equal(get('exportOrders').disabled,false);
+        transport=async()=>response({status:'success',data:exportRows.slice(0,3),pagination:{total_items:3}});
+        get('exportOrders').click();await settle();
+        context.window.XLSX=XLSX;
+        pendingScript.onload();await settle();
+        assert.equal(xlsxWritten.length,2,'successful lazy-load retry must create a workbook');
+        assert.equal(xlsxWritten[1].book.sheets[0].sheet.data.length,4,'export must use the new snapshot total rather than the stale list count');
+        assert.equal(get('exportOrders').disabled,false);
+        assert.equal(exportTimers.size,0,'all export timers must be cleaned up');
     }
     console.log('PASS current personal-order script: PDF URLs at root/subdirectory, encoded filenames, stale failure isolation and retained results');
     console.log('PASS personal-order pending pages: button/module refresh, search reset from page 3, distinct rows and out-of-order responses');
+    console.log('PASS Excel export: single filtered snapshot, duplicate ID rejection, fetch/body/library timeouts, retry and timer cleanup');
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});

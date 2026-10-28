@@ -33,6 +33,10 @@
 .my-orders #resultCount { font-size: 12px; color: var(--orders-muted); }
 .my-orders .last-updated { font-size: 11px; color: var(--orders-muted); }
 .my-orders .header-actions button { min-height: 36px; padding: 6px 11px; font-size: 12px; }
+.my-orders .order-review-notice { display: flex; align-items: flex-start; gap: 10px; margin: 0 24px 16px; padding: 12px 15px; border: 1px solid #f0d49d; border-radius: 7px; background: #fffbeb; color: #805b16; font-size: 13px; line-height: 1.75; }
+.my-orders .order-review-notice svg { flex: 0 0 18px; width: 18px; height: 18px; margin-top: 2px; }
+.my-orders .order-review-notice strong { font-weight: 500; }
+.my-orders .export-status { padding: 0 24px 12px; color: #475467; font-size: 12px; }
 .my-orders .list-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .my-orders .list-feedback { margin: 0 24px 16px; padding: 12px 14px; border: 1px solid #f1d7af; border-radius: 7px; background: #fffbf3; color: #854d0e; font-size: 13px; }
 .my-orders .list-feedback button { margin-left: 8px; min-height: 36px; padding: 5px 9px; color: inherit; background: transparent; text-decoration: underline; }
@@ -83,7 +87,10 @@
     .my-orders .filters > .button-primary { min-width: 84px; }
     .my-orders .filters > .button-text { flex-basis: 100%; justify-content: flex-start; padding-left: 0; }
     .my-orders .list-heading { padding: 14px 16px; }
+    .my-orders .header-actions { gap: 7px; }
     .my-orders .last-updated { display: none; }
+    .my-orders .order-review-notice { margin-inline: 16px; }
+    .my-orders .export-status { padding-inline: 16px; }
     .my-orders .list-feedback { margin-inline: 16px; }
     .my-orders .orders-table, .my-orders tbody { display: block; }
     .my-orders thead { display: none; }

@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
-    <link rel="stylesheet" href="my-dashboard.css?v=20261015-no-heading">
+    <link rel="stylesheet" href="my-dashboard.css?v=20261028-export-review">
     <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
 <body class="my-orders-page eoffice-module-page">
@@ -37,12 +37,21 @@
                 <div class="list-title"><h2 id="list-title">รายการคำสั่ง</h2><span id="resultCount">—</span></div>
                 <div class="header-actions">
                     <span id="lastUpdated" class="last-updated"></span>
+                    <button id="exportOrders" class="button-secondary" type="button" disabled>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 16v4h14v-4"/></svg>
+                        <span id="exportLabel">ส่งออก Excel</span>
+                    </button>
                     <button id="refreshOrders" class="button-secondary" type="button">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/></svg>
                         <span>อัปเดต</span>
                     </button>
                 </div>
             </div>
+            <aside class="order-review-notice" role="note">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 9v4m0 4h.01"/><path d="M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                <p><strong>โปรดตรวจสอบความถูกต้องของคำสั่งอีกครั้งก่อนนำไปใช้งาน</strong></p>
+            </aside>
+            <p id="exportStatus" class="export-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
             <p id="listStatus" class="list-status" role="status" aria-live="polite" aria-atomic="true">กำลังโหลดคำสั่ง…</p>
             <div id="listFeedback" class="list-feedback" role="alert" hidden></div>
             <div id="listContent" class="orders-content" aria-busy="true">
@@ -57,7 +66,7 @@
             </nav>
         </section>
     </main>
-    <script src="my-dashboard.js?v=20261015-no-heading"></script>
+    <script src="my-dashboard.js?v=20261028-export-snapshot"></script>
     </div></div>
 </body>
 </html>
