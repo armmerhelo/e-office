@@ -63,9 +63,30 @@ async function run(){
   });
  await test('private PDF unavailable to guest/outsider',async()=>{await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}`,{status:401});await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}`,{cookie:outsider,status:403});});
  await test('recipient can read bound PDF with revision',async()=>{const result=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:recipient});assert.match(result.text,/^%PDF/);revision=result.r.headers.get('X-Document-Revision');assert.ok(revision);});
- await test('read status requires actual access',async()=>{await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc},status:403});await request('/api/update_read_status.php',{cookie:recipient,data:{doc_id:doc}});});
+  await test('read status requires actual access',async()=>{await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc},status:403});await request('/api/update_read_status.php',{cookie:recipient,data:{doc_id:doc}});});
+  async function inboxSignature(cookie, signed, expected) {
+    const result=await request('/api/get_data_received.php',{cookie,data:{Year:'2569',Doc_Id:doc,Read_Status_find:signed?'Readed':'NotRead'}});
+    assert.equal(result.body.some(row=>row.doc_id===doc),expected);
+  }
+  await test('opening keeps the document pending and out of signed inbox',async()=>{
+    await inboxSignature(recipient,false,true);await inboxSignature(recipient,true,false);
+    const all=await request('/api/get_data_received.php',{cookie:recipient,data:{Year:'2569',Doc_Id:doc}});
+    assert.equal(all.body[0].status,'Readed');assert.equal(all.body[0].Total_Records,1);
+  });
  await test('recipient cannot modify shared document',async()=>{await request('/api/create_document.php',{cookie:recipient,form:form({formtype:'edit_document',doc_id:doc,doc_name:'ATTACK',doc_type:'คำสั่ง',doc_number_receive_stamp:'123'})});const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.equal(list.body[0].doc_name,'QA landscape document');});
- await test('signed PDF save and stale revision rejected',async()=>{const f=()=>form({Doc_Id:doc,year:2569,revision},{file:{name:fileName,data:Buffer.concat([pdf,Buffer.from('\n% signed\n')])}});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f()});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f(),status:409});});
+  await test('signed PDF save and stale revision rejected',async()=>{const f=()=>form({Doc_Id:doc,year:2569,revision},{file:{name:fileName,data:Buffer.concat([pdf,Buffer.from('\n% signed\n')])}});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f()});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f(),status:409});});
+  await test('successful signature moves only the signer out of pending',async()=>{
+    await inboxSignature(recipient,false,false);await inboxSignature(recipient,true,true);
+    await request('/api/update_read_status.php',{cookie:recipient,data:{doc_id:doc}});
+    await inboxSignature(recipient,false,false);await inboxSignature(recipient,true,true);
+    // Add a second recipient without changing the first recipient's signature.
+    await request('/api/create_document.php',{cookie:owner,form:form({...values,formtype:'edit_document',doc_id:doc,doc_file_name:[],file_id:[],send_to:[seed.users.recipient,seed.users.outsider],replace_recipients:1})});
+    await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc}});
+    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
+    const current=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:outsider});
+    await request('/e-sign/upload_pdf.php',{cookie:outsider,form:form({Doc_Id:doc,year:2569,revision:current.r.headers.get('X-Document-Revision')},{file:{name:fileName,data:'invalid PDF'}}),status:400});
+    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
+  });
  await test('rejected signing upload preserves signed state/file',async()=>{const before=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:owner});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:form({Doc_Id:doc,year:2569,revision:before.r.headers.get('X-Document-Revision')},{file:{name:fileName,data:'not a PDF'}}),status:400});const after=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:owner});assert.equal(after.r.headers.get('X-Document-Revision'),before.r.headers.get('X-Document-Revision'));assert.equal(inspect('access',doc).find(a=>a.User_Id===seed.users.recipient).Is_Signed,'true');});
  await test('file proxy and retired endpoints denied',async()=>{await request('/api/cors.php?url=file:///etc/passwd',{status:remote?[403,410]:410});await request('/api/uniqid.php',{status:410});await request('/api/create_document-Merhelo.php',{status:410});});
  await test('template upload requires session and actual image',async()=>{await request('/e-sign/save_template.php',{data:{file_name:'test.php',image_data:Buffer.from('<?php echo 1;').toString('base64')},status:401});await request('/e-sign/save_template.php',{cookie:owner,data:{file_name:'test.php',image_data:Buffer.from('<?php echo 1;').toString('base64')},status:400});});
@@ -95,7 +116,12 @@ async function run(){
  await test('private static paths blocked',async()=>{for(const path of ['/email_send/User_Data.json','/config/config.php']){const result=await request(path,{status:remote?[403,302]:403});if(result.r.status===302)assert.equal(new URL(result.r.headers.get('Location'),base).port,'2222','Only hosting access-denied redirect is accepted');}});
  await test('outbox worker records mocked SMTP/push',async()=>{cli('scripts/notifications.php');const rows=inspect('outbox','');assert.ok(rows.some(r=>r.payload.type==='mail'&&r.payload.email==='qa-recipient@siya.ac.th'));assert.ok(rows.some(r=>r.payload.type==='push'&&r.payload.user_id===seed.users.recipient));assert.ok(rows.some(r=>r.payload.type==='drive_image'));});
  await test('logout revokes server session and returns JSON only',async()=>{const r=await request('/api/logout.php',{cookie:owner,data:{}});assert.equal(r.body.status,'success');await request('/api/get_data_send.php',{cookie:owner,data:{Year:2569},status:401});});
- console.log(`Integration: ${passed} passed`);
+  await test('group-only recipient stays pending before and after opening',async()=>{
+    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
+    await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc}});
+    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
+  });
+  console.log(`Integration: ${passed} passed`);
  console.log(JSON.stringify({doc,fileName,users:seed.users,storage:remote?'private storage on staging host':env.EOFFICE_STORAGE}));
 }
 run().catch(e=>{console.error(e);console.error(serverErrors);process.exitCode=1;}).finally(()=>servers.forEach(server=>server.kill()));

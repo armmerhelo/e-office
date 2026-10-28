@@ -122,8 +122,13 @@ window.addEventListener('eoffice:permissions-changed', () => {
     refreshPermissionMenus();
 });
 window.addEventListener('focus', () => { refreshPermissionMenus(); });
-window.addEventListener('pageshow', event => {
-    if (event.persisted) refreshPermissionMenus();
+window.addEventListener('pageshow', async event => {
+    if (event.persisted) {
+        await refreshPermissionMenus();
+        if (window.eofficeSessionState?.status === 'authenticated' && localStorage.getItem('currentPage') === 'received') {
+            get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
+        }
+    }
 });
 
 var Page_number = 1;
@@ -619,7 +624,7 @@ if (! page_number) {
           }
 
         }
-        sub_head.innerHTML = "ทั้งหมด";
+        sub_head.innerHTML = localStorage.getItem('read_status_change') === 'NotRead' ? 'รอดำเนินการ' : localStorage.getItem('read_status_change') === 'Readed' ? 'ลงนามแล้ว' : 'ทั้งหมด';
         menu_received.className = className_click;
         content_received.style.display = "block";
         add_doc_btn.style.display = "none";
@@ -1163,9 +1168,9 @@ function read_status_change(status,api){
   read_status = localStorage.getItem("read_status_change");
 
         if (read_status == 'NotRead') {
-      document.getElementById('sub_head').innerHTML = 'ใหม่';
+      document.getElementById('sub_head').innerHTML = 'รอดำเนินการ';
       }else if (read_status =='Readed') {
-        document.getElementById('sub_head').innerHTML = 'อ่านแล้ว';
+        document.getElementById('sub_head').innerHTML = 'ลงนามแล้ว';
       }else {
         document.getElementById('sub_head').innerHTML = 'ทั้งหมด';
       }

@@ -1056,7 +1056,7 @@ async function mainPermissionRefreshChecks() {
     oldReply({ok:true,json:async()=>({user:{id:7,permissions:['members']}})});await older;assert.equal(window.eofficeUser.id,8);
     const pending=runtime.refreshPermissionMenus();window.eofficeRevokeSession();requests.shift()({ok:true,json:async()=>({user:{id:7,permissions:['members']}})});await pending;
     assert.equal(window.eofficeUser,null,'an outstanding main-page session check cannot undo a confirmed logout');
-    vm.runInContext(main.match(/window\.addEventListener\('pageshow', event => \{[\s\S]*?\n\}\);/)[0],runtime);
+    vm.runInContext(main.match(/window\.addEventListener\('pageshow', async event => \{[\s\S]*?\n\}\);/)[0],runtime);
     window.dispatchEvent({type:'pageshow',persisted:false});assert.equal(requests.length,0);
     window.dispatchEvent({type:'pageshow',persisted:true});assert.equal(window.eofficeSessionState.status,'pending','BFCache return must invalidate the cached authorization synchronously');
     requests.shift()({ok:true,json:async()=>({user:{id:9,permissions:[]}})});await new Promise(resolve=>setImmediate(resolve));assert.equal(window.eofficeUser.id,9);

@@ -369,7 +369,7 @@ if (width >= 1300) {
             // กรณีไม่มีข้อมูล หรือไม่ได้ Login
             currentPage = localStorage.getItem("currentPage");
             if (currentPage == 'received') {
-              if (content_received) content_received.innerHTML = `<div id="loop_receive">ไม่มีหนังสือใหม่<br></div>`;
+              if (content_received) content_received.innerHTML = `<div id="loop_receive">${read_status === 'NotRead' ? 'ไม่มีหนังสือรอดำเนินการ' : read_status === 'Readed' ? 'ไม่มีหนังสือที่ลงนามแล้ว' : 'ไม่พบข้อมูล'}<br></div>`;
 
             }else {
               if (content_received) content_received.innerHTML = `<div id="loop_receive">ไม่พบข้อมูล<br></div>`;
@@ -379,6 +379,10 @@ if (width >= 1300) {
             load_data.style.display = 'none';
 
             pagination_create(1, 'received', Page_number);
+            for (const id of ['All_Doc', 'All_Doc_1', 'All_Doc_2']) {
+                const counter = document.getElementById(id);
+                if (counter) counter.textContent = '0';
+            }
 
         }
 
@@ -1224,11 +1228,7 @@ async function update_read_status(doc_id, user_token, type) {
               console.log("✅ บันทึกสถานะการอ่านสำเร็จ!" + tb_status_read );
             }
 
-            if (type === 'received' && localStorage.getItem('read_status_change') === 'NotRead') {
-                const currentPage = parseInt(localStorage.getItem('page_number'), 10) || 1;
-                const searchText = document.getElementById('search_txt')?.value || '';
-                get_data_api_received(currentPage, searchText);
-            }
+            // Opening only updates read indicators; it must not remove pending signing work.
 
 
         } else {

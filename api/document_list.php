@@ -10,7 +10,8 @@ function document_list(string $mode): never {
     if($id>0&&$mode==='received'){$where.=' AND d.Doc_Id=?';$params[]=$id;}else{$where.=' AND d.Doc_Year=?';$params[]=$year;}
     if($mode==='public')$where.=" AND d.Doc_Type='External'";
     elseif($mode==='received'){$where.=' AND (EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=d.Doc_Id AND a.User_Id=?) OR EXISTS (SELECT 1 FROM t_access_rights_department a JOIN t_user_department u ON u.Department_Id=a.Department_Id WHERE a.Doc_Id=d.Doc_Id AND u.User_Id=?))';$params[]=$uid;$params[]=$uid;
-      if(in_array($d['Read_Status_find']??'', ['NotRead','Readed'],true)){$exists="EXISTS (SELECT 1 FROM t_access_rights r WHERE r.Doc_Id=d.Doc_Id AND r.User_Id=? AND r.Status='Readed')";$where.=' AND '.(($d['Read_Status_find']==='NotRead')?'NOT ':'').$exists;$params[]=$uid;}}
+      // Keep legacy filter values compatible; inbox completion is the current recipient's saved signature, not opening the document.
+      if(in_array($d['Read_Status_find']??'', ['NotRead','Readed'],true)){$exists="EXISTS (SELECT 1 FROM t_access_rights r WHERE r.Doc_Id=d.Doc_Id AND r.User_Id=? AND r.Is_Signed='true')";$where.=' AND '.(($d['Read_Status_find']==='NotRead')?'NOT ':'').$exists;$params[]=$uid;}}
     elseif($stamp){$where.=" AND EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=d.Doc_Id AND a.User_Id=? AND a.Is_Signed='true')";$params[]=$uid;}
     else{$where.=' AND d.User_Id=?';$params[]=$uid;if(in_array($d['doc_type']??'', ['Internal','External'],true)){$where.=' AND d.Doc_Type=?';$params[]=$d['doc_type'];}}
     if($search!==''){$where.=' AND (d.Doc_Id LIKE ? OR d.Doc_Name LIKE ? OR d.Doc_Number LIKE ? OR d.Doc_Date LIKE ? OR d.Doc_Number_Receive LIKE ? OR d.Doc_Receive_From LIKE ?)';array_push($params,...array_fill(0,6,'%'.$search.'%'));}

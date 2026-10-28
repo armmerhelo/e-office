@@ -319,22 +319,24 @@ window.addEventListener('load', function() {
           <div  class="menu-item flex ">
 
             <div id="read_icon_show" class="menu-item flex pl-3 pb-2">
-              <div class="menu-item item-unread pt-1 pl-2 pr-2 "  onclick="toggleSelection(this); read_status_change('NotRead','load'); ">
+              <button type="button" class="menu-item item-unread pt-1 pl-2 pr-2 " title="รอดำเนินการ (ยังไม่ลงนาม)" aria-label="รอดำเนินการ (ยังไม่ลงนาม)" onclick="toggleSelection(this); read_status_change('NotRead','load'); ">
                 <div class="icon-wrapper">
                   <svg class="envelope-icon" viewBox="0 0 24 24">
                     <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
                   </svg>
                   <span class="notification-dot"></span>
                 </div>
-              </div>
+                <span class="block text-xs">รอดำเนินการ</span>
+              </button>
 
-              <div  class="menu-item item-read pt-1 pr-2 pl-2 " onclick="toggleSelection(this); read_status_change('Readed','load');" >
+              <button type="button" class="menu-item item-read pt-1 pr-2 pl-2 " title="ลงนามแล้ว" aria-label="ลงนามแล้ว" onclick="toggleSelection(this); read_status_change('Readed','load');" >
                 <div class="icon-wrapper">
                   <svg class="envelope-icon" viewBox="0 0 24 24">
                     <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
                   </svg>
                   </div>
-              </div>
+                <span class="block text-xs">ลงนามแล้ว</span>
+              </button>
               <div class="p-1">
 
               </div>
