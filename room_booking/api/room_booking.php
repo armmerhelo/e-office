@@ -13,9 +13,11 @@ try{
   if(!array_key_exists('_expected_owner',$ownerInput))$ownerInput['_expected_owner']=(int)$user['User_Id'];
   $user=app_lock_create_owner($ownerInput,'room_bookings');
  }
+ if(!$pdo->inTransaction())$pdo->beginTransaction();
  $q=$pdo->prepare("SELECT 1 FROM room_bookings WHERE room_name=? AND status IN ('confirm','confirmed') AND start_datetime<? AND end_datetime>? LIMIT 1");$q->execute([$room,$end,$start]);if($q->fetchColumn())app_fail('ห้องถูกจองแล้ว',409);
  $q=$pdo->prepare("INSERT INTO room_bookings (User_Id,requester_name,room_name,topic,department,attendees,start_datetime,end_datetime,equipment_audio,equipment_computer,equipment_projector,equipment_food,equipment_other,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')");
  $q->execute([$user['User_Id']??null,$name,$room,$topic,$dept,$attendees,$start,$end,!empty($eq['audio'])?1:0,!empty($eq['computer'])?1:0,!empty($eq['projector'])?1:0,!empty($eq['food'])?1:0,app_text($eq,'otherText')]);$id=(int)$pdo->lastInsertId();
+ app_audit('booking.create',$user,$id);
  if($pdo->inTransaction())$pdo->commit();
 }catch(AppCreateOwnerChanged $e){$ownerError=$e;}
 finally{if($pdo->inTransaction())$pdo->rollBack();$pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]);}

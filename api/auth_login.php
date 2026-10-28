@@ -18,5 +18,7 @@ if (!$isHash || password_needs_rehash($stored, PASSWORD_DEFAULT)) {
     $q = $pdo->prepare('UPDATE t_user SET User_Password=? WHERE User_Id=?'); $q->execute([password_hash($password, PASSWORD_DEFAULT), $user['User_Id']]);
 }
 $pdo->prepare('DELETE FROM eoffice_login_attempts WHERE identity_hash=?')->execute([$key]);
-app_login_session($user);
+$pdo->beginTransaction();
+try {app_login_session($user);$pdo->commit();}
+catch (Throwable $e) {if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 app_json(['status'=>'success', 'user_name'=>$user['User_Name'], 'user_status'=>$user['User_Status']]);

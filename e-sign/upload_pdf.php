@@ -45,6 +45,7 @@ try{
  $pdo->prepare('INSERT INTO eoffice_signed_files VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE revision=VALUES(revision),signed_at=NOW()')->execute([$id,$name,$revision]);
  app_drive_archive_track($id,$name,'signed',$target);
   $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);
+  app_audit('document.sign',$user,$id,['receipt_departments'=>$receiptDepartments,'auto_sent_user_ids'=>$autoSent]);
  $pdo->commit();
 }catch(Throwable $e){
  try {

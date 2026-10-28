@@ -29,6 +29,7 @@ try {
     $q=$pdo->prepare('INSERT INTO eoffice_sign_routes (secretary_id,department,deputy_id) VALUES (?,?,?)');
     foreach ($routes as $route) $q->execute([$route->secretary_id,$route->department,$route->deputy_id]);
     $saved=app_sign_routes($pdo);
+    app_audit('routing.update',$locked['actor'],null,['count'=>count($saved)]);
     $pdo->commit();
 } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 app_json(['status'=>'success','message'=>'บันทึกเลขาฝ่าย / รองฝ่ายสำหรับ Auto send สำเร็จ','routes'=>$saved,'route_version'=>app_sign_routes_version($saved)]);

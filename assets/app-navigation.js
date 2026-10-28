@@ -7,6 +7,7 @@
     // The module host fetches this HTML without executing this bootstrap.
     const entryViews={
         'management/user_manage.html':'members','management/department_manage.html':'groups',
+        'management/audit_logs.html':'audit_logs',
         'external_number_booking/external_number_booking.html':'book','email_send/my_dashboard.html':'my_public',
         'email_send/doc_send_email.html':'send_email','email_send/ai_settings.html':'ai_settings',
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
@@ -31,7 +32,8 @@
         {label:'แจ้งซ่อม', path:'maintenance_requests/index.html', login:true, group:'อื่น ๆ', icon:'⚒'},
         {label:'แจ้งซ่อม (ฝ่ายงาน)', path:'maintenance_requests/admin.html', permission:'maintenance', group:'อื่น ๆ', icon:'report'},
         {label:'ส่งอีเมลคำสั่ง', path:'email_send/doc_send_email.html', permission:'email', group:'อื่น ๆ', icon:'✉'},
-        {label:'ตั้งค่า AI และอีเมล', path:'email_send/ai_settings.html', admin:true, group:'อื่น ๆ', icon:'⚙'}
+        {label:'ตั้งค่า AI และอีเมล', path:'email_send/ai_settings.html', admin:true, group:'อื่น ๆ', icon:'⚙'},
+        {label:'ประวัติการใช้งาน', path:'management/audit_logs.html', admin:true, group:'อื่น ๆ', icon:'report'}
     ];
     const make = (tag, className, text) => {
         const node = document.createElement(tag);

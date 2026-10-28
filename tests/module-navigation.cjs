@@ -61,7 +61,8 @@ const routes = {
     edit_room_booking: ['menu-edit-room-booking', 'room_booking/edit_room_booking.html'],
     maintenance: ['menu-maintenance', 'maintenance_requests/index.html'],
     maintenance_admin: ['menu-maintenance-admin', 'maintenance_requests/admin.html'],
-    updates: ['menu-updates', 'updates/index.html']
+    updates: ['menu-updates', 'updates/index.html'],
+    audit_logs: ['menu-audit-logs', 'management/audit_logs.html']
 };
 
 const main = fs.readFileSync('assets/main.js', 'utf8');
@@ -130,6 +131,7 @@ function sidebarParityChecks() {
     for(const user of [null,{status:'User',permissions:[]},{status:'User',permissions:['email']},{status:'Admin',permissions:['email','members','departments','maintenance']}]) {
         runtime.window.eofficeUser=user;runtime.applyPermissionMenus();
         assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
+        assert.equal(el('group_audit_logs').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
     }
     console.log('PASS shared sidebar stylesheet, all menu labels/icons and Admin-only AI/request-room visibility');
@@ -155,7 +157,7 @@ const recordHistory = (url, push) => {
     context.window.location.href = String(url);
 };
 const context = {
-    window: {...routerWindowEvents,eofficeUser:{permissions:['members','departments','email','maintenance']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path}},
+    window: {...routerWindowEvents,eofficeUser:{status:'Admin',permissions:['members','departments','email','maintenance']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path}},
     document: {body:{style:{}},getElementById:el},
     MODULE_ROUTES: Object.freeze(Object.fromEntries([...Object.entries(routes).map(([key,[,path]]) => [key,path]), ['room_booking2','room_booking/new_room.html']])),
     restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'})[view],
@@ -194,7 +196,7 @@ context.showView('room_booking','load');
 assert.equal(context.loaded,'public');
 console.log('PASS real router: module redirects, document tabs, invalid/prototype routes, denied permissions and guests');
 
-context.window.eofficeUser={permissions:['members','departments','email','maintenance']};
+context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance']};
 const mounted=[];
 context.window.eofficeModuleRouter={open:(view,options)=>mounted.push({view,...options}),leave:()=>true};
 context.navigated=null;
@@ -216,7 +218,7 @@ for (const view of Object.keys(context.MODULE_ROUTES)) {
     assert.equal(sessionValues.get('eoffice-login-view'),view,'guest module target must survive canonicalization');
     // Guest startup displays public again after opening its login modal.
     context.showView('public','load');
-    context.window.eofficeUser={permissions:['members','departments','email','maintenance']};
+    context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance']};
     context.navigated=null;
     startup.runInContext(context);
     assert.equal(context.navigated,context.MODULE_ROUTES[view]);
@@ -331,7 +333,7 @@ async function navigationChecks() {
     assert.equal(window.eofficeSessionState.user,verifiedState.user,'failed checks retain only the old owner boundary, not permission to write');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     const links=list.children.filter(link=>link.tag==='a');
-    assert.equal(links.filter(link=>!link.hidden).length,14);
+    assert.equal(links.filter(link=>!link.hidden).length,15);
     assert.equal(links[0].attributes['aria-current'],'page');
     assert.equal(links[0].href,'http://localhost/eoffice/management/user_manage.html');
     toggle.events.click();assert.equal(nav.inert,false);assert.equal(content.inert,true);assert.equal(toggle.attributes['aria-expanded'],'true');

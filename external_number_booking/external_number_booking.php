@@ -12,11 +12,16 @@ if($method==='POST'){
  $pdo->beginTransaction();
  try{$q=$pdo->prepare('SELECT value FROM eoffice_counters WHERE counter_key=? FOR UPDATE');$q->execute([$key]);$value=(int)$q->fetchColumn();
   $q=$pdo->prepare('SELECT COALESCE(MAX(External_Number),0) FROM t_external_number_booking WHERE Doc_Year=?');$q->execute([$year]);$next=max($value,(int)$q->fetchColumn())+1;
-  $pdo->prepare('UPDATE eoffice_counters SET value=? WHERE counter_key=?')->execute([$next,$key]);$pdo->prepare('INSERT INTO t_external_number_booking (User_Id,Doc_Detail,External_Number,Doc_Year) VALUES (?,?,?,?)')->execute([$user['User_Id'],$detail,$next,$year]);$id=(int)$pdo->lastInsertId();$pdo->commit();
+  $pdo->prepare('UPDATE eoffice_counters SET value=? WHERE counter_key=?')->execute([$next,$key]);$pdo->prepare('INSERT INTO t_external_number_booking (User_Id,Doc_Detail,External_Number,Doc_Year) VALUES (?,?,?,?)')->execute([$user['User_Id'],$detail,$next,$year]);$id=(int)$pdo->lastInsertId();app_audit('number.create',$user,$id,['number'=>$next,'year'=>$year]);$pdo->commit();
  }catch(Throwable $e){$pdo->rollBack();throw $e;}
  app_json(['status'=>'success','message'=>'จองเลขสำเร็จ','data'=>['id'=>$id,'External_Number'=>str_pad((string)$next,3,'0',STR_PAD_LEFT).'/'.$year,'Doc_Detail'=>$detail,'User_Name'=>$user['User_Name']]]);
 }
 if(!$admin)app_fail('Admin only',403);$id=(int)($d['id']??0);if($id<=0)app_fail('Invalid id');
-if($method==='PUT')$pdo->prepare('UPDATE t_external_number_booking SET Doc_Detail=? WHERE id=?')->execute([app_text($d,'docDetail',300,true),$id]);
-else $pdo->prepare('DELETE FROM t_external_number_booking WHERE id=?')->execute([$id]);
+$pdo->beginTransaction();
+try {
+ $q=$pdo->prepare('SELECT id FROM t_external_number_booking WHERE id=? FOR UPDATE');$q->execute([$id]);if(!$q->fetchColumn())app_fail('ไม่พบรายการ',404);
+ if($method==='PUT')$pdo->prepare('UPDATE t_external_number_booking SET Doc_Detail=? WHERE id=?')->execute([app_text($d,'docDetail',300,true),$id]);
+ else $pdo->prepare('DELETE FROM t_external_number_booking WHERE id=?')->execute([$id]);
+ app_audit($method==='PUT'?'number.update':'number.delete',$user,$id);$pdo->commit();
+} catch (Throwable $e) {if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 app_json(['status'=>'success','message'=>'ดำเนินการสำเร็จ']);

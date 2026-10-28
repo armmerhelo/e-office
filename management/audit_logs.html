@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ประวัติการใช้งาน — E-Office</title>
+  <link rel="stylesheet" href="../assets/app-navigation.css?v=20261028">
+  <link rel="stylesheet" href="../assets/sidebar.css?v=20261028">
+  <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261028">
+  <link rel="stylesheet" href="../assets/audit-logs.css?v=20261028">
+</head>
+<body class="eoffice-module-page">
+  <div class="eoffice-module-content"><div class="eoffice-module-view">
+    <script src="../assets/app-navigation.js?v=20261028-audit"></script>
+    <main class="audit-page" aria-labelledby="audit-title">
+      <header class="audit-heading">
+        <p class="audit-eyebrow">E-OFFICE · ADMIN</p>
+        <h1 id="audit-title">ประวัติการใช้งาน</h1>
+        <p>ตรวจสอบว่าใครทำรายการอะไร เมื่อใด และกับข้อมูลรายการใด</p>
+      </header>
+      <form id="filters" class="audit-filters">
+        <label class="audit-search">ค้นหา<input name="search" type="search" maxlength="100" placeholder="ชื่อผู้ใช้, ID ผู้ใช้/รายการ, IP หรือรหัสกิจกรรม"></label>
+        <label>ประเภทกิจกรรม<select name="category"><option value="">ทุกประเภท</option></select></label>
+        <label>ผลลัพธ์<select name="outcome"><option value="">ทั้งหมด</option><option value="success">สำเร็จ</option><option value="failure">ไม่สำเร็จ</option></select></label>
+        <label>ตั้งแต่วันที่<input name="from" type="date"></label>
+        <label>ถึงวันที่<input name="to" type="date"></label>
+        <div class="audit-actions"><button class="eo-btn eo-btn--primary" type="submit">ค้นหา</button><button class="eo-btn eo-btn--secondary" type="reset">ล้างตัวกรอง</button><button id="audit-refresh" class="eo-btn eo-btn--secondary" type="button">รีเฟรช</button></div>
+      </form>
+      <p class="audit-note">เวลาไทย (Asia/Bangkok) · เริ่มเก็บหลังติดตั้งฟังก์ชันนี้ · รายการสำเร็จหมายถึงบันทึกในระบบแล้ว ไม่ใช่ผลส่งอีเมลปลายทาง</p>
+      <div id="audit-feedback" role="status" aria-live="polite">กำลังโหลดประวัติ…</div>
+      <div id="audit-results" class="audit-table-wrap" aria-busy="true">
+        <table class="audit-table">
+          <caption class="audit-sr-only">ประวัติกิจกรรมในระบบ เรียงจากใหม่ไปเก่า</caption>
+          <thead><tr><th scope="col">วันและเวลา</th><th scope="col">ผู้ทำรายการ</th><th scope="col">กิจกรรม</th><th scope="col">รายการที่เกี่ยวข้อง</th><th scope="col">ผลลัพธ์</th><th scope="col">รายละเอียด</th></tr></thead>
+          <tbody id="audit-rows"></tbody>
+        </table>
+      </div>
+      <nav class="audit-pagination" aria-label="หน้าประวัติ"><button id="audit-prev" class="eo-btn eo-btn--secondary" type="button" disabled>ก่อนหน้า</button><span id="audit-page-number"></span><button id="audit-next" class="eo-btn eo-btn--secondary" type="button" disabled>ถัดไป</button></nav>
+    </main>
+  </div></div>
+  <script src="../assets/audit-logs.js?v=20261028"></script>
+</body>
+</html>

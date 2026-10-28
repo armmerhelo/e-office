@@ -28,4 +28,5 @@ foreach (['admin'=>'Admin','manager'=>'User','staff'=>'User','basic'=>'User'] as
 require_once __DIR__.'/../config/sign-routing.php';
 require_once __DIR__.'/../config/member-position.php';app_member_positions_migrate(app_pdo());
 app_sign_routes_migrate(app_pdo());
+app_audit_migrate(app_pdo());
 echo json_encode($users,JSON_THROW_ON_ERROR);

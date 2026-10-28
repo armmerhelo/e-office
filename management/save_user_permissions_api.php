@@ -21,6 +21,7 @@ try {
     $pdo->prepare('DELETE FROM eoffice_permissions WHERE User_Id=?')->execute([$id]);
     $q=$pdo->prepare('INSERT INTO eoffice_permissions (User_Id,permission) VALUES (?,?)');
     foreach ($permissions as $permission) $q->execute([$id,$permission]);
+    app_audit('member.permissions',$locked['actor'],$id,['permissions'=>$permissions]);
     $pdo->commit();
 } catch (Throwable $e) { $pdo->rollBack();throw $e; }
 app_json(['status'=>'success','message'=>'บันทึกสิทธิ์สำเร็จ','permissions'=>$permissions]);

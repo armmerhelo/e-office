@@ -9,6 +9,7 @@ try{
     if($locked['actor']['User_Status']!=='Admin'){$pdo->rollBack();app_fail('เฉพาะ Admin สูงสุดเท่านั้นที่กำหนดตำแหน่งได้',403);}
     app_check_member_version($pdo,$locked['target'],$version);
     $pdo->prepare('UPDATE t_user SET User_Position=? WHERE User_Id=?')->execute([$position,$id]);
+    app_audit('member.position',$locked['actor'],$id,['from'=>$locked['target']['User_Position']??'','to'=>$position]);
     $pdo->commit();
 }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 app_json(['status'=>'success','message'=>'บันทึกตำแหน่งสำเร็จ']);

@@ -20,7 +20,7 @@ if(in_array($action,['seed','drop'],true)){
     $db->exec("CREATE TABLE eoffice_access_history (id INT PRIMARY KEY AUTO_INCREMENT,Doc_Id INT,User_Id INT,snapshot JSON) ENGINE=InnoDB");
     $db->exec("CREATE TABLE eoffice_outbox (id BIGINT PRIMARY KEY AUTO_INCREMENT,payload JSON,status VARCHAR(20),created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     $db->exec("CREATE TABLE email_logs (id INT PRIMARY KEY AUTO_INCREMENT,doc_id VARCHAR(50),file_name VARCHAR(255),recipient_name VARCHAR(255),recipient_email VARCHAR(255),delivery_status VARCHAR(20),error_message TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
-    app_order_email_migrate($db);$users=[];
+    app_order_email_migrate($db);app_audit_migrate($db);$users=[];
     foreach(['admin'=>'Admin','owner'=>'User','staff'=>'User','alice'=>'User','bob'=>'User','invalid'=>'User'] as $name=>$role){
         $email=$name==='invalid'?'not-an-email':$name.'@example.test';
         $db->prepare('INSERT INTO t_user (User_Name,User_Email,User_Status) VALUES (?,?,?)')->execute([$name,$email,$role]);$id=(int)$db->lastInsertId();$token=bin2hex(random_bytes(32));

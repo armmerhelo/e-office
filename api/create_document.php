@@ -13,7 +13,7 @@ if(!$canEdit){
  app_document_transaction();$doc=app_locked_document($id,$user);
  $number=app_text($_POST,'doc_number_receive_stamp',20);$date=app_text($_POST,'stamp_date_recieve',20);
  $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Stamp_Recieve_Number,Stamp_Date_Recieve) VALUES (?,?,'',0,?,?) ON DUPLICATE KEY UPDATE Stamp_Recieve_Number=VALUES(Stamp_Recieve_Number),Stamp_Date_Recieve=VALUES(Stamp_Date_Recieve)");
- $q->execute([$user['User_Id'],$id,$number,$date]);$pdo->commit();app_json(['status'=>'success','message'=>'บันทึกเลขรับของคุณสำเร็จ','doc_id'=>$id]);
+ $q->execute([$user['User_Id'],$id,$number,$date]);app_audit('document.receipt',$user,$id);$pdo->commit();app_json(['status'=>'success','message'=>'บันทึกเลขรับของคุณสำเร็จ','doc_id'=>$id]);
 }
 $year=$edit?(string)$doc['Doc_Year']:(string)(date('Y')+543);
 $type=app_text($_POST,'doc_type',30,true)==='คำสั่ง'?'External':'Internal';
@@ -101,6 +101,7 @@ try{
    app_drive_archive_track($id,$path,'original',$target);
  }
  app_order_saved($id,!$edit,$type,$orderSettings);
+ app_audit($edit?'document.update':'document.create',$user,$id,['year'=>$year]);
  $pdo->commit();
 }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();foreach($moved as $path)if(is_file($path))unlink($path);if($e instanceof AppAmssException)app_fail($e->getMessage(),422);if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('เลขเอกสารซ้ำหรือผู้รับไม่ถูกต้อง',409);throw $e;}
 finally{foreach($staged as [$detail,$handle])if(is_resource($handle))fclose($handle);}

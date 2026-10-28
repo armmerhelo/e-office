@@ -15,6 +15,7 @@ if($action==='fill-attachments'){
 if($action!=='seed')throw new RuntimeException('Unknown fixture action');
 $db->exec("CREATE DATABASE `$database` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");$db->exec("USE `$database`");
 try{
+ app_audit_migrate($db);
  $db->exec("CREATE TABLE t_user (User_Id INT PRIMARY KEY AUTO_INCREMENT,User_Name VARCHAR(255),User_Email VARCHAR(255),User_Password VARCHAR(255),User_Status VARCHAR(20),User_Token VARCHAR(64)) ENGINE=InnoDB");
  $db->exec("CREATE TABLE eoffice_sessions (token_hash CHAR(64) PRIMARY KEY,User_Id INT,expires_at DATETIME) ENGINE=InnoDB");
  $db->exec("CREATE TABLE eoffice_permissions (User_Id INT,permission VARCHAR(50),PRIMARY KEY(User_Id,permission)) ENGINE=InnoDB");

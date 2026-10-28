@@ -54,6 +54,8 @@ npm.cmd run serve:test
 
 ## เอกสาร
 
+- [AUDIT_LOGS.md](AUDIT_LOGS.md): การเก็บ Log และหน้าประวัติการใช้งานสำหรับ Admin (รัน migration ก่อนใช้งาน)
+
 - [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md): การให้สิทธิ์รายบุคคลและการจัดการสมาชิกโดย Admin สูงสุด
 
 - [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client

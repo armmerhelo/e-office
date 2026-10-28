@@ -20,7 +20,7 @@ function fingerprint(config){
 function privateConfig(values){fs.writeFileSync(path.join(root,'config','local.php'),'<?php return json_decode('+JSON.stringify(JSON.stringify(values))+',true);',{mode:0o600});}
 async function run(){try{
     fs.mkdirSync(path.join(root,'config'),{recursive:true});
-    for(const name of ['bootstrap.php','permissions.php','member-management.php','sign-routing.php'])fs.copyFileSync(path.join(project,'config',name),path.join(root,'config',name));
+    for(const name of ['bootstrap.php','audit.php','permissions.php','member-management.php','member-position.php','sign-routing.php'])fs.copyFileSync(path.join(project,'config',name),path.join(root,'config',name));
     const setup=()=>prepareTestMemberKey(env,options);
     let first;
     test('local first setup creates a valid private key before serving',()=>{
@@ -76,7 +76,7 @@ async function run(){try{
         fs.copyFileSync(path.join(project,'config','settings.php'),path.join(root,'config','settings.php'));
         fs.mkdirSync(path.join(root,'management'),{recursive:true});
         fs.copyFileSync(path.join(project,'management','get_user_departments_api.php'),path.join(root,'management','get_user_departments_api.php'));
-        fs.writeFileSync(path.join(root,'config','local.php'),'<?php return require '+JSON.stringify(path.join(project,'config','local.php').replace(/\\/g,'/'))+';');
+        fs.writeFileSync(path.join(root,'config','local.php'),'<?php $path='+JSON.stringify(path.join(project,'config','local.php').replace(/\\/g,'/'))+'; return is_file($path) ? require $path : [];');
         const snapshots=[];
         for(let iteration=0;iteration<2;iteration++){
             const runtime=prepareTestMemberKey(httpEnv,options);

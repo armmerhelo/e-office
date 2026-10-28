@@ -28,6 +28,6 @@ if(array_key_exists('_expected_owner',$d) || $user) {
   throw $e;
  }
 }
-try{$q=$pdo->prepare("INSERT INTO maintenance_requests (User_Id,requester_name,position,department,phone,request_date,repair_types,other_type_detail,building,room,damage_details,images,consideration_status,action_result) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending')");$q->execute([$user['User_Id']??null,$name,$position,$department,$phone,$date,$types,$otherType,$building,$room,$details,$urls?json_encode($urls):null]);$id=(int)$pdo->lastInsertId();if($pdo->inTransaction())$pdo->commit();}
+try{if(!$pdo->inTransaction())$pdo->beginTransaction();$q=$pdo->prepare("INSERT INTO maintenance_requests (User_Id,requester_name,position,department,phone,request_date,repair_types,other_type_detail,building,room,damage_details,images,consideration_status,action_result) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'pending','pending')");$q->execute([$user['User_Id']??null,$name,$position,$department,$phone,$date,$types,$otherType,$building,$room,$details,$urls?json_encode($urls):null]);$id=(int)$pdo->lastInsertId();app_audit('maintenance.create',$user,$id);if($pdo->inTransaction())$pdo->commit();}
 catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();if($urls)app_queue(['type'=>'drive_cleanup_required','urls'=>$urls]);throw $e;}
 app_json(['status'=>'success','message'=>'บันทึกใบแจ้งซ่อมสำเร็จ','id'=>$id]);

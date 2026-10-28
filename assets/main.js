@@ -20,6 +20,8 @@ function applyPermissionMenus() {
     const sendEmail = document.getElementById('group_send_email');
     if (aiSettings?.parentNode && sendEmail) aiSettings.parentNode.insertBefore(sendEmail, aiSettings);
     if (aiSettings) aiSettings.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
+    const auditMenu = document.getElementById('group_audit_logs');
+    if (auditMenu) auditMenu.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
     for (const [id,visible] of [['menu-logout',!!window.eofficeUser],['openModal',!window.eofficeUser]]) {
@@ -84,6 +86,7 @@ const MODULE_ROUTES = Object.freeze({
     maintenance: 'maintenance_requests/index.html',
     maintenance_admin: 'maintenance_requests/admin.html',
     ai_settings: 'email_send/ai_settings.html',
+    audit_logs: 'management/audit_logs.html',
     updates: 'updates/index.html'
 });
 
@@ -532,7 +535,7 @@ function showView(showViews, page , page_number) {
     }
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
-    if (showViews === 'ai_settings' && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
+    if (['ai_settings','audit_logs'].includes(showViews) && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
 
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;
     if (moduleRoute) {

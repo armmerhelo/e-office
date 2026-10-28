@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/audit.php';
 date_default_timezone_set('Asia/Bangkok');
 function app_env(string $key, $default = '') {
     $value = getenv($key);

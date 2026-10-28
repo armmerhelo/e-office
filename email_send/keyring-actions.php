@@ -52,6 +52,7 @@ function order_keyring_action(string $action,array $input,array $actor): void {
         $details=['reference'=>$ref,'label'=>$label!==''?$label:($entry['label']??'เซิร์ฟเวอร์'),'success'=>$reason===null,'code'=>$reason];
         if($action==='key_update')$details['changes']=['key_reference'=>['before'=>$ref,'after'=>$ref],'key_label'=>['before'=>$entry['label'],'after'=>$label],'key_enabled'=>['before'=>(bool)$entry['enabled'],'after'=>$input['key_enabled']],'remind_days'=>['before'=>(int)$entry['remind_days'],'after'=>$days]];
         app_order_event($action,$details,(int)$actor['User_Id']);
+        app_audit('email.'.$action,$current,$id,['reference'=>$ref],$reason===null?'success':'failure');
         $pdo->commit();
     }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
     if($reason!==null)app_json(['status'=>'error','code'=>$reason,'message'=>'ทดสอบ Key ไม่ผ่าน ระบบยังใช้ Key เดิม'],400);

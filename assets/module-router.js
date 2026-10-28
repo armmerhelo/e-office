@@ -9,7 +9,7 @@
         send_email:'email_send/doc_send_email.html', ai_settings:'email_send/ai_settings.html',
         room_booking:'room_booking/index.html', room_booking2:'room_booking/new_room.html',
         edit_room_booking:'room_booking/edit_room_booking.html', maintenance:'maintenance_requests/index.html',
-        maintenance_admin:'maintenance_requests/admin.html', updates:'updates/index.html'
+        maintenance_admin:'maintenance_requests/admin.html', updates:'updates/index.html', audit_logs:'management/audit_logs.html'
     });
     const cache = new Map(), libraries = new Map();
     const roleIndependent=new Set(['room_booking','room_booking2','maintenance']);
@@ -308,7 +308,7 @@
         return ctx;
         } catch(error) {ctx.dispose();throw error;}
     }
-    const allowed=view=>window.eofficeUser && !window.eofficeFormOwner?.hasConflict() && window.eofficeSessionState?.status==='authenticated' && (view==='ai_settings'?window.eofficeUser.status==='Admin':
+    const allowed=view=>window.eofficeUser && !window.eofficeFormOwner?.hasConflict() && window.eofficeSessionState?.status==='authenticated' && (['ai_settings','audit_logs'].includes(view)?window.eofficeUser.status==='Admin':
         !({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]) ||
         window.eofficeUser.permissions?.includes({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]));
     const approve=()=>window.eofficeApproveDocumentLeaving?.(false,true)!==false;

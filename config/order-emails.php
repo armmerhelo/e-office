@@ -7,6 +7,9 @@ require_once __DIR__.'/member-position.php';
 
 function app_order_audit(string $action,?int $actor=null,?int $doc=null): void {
     app_pdo()->prepare('INSERT INTO eoffice_order_audit (actor_id,doc_id,action) VALUES (?,?,?)')->execute([$actor,$doc,$action]);
+    $user=null;
+    if($actor!==null){$q=app_pdo()->prepare('SELECT User_Id,User_Name FROM t_user WHERE User_Id=?');$q->execute([$actor]);$user=$q->fetch()?:null;}
+    app_audit('email.action',$user,$doc,['action'=>$action]);
 }
 
 function app_order_job(int $docId): ?array {

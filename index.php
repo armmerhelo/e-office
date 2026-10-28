@@ -357,6 +357,12 @@ window.addEventListener('load', function() {
             ส่งอีเมลคำสั่ง
           </a>
         </li>
+        <li id="group_audit_logs" style="display:none">
+          <a id="menu-audit-logs" href="management/audit_logs.html" onclick="showView('audit_logs'); return false;" class="menu-item eoffice-app-navigation__link">
+            <svg class="eoffice-app-navigation__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>ประวัติการใช้งาน</span>
+          </a>
+        </li>
         <li id="group_ai_settings" style="display:none">
           <a href="email_send/ai_settings.html" id="menu-ai-settings" class="menu-item">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2"></path></svg>

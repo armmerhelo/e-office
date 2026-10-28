@@ -2,6 +2,15 @@
 require_once __DIR__ . '/../config/bootstrap.php';
 app_method('POST');
 $token = $_COOKIE['User_Token'] ?? '';
-if (is_string($token)) app_pdo()->prepare('DELETE FROM eoffice_sessions WHERE token_hash=?')->execute([hash('sha256', $token)]);
+if($token===''&&preg_match('/^Bearer ([a-f0-9]{64})$/i',$_SERVER['HTTP_AUTHORIZATION']??'',$match))$token=$match[1];
+$user=app_user(false);$pdo=app_pdo();
+if (is_string($token)) {
+    // Session revocation must commit even when audit storage is unavailable.
+    $q=$pdo->prepare('DELETE FROM eoffice_sessions WHERE token_hash=?');$q->execute([hash('sha256', $token)]);
+    if ($user && $q->rowCount()>0) {
+        try {app_audit('auth.logout',$user,(int)$user['User_Id']);}
+        catch (Throwable $e) {error_log('Audit logout could not be stored ('.get_class($e).')');}
+    }
+}
 foreach (['User_Token','User_Status','User_DisplayName','User_Id'] as $name) app_cookie($name, '', time()-3600, $name==='User_Token');
 app_json(['status'=>'success', 'message'=>'Logged out successfully']);

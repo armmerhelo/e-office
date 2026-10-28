@@ -11,6 +11,7 @@ try {
     app_require_remaining_admin($pdo,$locked,$status);
     $pdo->prepare('UPDATE t_user SET User_Status=? WHERE User_Id=?')->execute([$status,$id]);
     if($status!==$locked['target']['User_Status']&&($status==='Admin'||$locked['target']['User_Status']==='Admin'))$pdo->prepare('DELETE FROM eoffice_permissions WHERE User_Id=?')->execute([$id]);
+    app_audit('member.role',$locked['actor'],$id,['from'=>$locked['target']['User_Status'],'to'=>$status]);
     $pdo->commit();
 }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
 app_json(['status'=>'success','message'=>'บันทึกระดับผู้ใช้สำเร็จ']);

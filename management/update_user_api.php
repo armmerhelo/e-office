@@ -13,6 +13,7 @@ try{
  if($p1!==''){$pdo->prepare('UPDATE t_user SET User_Name=?,User_Email=?,User_Password=? WHERE User_Id=?')->execute([$name,$email,password_hash($p1,PASSWORD_DEFAULT),$id]);$pdo->prepare('DELETE FROM eoffice_sessions WHERE User_Id=?')->execute([$id]);}
  else $pdo->prepare('UPDATE t_user SET User_Name=?,User_Email=? WHERE User_Id=?')->execute([$name,$email,$id]);
  $depts=$_POST['Department_Id_Acc']??[];if(!is_array($depts))throw new InvalidArgumentException('Invalid departments');
- $pdo->prepare('DELETE FROM t_user_department WHERE User_Id=?')->execute([$id]);$q=$pdo->prepare('INSERT INTO t_user_department (User_Id,Department_Id) VALUES (?,?)');foreach(array_unique(array_map('intval',$depts)) as $dept)$q->execute([$id,$dept]);$pdo->commit();
+ $pdo->prepare('DELETE FROM t_user_department WHERE User_Id=?')->execute([$id]);$q=$pdo->prepare('INSERT INTO t_user_department (User_Id,Department_Id) VALUES (?,?)');foreach(array_unique(array_map('intval',$depts)) as $dept)$q->execute([$id,$dept]);
+ app_audit('member.update',$locked['actor'],$id,['department_ids'=>array_values(array_unique(array_map('intval',$depts))),'reset_password'=>$p1!=='']);$pdo->commit();
 }catch(Throwable $e){$pdo->rollBack();if($e instanceof PDOException&&$e->getCode()==='23000')app_fail('อีเมลซ้ำหรือกลุ่มงานไม่ถูกต้อง',409);throw $e;}
 app_json(['status'=>'success','message'=>'บันทึกข้อมูลสำเร็จ']);
