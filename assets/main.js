@@ -31,6 +31,7 @@ function applyPermissionMenus() {
 }
 
 let permissionRefreshSequence = 0;
+let receivedRefreshAfterSession = false;
 let mainSessionRevision = 0, mainPageOwner = window.eofficeUser?.id ? String(window.eofficeUser.id) : null;
 function publishMainSession(status, user = null) {
     if (!mainPageOwner && user?.id) mainPageOwner = String(user.id);
@@ -63,6 +64,12 @@ async function refreshPermissionMenus() {
         publishMainSession(data.user?.id ? 'authenticated' : 'guest', data.user || null);
         applyPermissionMenus();
         const current = localStorage.getItem('currentPage');
+        if (receivedRefreshAfterSession) {
+            receivedRefreshAfterSession = false;
+            if (data.user?.id && current === 'received') {
+                get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
+            }
+        }
         if (restrictedViewPermission(current) && !eofficeCan(restrictedViewPermission(current))) showView(window.eofficeUser ? 'received' : 'public', 'load');
     } catch (error) {
         if (request !== permissionRefreshSequence) return;
@@ -122,12 +129,10 @@ window.addEventListener('eoffice:permissions-changed', () => {
     refreshPermissionMenus();
 });
 window.addEventListener('focus', () => { refreshPermissionMenus(); });
-window.addEventListener('pageshow', async event => {
+window.addEventListener('pageshow', event => {
     if (event.persisted) {
-        await refreshPermissionMenus();
-        if (window.eofficeSessionState?.status === 'authenticated' && localStorage.getItem('currentPage') === 'received') {
-            get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
-        }
+        receivedRefreshAfterSession = true;
+        refreshPermissionMenus();
     }
 });
 

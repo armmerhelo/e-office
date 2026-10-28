@@ -18,6 +18,7 @@ const context={history,console:{log(){},error(){}},FormData:class {constructor()
         writes.push(options.body.data);
         return {ok:!fail,status:500,json:async()=>({status:'success',revision:'next',auto_sent_user_ids:[3],registered_receipt_departments:acknowledge?JSON.parse(options.body.data.receipt_departments):[]})};
     },
+    hasVisibleSignature:()=>true,
     showLoading(){},showToast(){},redrawCanvas(page,actions){history[page]=actions;return Promise.resolve(true);},getCookie(){return '';},setTimeout,StampRenderQueue,confirm:()=>consent};
 vm.createContext(context);
 vm.runInContext(`let currentPDF=true,isDrawing=false,savingDocument=false,documentHistory=history,documentRevision='old';const stampRenderQueue=new StampRenderQueue();this.queue=stampRenderQueue;\n${scopesSource}\n${save}\n${undo}\nthis.save=saveToServer;this.undo=undoLastAction;`,context);

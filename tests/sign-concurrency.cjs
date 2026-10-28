@@ -31,7 +31,9 @@ async function request(route,{as='manager',data,body,status=200,worker=0,raw=fal
 }
 const view=(worker=0)=>request('/api/view_file.php?Doc_Id=1&File_Path=routing.pdf&Type=signed',{worker,raw:true});
 function upload(bytes,revision,department){
+    // Upload fixtures represent an explicit signing action, not an editor no-op.
     const body=new FormData();body.append('file',new Blob([bytes],{type:'application/pdf'}),'routing.pdf');body.append('Doc_Id','1');body.append('year','2569');body.append('revision',revision);
+    body.append('confirm_signature','1');
     if(department){body.append('receipt_departments',JSON.stringify([department]));body.append('confirm_receipt','1');}return body;
 }
 async function signed({worker=0,department,status=200,version,suffix='signed'}={}){

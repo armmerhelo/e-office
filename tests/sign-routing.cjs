@@ -25,10 +25,11 @@ async function save(routes, extra={}) {
     const snapshot = await read();
     return request('/management/save_sign_routes_api.php', {data:{routes, route_version:snapshot.route_version}, ...extra});
 }
-async function sign(as='manager', departments, {status=200, revision, legacy=false, confirm=true}={}) {
+async function sign(as='manager', departments, {status=200, revision, legacy=false, confirm=true, unchanged=false}={}) {
     const view = await fetch(base + '/api/view_file.php?Doc_Id=1&File_Path=routing.pdf&Type=signed', {headers:{Cookie:users[as].cookie}});
     assert.equal(view.status,200); const pdf = await view.arrayBuffer();
-    const body = new FormData(); body.append('file',new Blob([pdf, `\n% saved-${Date.now()}-${Math.random()}\n`],{type:'application/pdf'}),'routing.pdf');
+    const body = new FormData(); body.append('file',new Blob(unchanged?[pdf]:[pdf, `\n% saved-${Date.now()}-${Math.random()}\n`],{type:'application/pdf'}),'routing.pdf');
+    body.append('confirm_signature','1');
     body.append('Doc_Id','1'); body.append('year','2569'); body.append('revision',revision || view.headers.get('X-Document-Revision'));
     if (departments !== undefined) body.append(legacy?'stamp_departments':'receipt_departments',JSON.stringify(departments));
     if (confirm && !legacy) body.append('confirm_receipt','1');
@@ -100,7 +101,7 @@ async function run() {
         assert.equal(inspect().notifications.length,0);
     });
     await test('matching secretary stamp adds deputy access and one notification atomically',async()=>{
-        const result=await sign('manager',[department]);
+        const result=await sign('manager',[department],{unchanged:true});
         assert.deepEqual(result.auto_sent_user_ids,[users.staff.id]);
         assert.deepEqual(result.registered_receipt_departments,[department]);
         const data=inspect(); assert.equal(data.access.find(row=>row.User_Id===users.manager.id).Is_Signed,'true');

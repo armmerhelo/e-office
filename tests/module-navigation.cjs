@@ -1048,18 +1048,37 @@ async function sharedLogoutRaceChecks() {
 sharedLogoutRaceChecks().catch(error=>{console.error(error);process.exitCode=1;});
 
 async function mainPermissionRefreshChecks() {
+    let current = 'public';
+    const inboxLoads = [];
     const requests=[],window={...makeEventTarget(),eofficeUser:{id:7,permissions:['members']}},runtime={window,CustomEvent,
-        fetch:()=>new Promise(resolve=>requests.push(resolve)),applyPermissionMenus(){},localStorage:{getItem:()=> 'public'},restrictedViewPermission:()=>null,console:{error(){}}};
+        fetch:()=>new Promise(resolve=>requests.push(resolve)),applyPermissionMenus(){},localStorage:{getItem:key=>key==='currentPage'?current:'2'},restrictedViewPermission:()=>null,console:{error(){}},
+        document:{getElementById:()=>({value:'retained search'})},get_data_api_received:(...args)=>inboxLoads.push(args)};
     vm.createContext(runtime);vm.runInContext(main.slice(main.indexOf('let permissionRefreshSequence'),main.indexOf('function restrictedViewPermission(')),runtime);
     const older=runtime.refreshPermissionMenus(),latest=runtime.refreshPermissionMenus();
     const oldReply=requests.shift(),newReply=requests.shift();newReply({ok:true,json:async()=>({user:{id:8,permissions:[]}})});await latest;
     oldReply({ok:true,json:async()=>({user:{id:7,permissions:['members']}})});await older;assert.equal(window.eofficeUser.id,8);
     const pending=runtime.refreshPermissionMenus();window.eofficeRevokeSession();requests.shift()({ok:true,json:async()=>({user:{id:7,permissions:['members']}})});await pending;
     assert.equal(window.eofficeUser,null,'an outstanding main-page session check cannot undo a confirmed logout');
-    vm.runInContext(main.match(/window\.addEventListener\('pageshow', async event => \{[\s\S]*?\n\}\);/)[0],runtime);
+    vm.runInContext(main.match(/window\.addEventListener\('pageshow', event => \{[\s\S]*?\n\}\);/)[0],runtime);
     window.dispatchEvent({type:'pageshow',persisted:false});assert.equal(requests.length,0);
     window.dispatchEvent({type:'pageshow',persisted:true});assert.equal(window.eofficeSessionState.status,'pending','BFCache return must invalidate the cached authorization synchronously');
     requests.shift()({ok:true,json:async()=>({user:{id:9,permissions:[]}})});await new Promise(resolve=>setImmediate(resolve));assert.equal(window.eofficeUser.id,9);
+    current = 'received';
+    for (const newestFirst of [false, true]) {
+        const before = inboxLoads.length;
+        window.dispatchEvent({type:'pageshow',persisted:true});
+        const focus = runtime.refreshPermissionMenus();
+        const old = requests.shift(), latest = requests.shift();
+        const reply = callback => callback({ok:true,json:async()=>({user:{id:9,permissions:[]}})});
+        if (newestFirst) { reply(latest);await focus;reply(old); }
+        else { reply(old);await new Promise(resolve=>setImmediate(resolve));assert.equal(inboxLoads.length,before);reply(latest);await focus; }
+        await new Promise(resolve=>setImmediate(resolve));
+        assert.equal(inboxLoads.length,before+1,'BFCache + focus must refresh the inbox exactly once, after the accepted session');
+        assert.deepEqual(inboxLoads.at(-1),['2','retained search']);
+    }
+    window.dispatchEvent({type:'pageshow',persisted:true});
+    requests.shift()({ok:true,json:async()=>({user:null})});await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(inboxLoads.length,2,'guest replies must not refresh private documents');
     console.log('PASS main session refresh: latest reply wins and confirmed logout invalidates outstanding permission responses');
 }
 mainPermissionRefreshChecks().catch(error=>{console.error(error);process.exitCode=1;});

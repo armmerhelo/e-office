@@ -14,6 +14,9 @@ if ($receiptDepartments && ($_POST['confirm_receipt']??'')!=='1') app_fail('ต�
 $id=(int)($_POST['Doc_Id']??0);$doc=app_document($id,$user);$file=$_FILES['file']??[];app_uploaded($file,['pdf']);
 $name=basename($file['name']);app_bound_file($doc,$name);$year=(string)$doc['Doc_Year'];if((string)($_POST['year']??'')!==$year)app_fail('Invalid year');
 $expected=app_text($_POST,'revision',64,true);if(!preg_match('/^[a-f0-9]{64}$/',$expected))app_fail('Invalid revision');
+// This is an authenticated declaration of signing intent, not verification of
+// handwriting pixels. Old/no-op clients must not silently complete the inbox.
+if(($_POST['confirm_signature']??'')!=='1')app_fail('กรุณาโหลดหน้าใหม่และลงนามก่อนบันทึก');
 $dir=app_storage('e-sign',$year);if(!is_dir($dir)&&!@mkdir($dir,0755,true)&&!is_dir($dir))throw new RuntimeException('Storage unavailable');
 $target=$dir.'signed_'.$id.'_'.$name;$original=app_storage('original',$year,$name);$legacy=$dir.'signed_'.$name;
 $remoteCurrent=null;
@@ -36,6 +39,12 @@ try{
   if(!$cloud||!hash_equals($cloud['revision'],$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
  }
  if(!is_file($current)||!hash_equals(hash_file('sha256',$current),$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
+ if(hash_equals(hash_file('sha256',$file['tmp_name']),$expected)){
+  $signed=$pdo->prepare("SELECT Is_Signed FROM t_access_rights WHERE Doc_Id=? AND User_Id=?");$signed->execute([$id,$user['User_Id']]);
+  // A previously signed secretary may retry registering a saved receipt after
+  // their routing role changes, without changing the already-persisted PDF.
+  if($signed->fetchColumn()!=='true'){$pdo->rollBack();app_fail('เอกสารไม่มีการเปลี่ยนแปลง กรุณาลงนามก่อนบันทึก');}
+ }
  if(!move_uploaded_file($file['tmp_name'],$temp))throw new RuntimeException('Upload failed');
  if(is_file($target)){$candidate=$target.'.'.bin2hex(random_bytes(8)).'.bak';if(!rename($target,$candidate))throw new RuntimeException('Backup failed');$backup=$candidate;}
  if(!rename($temp,$target))throw new RuntimeException('File save failed');

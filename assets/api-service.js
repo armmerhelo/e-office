@@ -366,6 +366,11 @@ if (width >= 1300) {
             if (document.getElementById('All_Doc_2')) document.getElementById('All_Doc_2').textContent = (Page_number - 1) * 20 + data.length;
             //view_doc_detail(1179,'received');
         } else {
+            // Signing can remove the final item of the final page. An empty
+            // offset is not proof that the recipient has no pending documents.
+            if (Page_number > 1 && !doc_id) {
+                return await get_data_api_received(1, search_txt, doc_id, Year, user_token);
+            }
             // กรณีไม่มีข้อมูล หรือไม่ได้ Login
             currentPage = localStorage.getItem("currentPage");
             if (currentPage == 'received') {

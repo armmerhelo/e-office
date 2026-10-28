@@ -10,14 +10,15 @@ const vm = require('node:vm');
     const stored = new Map([['read_status_change', 'NotRead'], ['currentPage', 'received']]);
     const opened = {doc_id: 42, status: 'NotRead', Is_Signed: 'false'};
     const requests = [];
+    let listResponse = () => [];
     const context = vm.createContext({
-        document: {getElementById: id => nodes.get(id)}, window: {location: {href: 'https://example.test/'}, history: {replaceState() {}}},
+        document: {getElementById: id => nodes.get(id)}, window: {innerWidth: 1400, location: {href: 'https://example.test/'}, history: {replaceState() {}}},
         localStorage: {getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value)},
         console: {log() {}, error() {}, warn() {}}, data_save: [opened], getCookie: () => '2569',
         pagination_create() {}, updateDataSave() {}, URL,
         fetch: async (url, options) => {
             requests.push({url, payload: JSON.parse(options.body)});
-            return {ok: true, json: async () => url.includes('update_read') ? {status: 'success'} : []};
+            return {ok: true, json: async () => url.includes('update_read') ? {status: 'success'} : listResponse(JSON.parse(options.body))};
         }
     });
     vm.runInContext(fs.readFileSync('assets/api-service.js', 'utf8'), context);
@@ -33,6 +34,23 @@ const vm = require('node:vm');
         assert.ok(nodes.get('content_received').innerHTML.includes(message));
         for (const id of ['All_Doc', 'All_Doc_1', 'All_Doc_2']) assert.equal(nodes.get(id).textContent, '0');
     }
+    stored.set('read_status_change', 'NotRead');
+    listResponse = payload => payload.Page_number > 1 ? [] : [{doc_id: 43, status: 'Readed', Pagination: 1, Total_Records: 20}];
+    const beforeFallback = requests.length;
+    await context.get_data_api_received(2, 'retained search', undefined, '2568', 'token');
+    assert.deepEqual(requests.slice(beforeFallback).map(request => request.payload.Page_number), [2, 1]);
+    assert.equal(requests.at(-1).payload.search_txt, 'retained search');
+    assert.equal(requests.at(-1).payload.Year, '2568');
+    assert.equal(requests.at(-1).payload.Read_Status_find, 'NotRead');
+    assert.equal(nodes.get('All_Doc').textContent, 20, 'remaining documents must not be reported as zero');
+    assert.ok(nodes.get('loop_receive').innerHTML.includes('tb_status_read_43'));
+    listResponse = () => [];
+    const beforeEmpty = requests.length;
+    await context.get_data_api_received(5);
+    assert.equal(requests.length - beforeEmpty, 2, 'empty inbox fallback must terminate at page one');
+    const beforeTarget = requests.length;
+    await context.get_data_api_received(2, '', 42);
+    assert.equal(requests.length - beforeTarget, 1, 'targeted document lookups must not fall back to unrelated documents');
     const main = fs.readFileSync('assets/main.js', 'utf8');
     vm.runInContext(main.slice(main.indexOf('function read_status_change('), main.indexOf('function read_show(')), context);
     nodes.set('sub_head', {});

@@ -22,7 +22,7 @@ async function request(route,{cookie='',data,form,method=data||form?'POST':'GET'
  const r=await fetch((remote?base:`http://localhost:${port+worker}`)+route,{method,redirect:remote?'manual':'follow',headers:{...headers,...(cookie?{Cookie:cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:form||(data?JSON.stringify(data):undefined)});
  const text=await r.text();if(remote&&text.includes('One moment, please...'))throw Error(`Hosting bot verification blocked ${route}; no application test result was accepted`);if(Array.isArray(status))assert.ok(status.includes(r.status),`${route}: ${text}`);else assert.equal(r.status,status,`${route}: ${text}`);let body;try{body=JSON.parse(text);}catch{body=text;}return {body,r,text};
 }
-function form(values,files={}){const f=new FormData();for(const [k,v]of Object.entries(values)){if(Array.isArray(v))v.forEach(x=>f.append(k+'[]',String(x)));else f.append(k,String(v));}for(const [k,v]of Object.entries(files))f.append(k,new Blob([v.data],{type:v.type||'application/pdf'}),v.name);return f;}
+function form(values,files={}){const f=new FormData();if(values.Doc_Id)f.set('confirm_signature','1');for(const [k,v]of Object.entries(values)){if(Array.isArray(v))v.forEach(x=>f.append(k+'[]',String(x)));else f.set(k,String(v));}for(const [k,v]of Object.entries(files))f.append(k,new Blob([v.data],{type:v.type||'application/pdf'}),v.name);return f;}
 async function login(name){const {r}=await request('/api/auth_login.php',{data:{username:`qa-${name}@siya.ac.th`,password:testPassword}});assert.match(r.headers.getSetCookie().join(';'),/HttpOnly/i);return r.headers.getSetCookie().map(s=>s.split(';')[0]).join('; ');}
 async function test(name,fn){await fn();passed++;console.log('PASS '+name);}
 async function run(){
@@ -73,6 +73,21 @@ async function run(){
     const all=await request('/api/get_data_received.php',{cookie:recipient,data:{Year:'2569',Doc_Id:doc}});
     assert.equal(all.body[0].status,'Readed');assert.equal(all.body[0].Total_Records,1);
   });
+  await test('missing signing intent and unchanged PDF cannot complete pending work',async()=>{
+    const current=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:recipient});
+    const currentRevision=current.r.headers.get('X-Document-Revision');
+    const unchanged=()=>form({Doc_Id:doc,year:2569,revision:currentRevision},{file:{name:fileName,data:Buffer.from(current.text)}});
+    const legacy=unchanged();legacy.delete('confirm_signature');
+    await request('/e-sign/upload_pdf.php',{cookie:recipient,form:legacy,status:400});
+    for(const intent of ['0','true','']) {
+      const invalid=unchanged();invalid.set('confirm_signature',intent);
+      await request('/e-sign/upload_pdf.php',{cookie:recipient,form:invalid,status:400});
+    }
+    await request('/e-sign/upload_pdf.php',{cookie:recipient,form:unchanged(),status:400});
+    await inboxSignature(recipient,false,true);await inboxSignature(recipient,true,false);
+    const after=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:recipient});
+    assert.equal(after.r.headers.get('X-Document-Revision'),currentRevision);
+  });
  await test('recipient cannot modify shared document',async()=>{await request('/api/create_document.php',{cookie:recipient,form:form({formtype:'edit_document',doc_id:doc,doc_name:'ATTACK',doc_type:'คำสั่ง',doc_number_receive_stamp:'123'})});const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.equal(list.body[0].doc_name,'QA landscape document');});
   await test('signed PDF save and stale revision rejected',async()=>{const f=()=>form({Doc_Id:doc,year:2569,revision},{file:{name:fileName,data:Buffer.concat([pdf,Buffer.from('\n% signed\n')])}});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f()});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f(),status:409});});
   await test('successful signature moves only the signer out of pending',async()=>{
@@ -84,6 +99,8 @@ async function run(){
     await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc}});
     await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
     const current=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:outsider});
+    await request('/e-sign/upload_pdf.php',{cookie:outsider,form:form({Doc_Id:doc,year:2569,revision:current.r.headers.get('X-Document-Revision')},{file:{name:fileName,data:Buffer.from(current.text)}}),status:400});
+    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
     await request('/e-sign/upload_pdf.php',{cookie:outsider,form:form({Doc_Id:doc,year:2569,revision:current.r.headers.get('X-Document-Revision')},{file:{name:fileName,data:'invalid PDF'}}),status:400});
     await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
   });

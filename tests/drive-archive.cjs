@@ -95,6 +95,7 @@ async function test(){try{
     // Original may still be local even though the current signed version is
     // Drive-only: signing must compare against signed cloud bytes, not original.
     const form=new FormData();form.append('Doc_Id',String(fixture.doc));form.append('year','2566');form.append('revision',fixture.signed_revision);form.append('file',new Blob(['%PDF-1.4\n% HTTP signed fixture\n'],{type:'application/pdf'}),fixture.name);
+    form.append('confirm_signature','1');
     const saved=await fetch(url+'/e-sign/upload_pdf.php',{method:'POST',headers:{Cookie:fixture.cookies.reader},body:form});assert.equal(saved.status,200,await saved.text());
     const fresh=await request(route,'reader');assert.equal(fresh.status,200);assert.notEqual(fresh.headers.get('X-Document-Revision'),fixture.signed_revision);await fresh.arrayBuffer();
     const count=Number(run(`require 'config/bootstrap.php';echo app_pdo()->query("SELECT COUNT(*) FROM eoffice_drive_versions WHERE variant='signed' AND status='pending'")->fetchColumn();`,database));assert.equal(count,1);

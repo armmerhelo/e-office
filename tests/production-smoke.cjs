@@ -9,7 +9,7 @@ async function call(route,{method='GET',data,form,status=200,auth=true}={}){
     let body;try{body=JSON.parse(text);}catch{body=text;}return {r,body,text};
 }
 async function check(name,fn){await fn();passed++;console.log('PASS '+name);}
-function form(values,bytes,name){const f=new FormData();for(const[k,v]of Object.entries(values)){if(Array.isArray(v))v.forEach(x=>f.append(k+'[]',String(x)));else f.append(k,String(v));}if(bytes)f.append(name||'doc_upload[]',new Blob([bytes],{type:'application/pdf'}),name?'filename.pdf':'fixture.pdf');return f;}
+function form(values,bytes,name){const f=new FormData();if(values.Doc_Id)f.set('confirm_signature','1');for(const[k,v]of Object.entries(values)){if(Array.isArray(v))v.forEach(x=>f.append(k+'[]',String(x)));else f.set(k,String(v));}if(bytes)f.append(name||'doc_upload[]',new Blob([bytes],{type:'application/pdf'}),name?'filename.pdf':'fixture.pdf');return f;}
 async function run(){let doc,filename,revision;
  await check('public document listing works without internal recipient metadata',async()=>{const r=await call('/api/get_data_public.php',{method:'POST',data:{Year:'2569',limit:1},auth:false});assert.ok(r.body[0].doc_id>0);for(const key of ['user_send_to','department_id','status_read','date','send_from','doc_action','doc_other'])assert.equal(Object.hasOwn(r.body[0],key),false,key);});
  await check('boolean password rejected',async()=>call('/api/auth_login.php',{method:'POST',data:{username:state.email,password:true},status:400,auth:false}));

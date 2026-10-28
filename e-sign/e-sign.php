@@ -722,6 +722,23 @@ const CONFIG = {
             return match ? decodeURIComponent(match[1]) : '';
         }
 
+        function hasVisibleSignature() {
+            // History alone is insufficient: Undo or the eraser may leave an
+            // empty overlay. Inspect only the current user's drawing layer,
+            // never the original PDF (which may contain someone else's ink).
+            return Object.entries(documentHistory).some(([page, actions]) => {
+                const hasInkAction = actions.some(action => action.tool === 'stamp' ||
+                    (action.tool === 'pen' && action.points?.some(point =>
+                        point.x !== action.points[0].x || point.y !== action.points[0].y)));
+                if (!hasInkAction) return false;
+                const canvas = document.getElementById(`draw-layer-${page}`);
+                if (!canvas) return false;
+                const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+                for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) return true;
+                return false;
+            });
+        }
+
         // UPDATE: Function to Save to Server (Real Implementation Logic Added)
         async function saveToServer() {
             if (!currentPDF || savingDocument || isDrawing) return;
@@ -730,6 +747,7 @@ const CONFIG = {
 
             try {
                 await stampRenderQueue.wait();
+                if (!hasVisibleSignature()) throw new Error('กรุณาลงนามหรือประทับตราก่อนบันทึก');
                 const stamps = Object.values(documentHistory).flat().filter(action => action.tool === 'stamp' && action.department);
                 const pendingReceipts = stamps.filter(action => !action.receiptRegistered);
                 let registeredDepartments = [];
@@ -748,6 +766,8 @@ const CONFIG = {
                 formData.append('year', year);
                 formData.append('Doc_Id', <?= $doc_id_int ?>);
                 formData.append('revision', documentRevision || '');
+                // Explicit signing intent, separate from the optional secretary receipt.
+                formData.append('confirm_signature', '1');
                 formData.append('receipt_departments', JSON.stringify(registeredDepartments));
                 if (registeredDepartments.length) formData.append('confirm_receipt', '1');
 
