@@ -101,6 +101,34 @@ async function run(){
     });
     fixture('history-cleanup');
     const testKey='synthetic-test-key-not-a-real-credential';
+    await test('template-only saves enforce Admin, origin, revision and a template-only allowlist without writes on rejection',async()=>{
+        const settings=(await request('/email_send/ai_settings.php')).settings;
+        const data={action:'save_template',revision:settings.revision,options:{subject:'คำสั่ง {doc_number}',intro:'เรียน {recipient_name}',signature:'E-Office'}};
+        const before=snapshot();
+        for(const [as,status] of [[null,401],['owner',403],['staff',403]])await request('/email_send/ai_settings.php',{as,data,status});
+        await request('/email_send/ai_settings.php',{data,headers:{Origin:'https://foreign.example'},status:403});
+        for(const revision of [undefined,'0',-1,settings.revision+1])await request('/email_send/ai_settings.php',{data:{...data,revision},status:409});
+        for(const options of [null,[],{subject:'Only subject'},{...data.options,enabled:true},{...data.options,smtp_source:'admin'},{...data.options,subject:'{unknown}'},{...data.options,subject:'Line\nbreak'},{...data.options,intro:'x'.repeat(4001)}])await request('/email_send/ai_settings.php',{data:{...data,options},status:400});
+        assert.deepEqual(snapshot(),before,'rejected template saves must not change settings, history, queues or mail');
+    });
+    await test('template-only saves preserve provider settings and queue policy, record history and invalidate stale saves',async()=>{
+        const before=snapshot(),settings=(await request('/email_send/ai_settings.php')).settings;
+        const options={subject:'แจ้งคำสั่ง {doc_number} ปี {doc_year}',intro:'เรียน {recipient_name}\nเรื่อง {doc_name}\n<script>ตัวอย่าง</script>',signature:'หน่วยงานทดสอบ'};
+        const result=await request('/email_send/ai_settings.php',{data:{action:'save_template',revision:settings.revision,options,enabled:true,model:'../../invalid',api_key:'ignored-template-draft',smtp_password:'ignored-template-password'}});
+        assert.equal(result.settings.revision,settings.revision+1);assert.equal(result.settings.enabled,settings.enabled);
+        assert.equal(result.settings.model,settings.model);assert.equal(result.settings.activated_at,settings.activated_at);
+        assert.deepEqual(result.settings.options,{...settings.options,...options});
+        const after=snapshot();
+        for(const key of ['api_key_cipher','smtp_password_cipher','active_key_id'])assert.equal(after.eoffice_order_settings[0][key],before.eoffice_order_settings[0][key]);
+        for(const key of ['eoffice_order_jobs','eoffice_order_recipients','eoffice_outbox'])assert.deepEqual(after[key],before[key]);
+        const publicSettings=(await request('/email_send/ai_settings.php')).settings;
+        assert.ok(publicSettings.diagnostics.events.some(e=>e.event==='settings_saved'&&e.details.changes.intro?.after===options.intro));
+        const preview=await request('/email_send/ai_settings.php',{data:{action:'preview'}});
+        assert.match(preview.subject,/123\/2569/);assert.match(preview.body,/&lt;script&gt;/);assert.match(preview.intro,/ผู้รับตัวอย่าง/);
+        await request('/email_send/ai_settings.php',{data:{action:'save_template',revision:settings.revision,options},status:409});
+        await request('/email_send/ai_settings.php',{data:{action:'save',revision:settings.revision,enabled:false,model:'gemini-test'},status:409});
+        await request('/email_send/ai_settings.php',{data:{action:'save_template',revision:result.settings.revision,options:Object.fromEntries(['subject','intro','signature'].map(key=>[key,settings.options[key]]))}});
+    });
     await test('extended settings protect secrets, validate templates and preview escaped content',async()=>{
         const r=await setting({enabled:false,options:{smtp_source:'admin',smtp_host:'smtp.example.test',smtp_port:465,smtp_security:'tls',smtp_username:'qa@example.test',smtp_from:'qa@example.test',intro:'<script>alert(1)</script> {doc_name}'},smtp_password:'synthetic-smtp-password'});
         assert.equal(r.settings.smtp_password_configured,true);assert.equal(r.settings.diagnostics.smtp.configured,true);
@@ -120,6 +148,19 @@ async function run(){
         assert.ok(!JSON.stringify(result).includes('ignored-inactive-secret'));
     });
     await test('Admin stores encrypted key and public API never returns it',async()=>{const result=await setting({api_key:testKey});assert.ok(result.settings.activated_at);assert.equal(result.settings.key_configured,true);assert.ok(!JSON.stringify(result).includes(testKey));const cipher=snapshot().eoffice_order_settings[0].api_key_cipher;assert.ok(cipher&&!cipher.includes(testKey));const get=await request('/email_send/ai_settings.php');assert.ok(!JSON.stringify(get).includes(cipher));});
+    await test('live-mode template save succeeds with an unreadable AI key and untested SMTP while delivery stays enabled',async()=>{
+        const before=(await request('/email_send/ai_settings.php')).settings,liveBase=`http://localhost:${port+1}`;
+        const live=cp.spawn(php,['-S',`localhost:${port+1}`,'scripts/router.php'],{env:{...env,APP_URL:liveBase,EOFFICE_MOCK_SERVICES:'false',EOFFICE_SETTINGS_KEY:crypto.randomBytes(32).toString('base64'),SMTP_HOST:'',SMTP_USERNAME:'',SMTP_PASSWORD:''},stdio:'ignore'});servers.push(live);
+        try{
+            let ready=false;for(let i=0;i<50;i++){try{await fetch(liveBase+'/api/me.php');ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}assert.ok(ready);
+            const options={subject:before.options.subject,intro:'Live template without provider tests',signature:before.options.signature};
+            const response=await fetch(liveBase+'/email_send/ai_settings.php',{method:'POST',headers:{Cookie:users.admin.cookie,'Content-Type':'application/json',Origin:liveBase},body:JSON.stringify({action:'save_template',revision:before.revision,options})});
+            const result=await response.json();assert.equal(response.status,200,JSON.stringify(result));
+            assert.equal(result.settings.enabled,true);assert.equal(result.settings.key_usable,false);assert.equal(result.settings.diagnostics.mock,false);
+            assert.equal(result.settings.diagnostics.smtp.configured,false);assert.equal(result.settings.options.intro,options.intro);
+            await request('/email_send/ai_settings.php',{data:{action:'save_template',revision:result.settings.revision,options:Object.fromEntries(['subject','intro','signature'].map(key=>[key,before.options[key]]))}});
+        }finally{live.kill();}
+    });
     await test('model list and test use protected Admin endpoints',async()=>{assert.equal((await request('/email_send/ai_settings.php',{data:{action:'models'}})).models[0].id,'gemini-test');await request('/email_send/ai_settings.php',{data:{action:'test',model:'gemini-test'}});await request('/email_send/ai_settings.php',{data:{action:'save',model:'../../bad',enabled:true},status:400});});
     await test('SMTP and PDF diagnostics run separately without creating a document job',async()=>{
         const before=snapshot().eoffice_order_jobs.length;

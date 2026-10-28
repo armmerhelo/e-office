@@ -219,6 +219,7 @@ async function testSettingsDraftActions() {
             return {message: 'บันทึกแล้ว', settings};
         }
         if(data.action==='smtp_test')return {message:'SMTP รับอีเมลทดสอบแล้ว'};
+        if(data.action==='preview')return {subject:'คำสั่ง 123/2569',intro:'เรียน ผู้รับตัวอย่าง\n<script>ข้อความทดสอบ</script>',signature:'หน่วยงานทดสอบ',base_url:'https://example.test'};
         if(data.action==='key_add'){settings={...settings,revision:settings.revision+1};return {message:'เพิ่ม Key แล้ว',settings};}
         throw new Error('unexpected settings action');
     };
@@ -304,6 +305,18 @@ async function testSettingsDraftActions() {
 
     const field=id=>document.getElementById(id),change=id=>field(id).dispatch('change');
     const submit=async()=>{field('settings-form').onsubmit({preventDefault(){}});await settle();};
+    field('subject').value='คำสั่ง {doc_number}';field('intro').value='เรียน {recipient_name}\n<script>ข้อความทดสอบ</script>';field('signature').value='หน่วยงานทดสอบ';
+    field('settings-form').dispatch('input');
+    field('preview-mail').click();await settle();
+    assert.equal(requests.at(-1).action,'preview');
+    assert.equal(requests.at(-1).options.intro,field('intro').value,'preview uses the current email message draft');
+    assert.deepEqual(Object.keys(requests.at(-1).options).sort(),['intro','signature','subject'],'preview only submits template options');
+    assert.equal(field('mail-preview').hidden,false);
+    assert.equal(field('mail-preview').children[0].textContent,'เรียน ผู้รับตัวอย่าง\n<script>ข้อความทดสอบ</script>','preview renders message content as safe text');
+    assert.match(field('mail-preview').textContent,/PDF ตัวอย่าง/);
+    assert.equal(field('save').disabled,false,'preview does not save the draft');
+    await submit();assert.equal(settings.options.intro,'เรียน {recipient_name}\n<script>ข้อความทดสอบ</script>');
+    assert.equal(settings.options.signature,'หน่วยงานทดสอบ');assert.equal(field('save').disabled,true);
     field('smtp_source').value='admin';field('smtp_from').value='bad-email';field('smtp_from').checkValidity=()=>false;
     field('smtp_source').value='server';change('smtp_source');field('smtp_name').value='New sender';change('smtp_name');
     field('test-email').value='bad';field('test-email').checkValidity=()=>false;
@@ -352,7 +365,6 @@ async function testExecutiveExclusionDisplay() {
     assert.match(recipient.textContent,/executive_excluded/);
 }
 
-
 async function settingsRefreshHarness() {
     const document=makeDocument(),window={addEventListener() {}},requests=[];
     const backend={clock:0,smtpPassword:'synthetic-original-password',testedPassword:null,settings:{
@@ -373,6 +385,11 @@ async function settingsRefreshHarness() {
             return {message:'SMTP รับอีเมลทดสอบแล้ว',cooldown_seconds:30};
         }
         if(data.action==='test')return {message:'ทดสอบ AI ผ่าน'};
+        if(data.action==='save_template'){
+            if(data.revision!==backend.settings.revision)throw Error('การตั้งค่าถูกแก้ไขแล้ว กรุณาโหลดใหม่');
+            backend.settings.options={...backend.settings.options,...data.options};backend.settings.revision++;
+            return {message:'บันทึกข้อความอีเมลแล้ว',settings:snapshot()};
+        }
         if(data.action==='save'){
             if(data.revision!==backend.settings.revision)throw Error('การตั้งค่าถูกแก้ไขแล้ว กรุณาโหลดใหม่');
             if(data.smtp_password)backend.smtpPassword=data.smtp_password;
@@ -431,12 +448,57 @@ async function testSmtpTestAfterPasswordSave(){
     assert.match(field('readiness-checks').textContent,/✓ SMTP:/);await save();assert.match(field('readiness-checks').textContent,/✓ SMTP:/,'a tested candidate password remains valid after saving');
 }
 
+async function testTemplateOnlySave(){
+    const {backend,requests,field,set,save}=await settingsRefreshHarness();
+    let cleanEvents=0;field('settings-form').addEventListener('eoffice:form-saved',()=>cleanEvents++);
+    set('subject','แจ้งคำสั่ง {doc_number}');set('intro','เรียน {recipient_name}\nกรุณาตรวจสอบ {doc_name}');
+    const before=structuredClone(backend.settings);
+    set('model','');set('api-key','synthetic-unsaved-api-key');set('smtp-password','synthetic-unsaved-password');
+    set('smtp_from','invalid-mail');field('smtp_from').checkValidity=()=>false;
+    set('keyring-label','Vault draft');set('keyring-secret','synthetic-vault-draft');
+    field('delivery-mode').value='automatic';field('delivery-mode').dispatch('change');
+    assert.equal(field('save-template').disabled,false);
+    field('save-template').click();await settle();
+    const request=requests.at(-1);
+    assert.deepEqual(Object.keys(request).sort(),['action','options','revision']);
+    assert.equal(request.action,'save_template');assert.equal(request.revision,10);
+    assert.deepEqual(Object.keys(request.options).sort(),['intro','signature','subject']);
+    assert.equal(backend.settings.enabled,before.enabled);assert.equal(backend.settings.model,before.model);
+    assert.equal(backend.settings.options.smtp_from,before.options.smtp_from);assert.equal(backend.smtpPassword,'synthetic-original-password');
+    assert.equal(field('model').value,'');assert.equal(field('smtp_from').value,'invalid-mail');
+    assert.equal(field('api-key').value,'synthetic-unsaved-api-key');assert.equal(field('smtp-password').value,'synthetic-unsaved-password');
+    assert.equal(field('delivery-mode').value,'automatic');assert.equal(field('keyring-secret').value,'synthetic-vault-draft');
+    assert.equal(field('save-template').disabled,true);assert.equal(field('save').disabled,false);assert.equal(cleanEvents,0);
+    assert.match(field('template-result').textContent,/ส่วนอื่นยังเป็นแบบร่าง/);
+    field('discard').click();field('keyring-discard').click();
+    assert.equal(field('intro').value,request.options.intro,'discard retains the separately saved template');
+    assert.equal(field('save').disabled,true);
+    set('signature','New signature');const beforeClean=cleanEvents;field('save-template').click();await settle();
+    assert.equal(cleanEvents,beforeClean+1,'template-only success clears the shared form guard when no other draft remains');
+    assert.equal(field('save').disabled,true);assert.equal(backend.settings.revision,12);
+    set('intro','Conflicting draft');backend.settings.revision++;
+    const beforeConflict=structuredClone(backend.settings);field('save-template').click();await settle();
+    assert.match(field('template-result').textContent,/ถูกแก้ไขแล้ว/);assert.equal(field('intro').value,'Conflicting draft');
+    assert.equal(field('save-template').disabled,false);assert.deepEqual(backend.settings,beforeConflict);
+    field('model').value='gemini-test';field('smtp_from').checkValidity=()=>true;
+    await save();assert.equal(requests.at(-1).revision,12,'a rejected template save must not adopt an external revision');
+}
+
 function testSaveBarDoesNotOverlay() {
     const css = fs.readFileSync('email_send/ai-settings.css', 'utf8');
     const rule = css.match(/\.ai-settings-page \.save-bar\s*\{([^}]*)\}/);
     assert.ok(rule, 'save bar has a dedicated layout rule');
     assert.match(rule[1], /position:\s*static\s*;/);
     assert.doesNotMatch(rule[1], /position:\s*(?:sticky|fixed)\s*;/, 'save bar must stay in document flow rather than cover form controls');
+}
+
+function testEmailMessageMenu() {
+    const html=fs.readFileSync('email_send/ai_settings.html','utf8');
+    assert.match(html,/<button\b[^>]*data-settings-section="policy-title"[^>]*>ข้อความอีเมล<\/button>/,'settings navigation exposes the email message editor');
+    const section=html.match(/<section\b[^>]*aria-labelledby="policy-title"[^>]*>([\s\S]*?)<\/section>/);
+    assert.ok(section,'email message editor is a visible section rather than a collapsed advanced setting');
+    for(const id of ['subject','intro','signature','preview-mail','save-template'])assert.ok(section[1].includes(`id="${id}"`));
+    for(const token of ['recipient_name','doc_number','doc_name','doc_year'])assert.ok(section[1].includes(`{${token}}`));
 }
 
 function testKeyringControls(){
@@ -475,7 +537,9 @@ function testKeyringControls(){
     console.log('PASS diagnostics refresh synchronizes Cron tile/banner/checklist, preserves drafts and rejects external revisions');
     await testSmtpTestAfterPasswordSave();
     console.log('PASS SMTP password changes discard stale trials while server-confirmed and pretested credentials remain ready');
+    await testTemplateOnlySave();console.log('PASS template-only saves exclude credentials, preserve unrelated drafts, synchronize the form guard and reject revision conflicts');
     testSaveBarDoesNotOverlay();
     console.log('PASS settings save bar stays in normal document flow');
+    testEmailMessageMenu();console.log('PASS email message menu exposes a visible editor with template variables and preview');
     testKeyringControls();console.log('PASS key vault cards protect the primary key, bind confirmations and clear sensitive drafts');
 })().catch(error => { console.error(error); process.exitCode = 1; });

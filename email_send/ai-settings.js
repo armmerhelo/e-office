@@ -16,6 +16,7 @@
         return Boolean(saved && (K.dirty() || settingsDirty()));
     }
     function settingsDirty(){return Boolean(saved&&(C.dirty(saved)||el('api-key').value||el('clear-key').checked||el('model').value.trim()!==saved.model||el('enabled').checked!==saved.enabled));}
+    function templateDirty(){return Boolean(saved&&['subject','intro','signature'].some(id=>el(id).value.trim()!==saved.options[id]));}
     function status(id, text, good) {
         el(id).textContent = text;
         el(id).className = good ? 'status-good' : 'status-warning';
@@ -36,6 +37,7 @@
         el('settings-form').setAttribute('aria-busy', String(busy || !ready));
         el('save').disabled = busy || !ready || !settingsDirty();
         el('save-top').disabled = el('save').disabled;
+        el('save-template').disabled=busy||!ready||!templateDirty();
         el('discard').disabled = busy || !ready || !settingsDirty();
         el('save-state').classList.toggle('unsaved', ready && settingsDirty());
         el('retry-load').disabled = busy;
@@ -118,6 +120,20 @@
             render(result.settings,true);if(['key_activate','key_server'].includes(action)&&!el('api-key').value)invalidateTest();U.message('keyring-message',result.message+' · แบบร่างการตั้งค่าหลักยังคงอยู่');
             el('keyring-form').dispatchEvent(new Event('eoffice:form-saved',{bubbles:true}));
         }catch(error){U.message('keyring-message',error.message+' · หากมีการทดสอบแล้ว ให้โหลดค่าล่าสุดก่อนทำรายการต่อ',true);}
+        finally{busy=false;updateControls();}
+    }
+
+    async function saveTemplate(){
+        if(busy||!ready||!templateDirty()||!C.validate('save_template'))return;
+        const data={action:'save_template',revision:saved.revision,options:C.optionsFor('save_template')};
+        busy=true;hideKey();updateControls();U.message('template-result','กำลังบันทึกข้อความอีเมล…');
+        try{
+            const result=await U.request('ai_settings.php',data);
+            render(result.settings,true,true);
+            for(const id of ['subject','intro','signature'])el(id).value=saved.options[id];
+            if(!settingsDirty())el('settings-form').dispatchEvent(new Event('eoffice:form-saved',{bubbles:true}));
+            U.message('template-result',result.message+(settingsDirty()?' · การตั้งค่าส่วนอื่นยังเป็นแบบร่าง':''));
+        }catch(error){U.message('template-result',error.message,true);}
         finally{busy=false;updateControls();}
     }
 
@@ -222,6 +238,7 @@
 
     el('settings-form').onsubmit = event => { event.preventDefault(); run('save'); };
     el('save-top').onclick=()=>run('save');
+    el('save-template').onclick=saveTemplate;
     el('keyring-form').onsubmit=event=>event.preventDefault();
     el('keyring-discard').onclick=()=>{if(busy||!ready)return;K.render(saved,dateTime,keyAction);updateControls();el('keyring-form').dispatchEvent(new Event('eoffice:form-saved',{bubbles:true}));U.message('keyring-message','ยกเลิกแบบร่างในคลัง Key แล้ว');};
     el('load-models').onclick = () => run('models');

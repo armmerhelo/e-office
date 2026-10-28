@@ -21,6 +21,7 @@ function order_settings_public(): array {
 try{
     if($_SERVER['REQUEST_METHOD']==='GET')app_json(['status'=>'success','settings'=>order_settings_public()]);
     $input=app_input();$action=app_text($input,'action',30,true);
+    if($action==='save_template')order_save_template($input,$actor);
     order_keyring_action($action,$input,$actor);
     order_extended_action($action,$input,$actor);
     if(in_array($action,['models','test'],true)){

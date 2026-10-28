@@ -18,13 +18,13 @@ window.OrderSettingsControls = (() => {
     function optionsFor(action){
         const options=values();
         if(action==='save')return options;
-        const keys=action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to']:action==='preview'?['subject','intro','signature']:[];
+        const keys=action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to']:['preview','save_template'].includes(action)?['subject','intro','signature']:[];
         return Object.fromEntries(keys.map(id=>[id,options[id]]));
     }
     function password(){return el('smtp_source').value==='admin'?el('smtp-password').value:'';}
     function dirty(saved){return Boolean(saved&&(password()||JSON.stringify(values())!==JSON.stringify(Object.fromEntries(fields.map(f=>[f.id,saved.options[f.id]])))));}
     function validate(action){
-        const ids=action==='save'?['model','api-key',...fields.filter(f=>f.type!=='checkbox').map(f=>f.id),'smtp-password']:action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to','smtp-password',...(action==='smtp_test'?['test-email']:[])]:action==='preview'?['subject','intro','signature']:['model'];
+        const ids=action==='save'?['model','api-key',...fields.filter(f=>f.type!=='checkbox').map(f=>f.id),'smtp-password']:action.startsWith('smtp_')?['smtp_source',...adminFields,'smtp_name','smtp_reply_to','smtp-password',...(action==='smtp_test'?['test-email']:[])]:['preview','save_template'].includes(action)?['subject','intro','signature']:['model'];
         for(const id of ids){
             if(el('smtp_source').value!=='admin'&&[...adminFields,'smtp-password'].includes(id))continue;
             const field=el(id);
@@ -75,6 +75,7 @@ window.OrderSettingsControls = (() => {
             smtpTrial=null;
             for(const f of fields){if(f.type==='checkbox')f.checked=Boolean(saved.options[f.id]);else f.value=saved.options[f.id];}
             el('smtp-password').value='';
+            U.message('template-result','');
             U.message('smtp-result','');el('mail-preview').hidden=true;el('preview-subject').textContent='';el('pdf-mentions').replaceChildren();U.message('pdf-result','');
         }
         el('smtp-password-state').textContent=saved.smtp_password_configured?'มีรหัสผ่านที่บันทึกแล้ว เว้นว่างเพื่อใช้ค่าเดิม':'ยังไม่มีรหัสผ่าน SMTP ที่บันทึกผ่าน Admin';
@@ -128,7 +129,7 @@ window.OrderSettingsControls = (() => {
     const invalidate=event=>{
         const id=event.target.id;
         if(id.startsWith('smtp')||id==='test-email')U.message('smtp-result','ค่าที่กรอกเปลี่ยนแล้ว กรุณาทดสอบชุดนี้อีกครั้ง');
-        if(['subject','intro','signature'].includes(id)){el('mail-preview').hidden=true;el('preview-subject').textContent='แม่แบบเปลี่ยนแล้ว กดดูตัวอย่างอีกครั้ง';}
+        if(['subject','intro','signature'].includes(id)){el('mail-preview').hidden=true;el('preview-subject').textContent='แม่แบบเปลี่ยนแล้ว กดดูตัวอย่างอีกครั้ง';U.message('template-result','ข้อความเปลี่ยนแล้ว กดบันทึกข้อความอีเมลเพื่อให้มีผล');}
         if(['test-pdf','api-key','model','model-options'].includes(id)){el('pdf-mentions').replaceChildren();U.message('pdf-result','');}
     };
     el('settings-form').addEventListener('input',invalidate);el('settings-form').addEventListener('change',invalidate);

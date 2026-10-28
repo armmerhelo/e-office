@@ -24,6 +24,27 @@ function order_tested_at(string $event,string $fingerprint): ?string {
     foreach($q as $row){$d=json_decode($row['details'],true);if(($d['success']??false)&&hash_equals($d['fingerprint']??'',$fingerprint))return $row['created_at'];}
     return null;
 }
+function order_save_template(array $input,array $actor): void {
+    $revision=$input['revision']??null;
+    if(!is_int($revision)||$revision<0)app_fail('กรุณาโหลดการตั้งค่าใหม่ก่อนบันทึก',409);
+    $fields=['subject','intro','signature'];$draft=$input['options']??null;
+    if(!is_array($draft)||count($draft)!==count($fields)||array_diff($fields,array_keys($draft)))app_fail('กรุณาระบุหัวเรื่อง ข้อความ และลายเซ็นเท่านั้น');
+    // Validate only the template; provider configuration and tests are unrelated.
+    $validated=app_order_validate_options($draft,app_order_options(['options_json'=>'{}']));
+    $template=array_intersect_key($validated,array_flip($fields));
+    $pdo=app_pdo();$pdo->beginTransaction();
+    try{
+        $row=$pdo->query('SELECT * FROM eoffice_order_settings WHERE id=1 FOR UPDATE')->fetch();
+        if((int)$row['revision']!==$revision){$pdo->rollBack();app_fail('การตั้งค่าถูกแก้ไขแล้ว กรุณาโหลดใหม่',409);}
+        $current=app_user(true,true);if($current['User_Status']!=='Admin'){$pdo->rollBack();app_fail('เฉพาะ Admin สูงสุดเท่านั้น',403);}
+        $before=app_order_options($row);$options=array_replace($before,$template);$changes=[];
+        foreach($template as $key=>$value)if($value!==$before[$key])$changes[$key]=['before'=>$before[$key],'after'=>$value];
+        $pdo->prepare('UPDATE eoffice_order_settings SET options_json=?,updated_by=?,updated_at=NOW(),revision=revision+1 WHERE id=1')->execute([json_encode($options,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$actor['User_Id']]);
+        app_order_event('settings_saved',['changes'=>$changes],(int)$actor['User_Id']);
+        app_order_audit('template_saved',(int)$actor['User_Id']);$pdo->commit();
+    }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+    app_json(['status'=>'success','message'=>'บันทึกข้อความอีเมลแล้ว','settings'=>order_settings_public()]);
+}
 function order_extended_action(string $action,array $input,array $actor): void {
     if(!in_array($action,['smtp_check','smtp_test','preview','pdf_test'],true))return;
     [$row,$options,$password]=order_candidate($input);$started=microtime(true);
