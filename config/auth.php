@@ -15,6 +15,12 @@ function app_login_failed_attempt(string $key): void {
 }
 
 function app_login_session(array $user): void {
+    // Login callers hold a transaction. Replace only this browser's previous
+    // session, so an in-flight registration cannot rebind after account switch.
+    $previous=$_COOKIE['User_Token']??'';
+    if(is_string($previous)&&preg_match('/^[a-f0-9]{64}$/D',$previous)){
+        app_pdo()->prepare('DELETE FROM eoffice_sessions WHERE token_hash=?')->execute([hash('sha256',$previous)]);
+    }
     $token = bin2hex(random_bytes(32));
     $expires = time() + 86400 * 30;
     app_pdo()->prepare('INSERT INTO eoffice_sessions VALUES (?,?,?)')->execute([

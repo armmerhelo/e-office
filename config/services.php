@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/bootstrap.php';
 require_once __DIR__.'/member-position.php';
+require_once __DIR__.'/push-subscriptions.php';
 class AppPushDeliveryException extends RuntimeException {
     public function __construct(public readonly int $retryAfter=0){parent::__construct('Push delivery failed');}
 }
@@ -43,7 +44,7 @@ function app_mail(string $subject,string $email,string $body): bool {
 
 function app_push(int $userId,int $docId,string $title,string $url,string $key): string {
     if(app_settings()['mock']){app_queue(['type'=>'push','user_id'=>$userId,'doc_id'=>$docId,'idempotency_key'=>$key]);return 'success';}
-    $q=app_pdo()->prepare('SELECT target_Id FROM t_target_id WHERE User_Id=?');$q->execute([$userId]);$targets=$q->fetchAll(PDO::FETCH_COLUMN);
+    $targets=app_push_targets($userId);
     if(!$targets)return 'skipped';
     $apiKey=app_env('ONESIGNAL_REST_API_KEY');$appId=app_env('ONESIGNAL_APP_ID');
     if(!$apiKey||!$appId)throw new RuntimeException('Push configuration required');

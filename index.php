@@ -33,57 +33,7 @@ header('Cache-Control: no-store');
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <?php endif; ?>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script>
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      if (window.EOFFICE_MOCK_SERVICES || ['localhost','127.0.0.1','[::1]'].includes(location.hostname)) return;
-      await OneSignal.init({
-        appId: "66d3f5ec-449a-4228-a313-05d87a614076",
-        safari_web_id: "web.onesignal.auto.3a07767d-f8c5-4ebf-965b-cb322da40f9f",
-        notifyButton: {
-          enable: true,
-        },
-        allowLocalhostAsSecureOrigin: true,
-      });
-      // รอให้ OneSignal พร้อมทำงานก่อน
-          OneSignal.User.PushSubscription.addEventListener("change", function(event) {
-              if (event.current.id) {
-                  console.log("Subscription ID:", event.current.id);
-                  sendIdToBackend(event.current.id);
-                  // ส่งค่านี้ไปเก็บที่ Server ของคุณ
-              }
-          });
-
-          // หรือดึงค่าตรงๆ (ถ้า User กด Subscribe แล้ว)
-          const subId = OneSignal.User.PushSubscription.id;
-          console.log("Subscription ID:", subId);
-          sendIdToBackend(subId);
-    });
-
-
-    const sendIdToBackend = (subscriptionId) => {
-      let User_Token = getCookie("User_Token");
-      if (!subscriptionId || !User_Token) return;
-
-      console.log("กำลังส่ง ID ไปยังเซิร์ฟเวอร์:", subscriptionId);
-
-      fetch('../api/create_user_notification.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_token: User_Token,
-            target_Id: subscriptionId
-          })
-        })
-        .then(res => res.json())
-        .then(data => console.log('✅ บันทึกสำเร็จ:', data))
-        .catch(err => console.error('❌ ผิดพลาด:', err));
-    };
-
-
-  </script>
+  <script>window.EOFFICE_PUSH_APP_ID = <?= json_encode((string)app_env('ONESIGNAL_APP_ID'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
   <!--
 <script>
   // ตรวจสอบว่า Browser รองรับ Service Worker ไหม
@@ -105,56 +55,6 @@ window.addEventListener('load', function() {
 
 
 
-<!--
-  <script>
-
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "66d3f5ec-449a-4228-a313-05d87a614076",
-        safari_web_id: "web.onesignal.auto.3a07767d-f8c5-4ebf-965b-cb322da40f9f",
-        notifyButton: {
-          enable: true
-        },
-      });
-
-      // สร้างฟังก์ชันกลางเพื่อส่งข้อมูลไปหา PHP
-      const sendIdToBackend = (subscriptionId) => {
-        let User_Token = getCookie("User_Token");
-        if (!subscriptionId || !User_Token) return;
-
-        console.log("กำลังส่ง ID ไปยังเซิร์ฟเวอร์:", subscriptionId);
-
-        fetch('../api/create_user_notification.php', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              user_token: User_Token,
-              target_Id: subscriptionId
-            })
-          })
-          .then(res => res.json())
-          .then(data => console.log('✅ บันทึกสำเร็จ:', data))
-          .catch(err => console.error('❌ ผิดพลาด:', err));
-      };
-
-      // กรณีที่ 1: มี ID อยู่แล้ว (เคยเข้าเว็บแล้ว)
-      const currentId = OneSignal.User.PushSubscription.id;
-      if (currentId) {
-        sendIdToBackend(currentId);
-      }
-
-      // กรณีที่ 2: เพิ่งกด Allow ครั้งแรก (รอรับ Event)
-      OneSignal.User.PushSubscription.addEventListener("change", (event) => {
-        if (event.current.id) {
-          sendIdToBackend(event.current.id);
-        }
-      });
-    });
-  </script>
- -->
 
 
 
@@ -587,6 +487,7 @@ window.addEventListener('load', function() {
   <script src="assets/document-file-state.js?v=<?php echo filemtime(__DIR__.'/assets/document-file-state.js'); ?>"></script>
   <script src="assets/module-router.js?v=<?php echo filemtime(__DIR__.'/assets/module-router.js'); ?>"></script>
   <script src="assets/main.js?v=<?php echo filemtime(__DIR__.'/assets/main.js'); ?>"></script>
+  <script src="assets/notifications.js?v=<?php echo filemtime(__DIR__.'/assets/notifications.js'); ?>"></script>
   <script src="assets/system-updates.js?v=<?php echo filemtime(__DIR__.'/assets/system-updates.js'); ?>"></script>
   <script src="assets/modal.js?v=<?php echo filemtime(__DIR__.'/assets/modal.js'); ?>"></script>
   <!-- <script src="room_booking/main-room.js?v=<?php echo time(); ?>"></script> -->

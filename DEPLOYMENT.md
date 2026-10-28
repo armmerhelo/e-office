@@ -18,7 +18,7 @@ Use environment variables or copy `config/local.example.php` to `config/local.ph
 | EOFFICE_MOCK_SERVICES | Explicitly set `true` for test/development; mail, push and AI recorded in eoffice_outbox. Defaults false, including CLI workers. |
 | EOFFICE_REMOTE_FILES | Explicitly permit reads from the fixed legacy `https://eoffice.siya.ac.th` host; default false |
 | SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_FROM | Production SMTP with TLS verification |
-| ONESIGNAL_APP_ID / ONESIGNAL_REST_API_KEY | Notification worker configuration |
+| ONESIGNAL_APP_ID / ONESIGNAL_REST_API_KEY | OneSignal application ID shared by browser registration and notification worker / private worker API key. Configure the matching HTTPS site origin and allow notifications in the browser. |
 | GEMINI_API_KEY / GEMINI_MODEL | Production PDF recipient matching; model default gemini-2.5-flash |
 | EOFFICE_SETTINGS_KEY | Base64-encoded 32-byte encryption key for Admin-managed Gemini credentials; same value for web and cron |
 | DRIVE_APPS_SCRIPT_URL | HTTPS Drive adapter deployment for production image upload |
@@ -33,6 +33,7 @@ All exposed database, mail, AI and push credentials from the previous source mus
 3. Run `php scripts/migrate.php` using the same environment as the app. The migration is additive/idempotent and adds sessions, counters, signed-file revisions, an outbox and access-history archive.
 4. Existing users must log in again. Legacy database tokens are no longer accepted over HTTP. Plaintext passwords are rehashed only after successful, type-safe authentication. Password resets revoke all sessions for that user.
 5. Document notifications are processed after successful responses; authenticated email staff also drain the queue from the browser. Schedule `php scripts/notifications.php` as an additional fallback for unattended delivery. Uncertain/exhausted deliveries remain visible as `manual`/`partial`; inspect the per-channel result before retrying. It is not safe to blindly retry SMTP jobs after an ambiguous delivery failure.
+   Push registration uses `eoffice_push_subscriptions`, bound to the current server session. Run the migration before publishing the new registration API/worker. Existing devices must reopen/reload the home page while signed in and allow notifications; legacy `t_target_id` entries are preserved but are no longer delivery targets. Logout, expiry and session revocation exclude that session's bindings without affecting other devices. Logging in again replaces only the previous session cookie's session.
 6. Verify Apache blocks config, scripts, tests, backups, staff JSON and direct document storage. On non-Apache hosts, implement equivalent web-server restrictions before rollout.
 
 Recipients can update only their own receipt number/date, not document content, file attachments or recipients. Owners/Admins manage the shared document. Group membership grants access dynamically. Revoked direct access is archived in eoffice_access_history, preserving read/sign data.
