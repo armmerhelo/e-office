@@ -1,5 +1,16 @@
 # Production deployment — E-Office
 
+## ประวัติการใช้งานสำหรับ Admin — 28 ตุลาคม 2026
+
+- เผยแพร่ส่วน Log จาก `d3a29f2b53e385abd75bf4172e60dcd6a8247cdc`: **34 runtime files**, สร้างตาราง `eoffice_audit_log` ก่อนติดตั้งจุดบันทึก ตรวจ checksum ตรงทั้งหมด และสำรองซอร์ส/ฐานข้อมูลก่อนเริ่ม
+- Production ยังไม่มีฟังก์ชันตำแหน่งผู้บริหารจาก commit อื่น จึงไม่เผยแพร่ `management/save_user_position_api.php`; สามไฟล์ร่วม (`config/order-emails.php`, `management/new_user_api.php`, `management/update_user_api.php`) ใช้เฉพาะ diff เพิ่ม Log บนซอร์ส production ที่ตรวจแล้ว ไม่รวมการเปลี่ยนพฤติกรรมจากงานตำแหน่งหรือฟอร์มตั้งค่าอีเมล
+- เผยแพร่ **4 runtime files** สำหรับแสดงรายละเอียด commit ในหน้าอัปเดตจาก `b52818efef2ac2c226faa5c3715698f8d49a7726` และเผยแพร่ feed โดยรักษาประวัติเดิม Release ID: `deploy-20261028T125851000Z`
+- ทดสอบซอร์สที่จะนำขึ้นจริง: Audit HTTP 11 กลุ่ม, Key vault 3 กลุ่ม, Chromium local 6 กลุ่ม ผ่าน; การทดสอบชุดรวมของ commit ก่อน release ผ่านครบ
+- Production HTTP smoke **7 กลุ่มผ่าน**: สิทธิ์ guest/User, Admin login, ตัวกรองวันที่, เพิ่ม/ลบสมาชิกและกลุ่มงาน, สร้าง/ลบเอกสารภายในโดยไม่มีผู้รับ และความครบถ้วน/ความปลอดภัยของ Log; ตรวจ Logout เพิกถอน session สำเร็จหลังทดสอบ
+- Chromium production **4 กลุ่มผ่าน**: หน้าประวัติ Admin, ค้นหาประวัติบัญชีสังเคราะห์, layout 390/320px และหน้าอัปเดตพร้อมรายละเอียด commit ทั้งสองรายการ ไม่มี JavaScript exception
+- ลบเฉพาะบัญชี/ข้อมูล/Log สังเคราะห์ของ smoke test แล้ว จำนวนผู้ใช้/เอกสาร/กลุ่มงาน/สิทธิ์กลับสู่ค่าก่อนทดสอบ ไม่ส่งอีเมลหรือแจ้งเตือนจาก smoke test และไม่แก้ไข private configuration
+- Final verification: checksum ไม่ตรง **0**, temporary helpers **0**, feed ตรวจผ่าน และ order worker ยังเปิดใช้งานโดยรักษา activation boundary เดิมพร้อม heartbeat `2026-10-28 20:00:01 Asia/Bangkok`
+
 ## ประวัติการปรับปรุงหลัง deploy (ทุกครั้ง)
 
 ทำตาม [SYSTEM_UPDATES.md](SYSTEM_UPDATES.md#ทุกครั้งที่-deploy) สำหรับทุกวิธี deploy รวมถึงสคริปต์ targeted release ใน `scripts/*release.py`:

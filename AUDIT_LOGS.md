@@ -50,3 +50,7 @@ Log ไม่มีคำสั่งแก้ไข/ลบใน UI หรื�
 - `npm.cmd test` ผ่านครบจากสำเนา staged files ที่ไม่มี `config/local.php` รวม integration 44, document races 12 และชุดสำรอง/กู้คืนข้อมูล โดยไม่รวมงานแก้ฟอร์มตั้งค่าอีเมลที่ยังค้างใน working tree
 - ตรวจ syntax PHP/JavaScript/inline scripts และ `git diff --check`: ผ่าน
 - ทดสอบด้วยข้อมูลจำลองในฐานชั่วคราว `_test` และ mock services; ยังไม่ได้รัน migration หรือ deploy บน production
+
+### Production — 28 ตุลาคม 2026
+
+เปิดใช้งานแล้วที่ `index.php?view=audit_logs` สำหรับ Admin พร้อมตาราง Log และประวัติอัปเดตระบบ ตรวจ API/เบราว์เซอร์จริงและ checksum ผ่าน รายละเอียดขอบเขต release อยู่ใน [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md#ประวัติการใช้งานสำหรับ-admin--28-ตุลาคม-2026) ส่วน Log สำหรับเปลี่ยนตำแหน่งสมาชิกยังไม่เผยแพร่ เนื่องจาก production ยังไม่ได้ติดตั้งฟังก์ชันตำแหน่งสมาชิก
