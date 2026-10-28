@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## Push notification registration — 28 October 2026
+
+- Published the **8 runtime files** from `6dc2343b2454791e918210515aa9652dc337e5ae`, after verifying the previous production bytes against its parent and taking a private source rollback archive. Added only `eoffice_push_subscriptions`; the legacy registry and all existing document/outbox data remain unchanged.
+- Browser registration uses the HttpOnly server session and the same configured OneSignal App ID as the sender. Delivery selects only live session bindings; logout, account replacement and session expiry exclude the old device/session without removing other devices.
+- Full `npm.cmd test` passed, including new registration/session registry tests and existing notification queue, integration, document race, order and backup tests. Production HTTP smoke passed authentication, owner mismatch, deduplication, per-device opt-out, logout, account replacement and stale-session rejection; the synthetic users/registry/audit records were removed and the user count returned to baseline. Smoke sent no notifications or email.
+- OneSignal configuration was checked read-only: provider HTTP 200 and the configured HTTPS origin matches production. Runtime SHA-256 verification found **0 mismatches / 0 temporary helpers**. Real phone delivery is a separate acceptance check: an Admin must reopen the home page and allow notifications to register a live device; legacy targets are deliberately not imported or used for testing.
+- Deployment time: **2026-10-28 22:23:18 +07:00**. User-facing release notes use stable release ID `deploy-20261028T152318000Z` and include the reviewed full source commit hash.
+
 ## ปรับ production ให้ตรงกับ main — 28 ตุลาคม 2026
 
 - เทียบ runtime ที่อยู่ในขอบเขต deployment **221 paths** กับซอร์ส `24689dd15b017c5abe8fdbe8c542a36e4dcb08cb`: เดิมตรง 183 paths และเผยแพร่ส่วนที่ขาด/ต่าง **38 paths** จาก Git blobs โดยตรง ตรวจ SHA-256 ตรงครบหลังติดตั้ง ไม่รวม tests, เอกสารพัฒนา, private/runtime data และไฟล์ legacy ที่เครื่องมือ deployment เดิมยกเว้น
