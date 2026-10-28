@@ -1,5 +1,17 @@
 # Production deployment — E-Office
 
+## ปรับ production ให้ตรงกับ main — 28 ตุลาคม 2026
+
+- เทียบ runtime ที่อยู่ในขอบเขต deployment **221 paths** กับซอร์ส `24689dd15b017c5abe8fdbe8c542a36e4dcb08cb`: เดิมตรง 183 paths และเผยแพร่ส่วนที่ขาด/ต่าง **38 paths** จาก Git blobs โดยตรง ตรวจ SHA-256 ตรงครบหลังติดตั้ง ไม่รวม tests, เอกสารพัฒนา, private/runtime data และไฟล์ legacy ที่เครื่องมือ deployment เดิมยกเว้น
+- สำรองซอร์สที่เปลี่ยนและฐานข้อมูลก่อนเริ่ม พักคิวอีเมลและรอ worker จบก่อนเพิ่ม `t_user.User_Position` จากนั้นติดตั้ง dependency, PHP consumers และ UI ตามลำดับ คืนสถานะส่งอีเมลเดิมโดยรักษา activation boundary และค่าผู้ให้บริการ ไม่กำหนดตำแหน่งผู้บริหารให้บุคลากรจริงโดยอัตโนมัติ
+- เปิดใช้ส่วนที่ยังขาด: ตำแหน่งสมาชิก/ยกเว้นอีเมลคำสั่งสำหรับผู้บริหารและอีเมลร่วม, Log การเปลี่ยนตำแหน่ง, บันทึกข้อความอีเมลแยกจาก SMTP/AI, ส่งออกคำสั่งส่วนตัวเป็น Excel และรูปแบบปุ่มที่สอดคล้องกัน
+- ตรวจ commit/diff ที่เผยแพร่จริงและเผยแพร่ประวัติภาษาไทย 5 commits โดยรักษาประวัติเดิม Release ID: `deploy-20261028T133645000Z` ตรวจ feed และหน้า `index.php?view=updates` พร้อมรายละเอียด commit ครบ
+- `npm.cmd test` ผ่านครบกับฐานข้อมูลทดสอบและ mock services รวม integration 44, document races 12, order HTTP 48, order behavior 119 และ Audit HTTP/Key vault 14 กลุ่ม; ทดสอบ export API แยกผ่านทั้งมากกว่า 200 รายการ ตัวกรอง สิทธิ์ และ concurrent snapshot
+- Production HTTP smoke **12 กลุ่มผ่าน**: Audit/สมาชิก/กลุ่มงาน/เอกสาร 7 กลุ่ม และฟีเจอร์ใหม่ 5 กลุ่ม ครอบคลุมตำแหน่งทั้งสามค่า, stale member version, การยกเว้นผู้บริหารตามบัญชี/อีเมลร่วม, สิทธิ์ Admin, บันทึก template เดิมโดยไม่เปลี่ยน provider, stale settings revision, export authentication/recipient isolation และ Log การเปลี่ยนตำแหน่ง ไม่มีการส่งอีเมลหรือแจ้งเตือนทดสอบ
+- Chromium production **7 กลุ่มผ่าน**: Audit/ค้นหา, มือถือ 390/320px, ประวัติอัปเดตและรายละเอียด commit, UI ตำแหน่งสมาชิก, ฟอร์มข้อความอีเมลแยกอิสระ และปุ่มส่งออก Excel ไม่มี JavaScript exception
+- ลบบัญชีและข้อมูลสังเคราะห์ครบ จำนวนผู้ใช้/เอกสาร/กลุ่มงาน/สิทธิ์กลับเท่าก่อนทดสอบ Worker ยังคงเปิดใช้งานและมี heartbeat `2026-10-28 20:35:02 Asia/Bangkok` ไม่แก้ private configuration หรือเอกสารเดิม
+- หลังบันทึกเอกสารและ feed กลับเข้า Git ต้องตรวจ runtime ทั้ง 221 paths เทียบ **final HEAD** อีกครั้งและปรับ production manifest ให้ระบุ commit สุดท้าย รวม feed ที่เผยแพร่แล้ว
+
 ## ประวัติการใช้งานสำหรับ Admin — 28 ตุลาคม 2026
 
 - เผยแพร่ส่วน Log จาก `d3a29f2b53e385abd75bf4172e60dcd6a8247cdc`: **34 runtime files**, สร้างตาราง `eoffice_audit_log` ก่อนติดตั้งจุดบันทึก ตรวจ checksum ตรงทั้งหมด และสำรองซอร์ส/ฐานข้อมูลก่อนเริ่ม
