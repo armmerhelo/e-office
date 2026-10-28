@@ -7,6 +7,7 @@
 - Full `npm.cmd test` passed, including new registration/session registry tests and existing notification queue, integration, document race, order and backup tests. Production HTTP smoke passed authentication, owner mismatch, deduplication, per-device opt-out, logout, account replacement and stale-session rejection; the synthetic users/registry/audit records were removed and the user count returned to baseline. Smoke sent no notifications or email.
 - OneSignal configuration was checked read-only: provider HTTP 200 and the configured HTTPS origin matches production. Runtime SHA-256 verification found **0 mismatches / 0 temporary helpers**. Real phone delivery is a separate acceptance check: an Admin must reopen the home page and allow notifications to register a live device; legacy targets are deliberately not imported or used for testing.
 - Deployment time: **2026-10-28 22:23:18 +07:00**. User-facing release notes use stable release ID `deploy-20261028T152318000Z` and include the reviewed full source commit hash.
+- Real-device acceptance completed afterward: reopening a fresh home-page URL registered the Admin devices. An Admin-only test returned OneSignal **HTTP 200**, a notification ID and no provider errors; the user confirmed receiving “ทดสอบการแจ้งเตือน E-Office” on Android/Chrome. No document or email was created for this test. The production updates feed and page were checked for the release title and reviewed source commit.
 
 ## ปรับ production ให้ตรงกับ main — 28 ตุลาคม 2026
 
