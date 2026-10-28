@@ -20,10 +20,10 @@ function form(values) {
     }
     return body;
 }
-async function request(path, {as='admin', data, body, status=200, worker=0, method=data || body ? 'POST' : 'GET'} = {}) {
+async function request(path, {as='admin', data, body, status=200, worker=0, method=data || body ? 'POST' : 'GET', headers={}} = {}) {
     const response = await fetch(`http://localhost:${port+worker}${path}`, {
         method,
-        headers:{...(as ? {Cookie:users[as].cookie} : {}), ...(data ? {'Content-Type':'application/json'} : {})},
+        headers:{...headers,...(as ? {Cookie:users[as].cookie} : {}), ...(data ? {'Content-Type':'application/json'} : {})},
         body:body || (data ? JSON.stringify(data) : undefined)
     });
     const text = await response.text();
@@ -103,6 +103,29 @@ async function run() {
         await request('/management/update_user_api.php',{as:'manager',body:form(values('basic','Admin')),status:403});
         await request('/management/new_user_api.php',{as:'manager',body:form({User_name:'rogue',User_Email:'rogue@example.test',User_Status:'Admin',User_password1:'Member-Test-2026!',User_password2:'Member-Test-2026!'}),status:403});
         await request('/management/update_user_api.php',{as:'manager',body:form({...values('basic'),permissions:['email']}),status:403});
+    });
+    await test('position defaults and catalog are independent from privileges and only Admin can assign them',async()=>{
+        const list=await request('/management/get_users_api.php');
+        assert.deepEqual(Object.keys(list.position_catalog),['staff','director','deputy_director']);
+        assert.ok(list.data.every(user=>user.User_Position==='staff'));
+        const before=await request('/management/get_user_departments_api.php?User_Id='+users.basic.id);
+        const data={user_id:users.basic.id,position:'director',member_version:before.member_version};
+        await request('/management/save_user_position_api.php',{data,headers:{Origin:'https://foreign.example'},status:403});
+        for(const as of [null,'basic','manager'])await request('/management/save_user_position_api.php',{as,data,status:as?403:401});
+        for(const position of ['Admin','principal',true,{},null])await request('/management/save_user_position_api.php',{data:{...data,position},status:400});
+        await request('/management/new_user_api.php',{as:'manager',body:form({User_name:'Forged position',User_Email:'forged@example.test',User_Status:'User',User_Position:'director',User_password1:'Member-Test-2026!',User_password2:'Member-Test-2026!'}),status:403});
+        await request('/management/update_user_api.php',{body:form({...await profile('basic'),User_Position:'director'}),status:403});
+        await request('/management/save_user_position_api.php',{data});
+        helper('positions-remigrate');
+        const after=await request('/management/get_user_departments_api.php?User_Id='+users.basic.id);
+        assert.equal(after.user.User_Position,'director');assert.equal(after.user.User_Status,before.user.User_Status);
+        assert.deepEqual(after.permissions,before.permissions);assert.deepEqual(after.data,before.data);assert.notEqual(after.member_version,before.member_version);
+        await request('/management/save_user_position_api.php',{data:{...data,position:'staff'},status:409});
+        await request('/management/update_user_api.php',{body:form({...values('basic'),member_version:before.member_version}),status:409});
+        await request('/management/save_user_position_api.php',{data:{...data,position:'deputy_director',member_version:after.member_version}});
+        const deputy=await request('/management/get_user_departments_api.php?User_Id='+users.basic.id);
+        assert.equal(deputy.user.User_Position,'deputy_director');
+        await request('/management/save_user_position_api.php',{data:{...data,position:'staff',member_version:deputy.member_version}});
     });
     await test('member manager cannot change or delete Admin/staff accounts',async()=>{
         await grant('staff',['email','room_booking','maintenance','external_numbers']);
@@ -234,6 +257,13 @@ async function run() {
         await waitForRoster();await request('/api/logout.php',{data:{},worker:1});await releaseDelete();await deleted;
         helper('session',users.admin.id);users.admin.cookie=helper('session-cookie',users.admin.id).trim();
         assert.equal((await request('/management/get_users_api.php?search=staff')).total,1);
+    });
+    await test('logout while queued blocks position assignment',async()=>{
+        const version=(await profile('staff')).member_version;const release=await holdRoster();
+        const pending=request('/management/save_user_position_api.php',{data:{user_id:users.staff.id,position:'director',member_version:version},status:401});
+        await waitForRoster();await request('/api/logout.php',{data:{},worker:1});await release();await pending;
+        helper('session',users.admin.id);users.admin.cookie=helper('session-cookie',users.admin.id).trim();
+        assert.equal((await request('/management/get_user_departments_api.php?User_Id='+users.staff.id)).user.User_Position,'staff');
     });
     await test('logout while queued blocks role promotion',async()=>{
         const version=(await profile('staff')).member_version;const release=await holdRoster();

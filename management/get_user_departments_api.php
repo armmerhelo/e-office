@@ -10,4 +10,4 @@ try {
     $pdo->commit();
 } catch (Throwable $e) { if($pdo->inTransaction())$pdo->rollBack();throw $e; }
 app_json(['status'=>'success','data'=>$departments,'member_version'=>$version,'permissions'=>$permissions,'permission_version'=>$permissionVersion,
-    'user'=>['User_Id'=>(int)$user['User_Id'],'User_Name'=>$user['User_Name'],'User_Email'=>$user['User_Email'],'User_Status'=>$user['User_Status']]]);
+    'user'=>['User_Id'=>(int)$user['User_Id'],'User_Name'=>$user['User_Name'],'User_Email'=>$user['User_Email'],'User_Status'=>$user['User_Status'],'User_Position'=>$user['User_Position']]]);

@@ -344,6 +344,44 @@ async function run(){
             const after=(await request('/email_send/ai_settings.php')).settings;assert.equal(after.enabled,false);assert.equal(after.keyring.server.active,true);
         }finally{blocker.stdin.end();blocker.kill();if(activation)await activation.catch(()=>{});}
     });
+    await test('executive positions prevent recipient retry and remain distinct in list/detail until explicitly retried as staff',async()=>{
+        await setting();
+        const doc=await create([pdf]);fixture('position:'+users.alice.id+':director');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'add_recipient',email:'alice@example.test'}});
+        fixture('worker-empty');
+        const detail=await request('/email_send/order_jobs.php?doc_id='+doc.doc_id),recipient=detail.recipients[0];
+        assert.equal(recipient.status,'skipped');assert.equal(recipient.error_code,'executive_excluded');assert.equal(detail.job.status,'excluded');
+        const list=await request('/email_send/order_jobs.php?search=ORDER-QA-'+number);const row=list.data.find(row=>row.doc_id===doc.doc_id);
+        assert.equal(Number(row.excluded_count),1);assert.equal(Number(row.attention_count),0);assert.equal(Number(row.success_count),0);
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'retry_recipient',recipient_id:recipient.id,confirmed:true},status:409});
+        fixture('position:'+users.alice.id+':staff');
+        assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients[0].status,'skipped','returning to staff cannot silently start a previously excluded send');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'reanalyze',confirmed:true}});
+        fixture('worker');
+        const reanalyzed=await request('/email_send/order_jobs.php?doc_id='+doc.doc_id);
+        assert.equal(reanalyzed.recipients.find(row=>row.recipient_email==='alice@example.test').status,'skipped','confirmed reanalysis retains excluded recipients');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'retry_recipient',recipient_id:recipient.id,confirmed:true}});
+        fixture('worker-empty');assert.equal((await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients[0].status,'success');
+    });
+    await test('explicit reanalysis preserves excluded AI recipients after position changes',async()=>{
+        const doc=await create([pdf]);fixture('position:'+users.alice.id+':director');fixture('prepare-ai:'+doc.doc_id);
+        const first=(await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients.find(row=>row.recipient_email==='alice@example.test');
+        assert.equal(first.source,'ai');assert.equal(first.status,'skipped');assert.equal(first.error_code,'executive_excluded');
+        fixture('position:'+users.alice.id+':staff');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'reanalyze',confirmed:true}});fixture('worker');
+        const after=(await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients.find(row=>row.recipient_email==='alice@example.test');
+        assert.equal(after.id,first.id);assert.equal(after.status,'skipped');assert.equal(after.error_code,'executive_excluded');
+        fixture('email:'+users.alice.id+':new-alice@example.test');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'reanalyze',confirmed:true}});fixture('worker');
+        const changed=(await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients.filter(row=>row.user_id===users.alice.id);
+        assert.equal(changed.length,1);assert.equal(changed[0].id,first.id);assert.equal(changed[0].status,'skipped');
+        await request('/email_send/order_jobs.php',{data:{doc_id:doc.doc_id,action:'retry_recipient',recipient_id:first.id,confirmed:true}});fixture('worker');
+        const retried=(await request('/email_send/order_jobs.php?doc_id='+doc.doc_id)).recipients.find(row=>row.id===first.id);
+        assert.equal(retried.recipient_email,'new-alice@example.test');assert.equal(retried.status,'success');
+        fixture('email:'+users.alice.id+':alice@example.test');
+    });
+    console.log(fixture('notification-position').trim());fixture('notification-seed');
+    {const regression=cp.spawnSync(php,['tests/notification-queue.php'],{env,encoding:'utf8'});if(regression.status!==0)throw Error(regression.stdout+regression.stderr);console.log(regression.stdout.trim());}
     console.log(fixture('behavior').trim());console.log(`Order HTTP: ${passed} passed`);
 }
 run().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{servers.forEach(server=>server.kill());if(created)fixture('drop');require('node:fs').rmSync(path.dirname(env.EOFFICE_STORAGE),{recursive:true,force:true});});

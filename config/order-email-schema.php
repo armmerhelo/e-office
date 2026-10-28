@@ -1,5 +1,6 @@
 <?php
 function app_order_email_migrate(PDO $pdo): void {
+    require_once __DIR__.'/member-position.php';app_member_positions_migrate($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_order_settings (
         id TINYINT PRIMARY KEY, enabled TINYINT NOT NULL DEFAULT 0, activated_at DATETIME NULL,
         api_key_cipher TEXT NULL, model VARCHAR(150) NULL, updated_by INT NULL,

@@ -26,7 +26,7 @@ foreach(['wrong-password',$user['User_Password']] as $guess){
     $offline=hash('sha256',json_encode([$user['User_Id'],$user['User_Name'],$user['User_Email'],$user['User_Status'],$guess,[7]],JSON_THROW_ON_ERROR));
     check($version!==$offline,'plain offline password guesses do not match the version');
 }
-foreach(['User_Name'=>'Changed name','User_Email'=>'changed@example.test','User_Status'=>'Admin','User_Password'=>'Changed password'] as $field=>$value){
+foreach(['User_Name'=>'Changed name','User_Email'=>'changed@example.test','User_Status'=>'Admin','User_Password'=>'Changed password','User_Position'=>'director'] as $field=>$value){
     $changed=$user;$changed[$field]=$value;
     check(app_member_version($changed,$departments)!==$version,'version invalidates on change: '.$field);
 }

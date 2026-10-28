@@ -340,6 +340,19 @@ async function testSettingsDraftActions() {
     assert.equal(warns(),true,'main draft remains guarded after a vault write');field('discard').click();assert.equal(warns(),false);
 }
 
+async function testExecutiveExclusionDisplay() {
+    const document=makeDocument(),item={doc_id:31,doc_number:'31',doc_year:'2569',doc_name:'Executive exclusion',status:'excluded',excluded_count:1};
+    const request=async url=>url.includes('doc_id=')?{job:{status:'excluded',error_code:'executive_excluded'},files:[],recipients:[{id:1,recipient_name:'Director',recipient_email:'director@example.test',status:'skipped',error_code:'executive_excluded',attempts:0}]}:{total:1,years:[],is_admin:true,worker:{enabled:false},data:[item]};
+    vm.runInNewContext(fs.readFileSync('email_send/order-dashboard.js','utf8'),{OrderUI:uiFor(document,request),document,window:{},URLSearchParams,Event,Option:class{},setInterval(){},confirm:()=>true});
+    await settle();const row=document.getElementById('rows').children[0];
+    assert.match(row.textContent,/ยกเว้น ผอ\. \/ รอง ผอ\. 1 คน/);assert.ok(!row.textContent.includes('ยังไม่มีผลส่ง'));
+    row.children[3].children[0].click();await settle();
+    const recipient=document.getElementById('recipient-rows').children[0];
+    assert.equal(recipient.children[1].children[0].textContent,'excluded');
+    assert.match(recipient.textContent,/executive_excluded/);
+}
+
+
 async function settingsRefreshHarness() {
     const document=makeDocument(),window={addEventListener() {}},requests=[];
     const backend={clock:0,smtpPassword:'synthetic-original-password',testedPassword:null,settings:{
@@ -454,6 +467,8 @@ function testKeyringControls(){
     console.log('PASS recipient form: successful save, reopen, rejected write and failed post-save refresh synchronize the shared guard');
     await testHistoricalOrderDisplay();
     console.log('PASS historical orders show sent/review badges, safe read-only history and explicit enqueue confirmation');
+    await testExecutiveExclusionDisplay();
+    console.log('PASS executive exclusions display a distinct policy status and do not claim missing results or SMTP success');
     await testSettingsDraftActions();
     console.log('PASS AI test invalidation and clearing the key pauses delivery without sending a new key');
     await testSettingsDiagnosticsRefresh();

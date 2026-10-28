@@ -38,7 +38,8 @@ if($_SERVER['REQUEST_METHOD']==='GET'){
     $q=$pdo->prepare("SELECT d.Doc_Id doc_id,d.Doc_Number doc_number,d.Doc_Name doc_name,d.Doc_Year doc_year,j.status,j.source,j.error_code,j.updated_at,
         (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status='success') success_count,
         (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status='pending') pending_count,
-        (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status IN ('uncertain','failed','skipped','sending')) attention_count,
+        (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status IN ('uncertain','failed','skipped','sending') AND NOT (r.status='skipped' AND COALESCE(r.error_code,'')='executive_excluded')) attention_count,
+        (SELECT COUNT(*) FROM eoffice_order_recipients r WHERE r.job_id=j.id AND r.status='skipped' AND r.error_code='executive_excluded') excluded_count,
         (SELECT COUNT(DISTINCT LOWER(TRIM(COALESCE(l.recipient_email,'')))) FROM email_logs l WHERE $historyDoc) history_count,
         (SELECT COUNT(DISTINCT LOWER(TRIM(COALESCE(l.recipient_email,'')))) FROM email_logs l WHERE $historyDoc AND l.delivery_status='success') history_success_count,
         (SELECT MAX(l.created_at) FROM email_logs l WHERE $historyDoc AND l.delivery_status='success') history_sent_at
@@ -75,7 +76,7 @@ try{
             if(($input['confirmed']??false)!==true)throw new DomainException('กรุณายืนยันการวิเคราะห์ใหม่');
             $pdo->prepare("UPDATE eoffice_order_recipients SET status='uncertain',error_code='smtp_result_unknown' WHERE job_id=? AND status='sending'")->execute([$job['id']]);
             $pdo->prepare('DELETE FROM eoffice_order_files WHERE job_id=?')->execute([$job['id']]);
-            $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped')")->execute([$job['id']]);
+            $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped') AND NOT (status='skipped' AND COALESCE(error_code,'')='executive_excluded')")->execute([$job['id']]);
             $pdo->prepare('UPDATE eoffice_order_jobs SET model=NULL,approval_hash=NULL,retry_attempts=0,retry_at=NULL WHERE id=?')->execute([$job['id']]);
             app_order_update((int)$job['id'],'queued');
         }elseif($action==='add_recipient'){
@@ -93,7 +94,23 @@ try{
             }else{
                 if($job['status']==='cancelled')throw new DomainException('งานถูกยกเลิกแล้ว กรุณายืนยันการวิเคราะห์ใหม่ก่อนส่งต่อ');
                 if($recipient['status']==='success')throw new DomainException('รายการนี้ส่งสำเร็จแล้ว');
+                if(app_order_executive_recipient($recipient['user_id']!==null?(int)$recipient['user_id']:null,$recipient['recipient_email'],true))throw new DomainException('ยกเว้นการส่งอีเมลคำสั่งให้ ผอ. / รอง ผอ. ตามตำแหน่งสมาชิก');
                 if(in_array($recipient['status'],['uncertain','sending'],true)&&($input['confirmed']??false)!==true)throw new DomainException('กรุณายืนยันว่าได้ตรวจสอบผลส่งแล้ว การส่งใหม่อาจซ้ำ');
+                if($recipient['status']==='skipped'&&$recipient['error_code']==='executive_excluded'&&$recipient['user_id']!==null){
+                    $q=$pdo->prepare('SELECT User_Email FROM t_user WHERE User_Id=? LOCK IN SHARE MODE');$q->execute([$recipient['user_id']]);$currentEmail=$q->fetchColumn();
+                    if($currentEmail===false)throw new DomainException('ไม่พบผู้รับในระบบ');
+                    $currentEmail=strtolower(trim($currentEmail));
+                    if(app_order_executive_recipient((int)$recipient['user_id'],$currentEmail,true))throw new DomainException('ยกเว้นการส่งอีเมลคำสั่งให้ ผอ. / รอง ผอ. ตามตำแหน่งสมาชิก');
+                    if($currentEmail!==$recipient['recipient_email']){
+                        if(!filter_var($currentEmail,FILTER_VALIDATE_EMAIL))throw new DomainException('อีเมลผู้รับไม่ถูกต้อง');
+                        $q=$pdo->prepare('SELECT 1 FROM eoffice_order_recipients WHERE job_id=? AND email_key=? AND id<>?');$key=hash('sha256',$currentEmail);$q->execute([$job['id'],$key,$recipient['id']]);
+                        if($q->fetchColumn())throw new DomainException('อีเมลปัจจุบันมีรายการผู้รับอยู่แล้ว กรุณาตรวจสอบก่อนส่ง');
+                        $q=$pdo->prepare('SELECT recipient_email FROM email_logs WHERE doc_id=?');$q->execute([(string)$docId]);
+                        foreach($q as $log)if(strtolower(trim((string)$log['recipient_email']))===$currentEmail)throw new DomainException('อีเมลปัจจุบันมีประวัติส่งแล้ว กรุณาตรวจสอบก่อนส่ง');
+                        $pdo->prepare('UPDATE eoffice_order_recipients SET recipient_email=?,email_key=? WHERE id=?')->execute([$currentEmail,$key,$recipient['id']]);
+                        $recipient['recipient_email']=$currentEmail;
+                    }
+                }
                 if(!filter_var($recipient['recipient_email'],FILTER_VALIDATE_EMAIL))throw new DomainException('อีเมลผู้รับไม่ถูกต้อง');
                 $pdo->prepare("UPDATE eoffice_order_recipients SET status='pending',error_code=NULL WHERE id=?")->execute([$recipient['id']]);app_order_clear_retry((int)$job['id']);app_order_update((int)$job['id'],'queued');
             }

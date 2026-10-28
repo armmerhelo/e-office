@@ -1,6 +1,6 @@
 (() => {
     const el = id => document.getElementById(id);
-    const state = {page:1, limit:20, total:0, users:[], catalog:{}, canManage:false, departments:[], editId:null, permissionId:null, permissionVersion:'', request:0, departmentRequest:0, dialogRequest:0, memberVersion:'', departmentsReady:false, statusUser:null, busy:false};
+    const state = {page:1, limit:20, total:0, users:[], catalog:{}, positions:{staff:'บุคลากรทั่วไป',director:'ผู้อำนวยการ',deputy_director:'รองผู้อำนวยการ'}, canManage:false, departments:[], editId:null, permissionId:null, permissionVersion:'', request:0, departmentRequest:0, dialogRequest:0, memberVersion:'', departmentsReady:false, statusUser:null, positionUser:null, busy:false};
     let returnFocus;
 
     function message(id, text, error = false) {
@@ -16,7 +16,7 @@
         return data;
     }
     function showDialog(id) {
-        const forms = {modal_user_manage:'form_user_data', modal_status:'form_status', modal_permissions:'form_permissions'};
+        const forms = {modal_user_manage:'form_user_data', modal_status:'form_status', modal_permissions:'form_permissions', modal_position:'form_position'};
         if (forms[id]) markFormClean(forms[id]);
         returnFocus = document.activeElement;
         el(id).hidden = false;
@@ -24,7 +24,7 @@
     }
     function closeDialog(id) {
         if (state.busy) return;
-        if (id === 'modal_user_manage' || id === 'modal_status' || id === 'modal_permissions') {
+        if (['modal_user_manage','modal_status','modal_permissions','modal_position'].includes(id)) {
             state.dialogRequest++; state.departmentRequest++; state.departmentsReady = false;
         }
         el(id).hidden = true;
@@ -54,7 +54,7 @@
     function renderTable() {
         const tbody = el('userTableBody'); tbody.replaceChildren();
         if (!state.users.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="muted">ไม่พบสมาชิกตามเงื่อนไขที่เลือก</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="muted">ไม่พบสมาชิกตามเงื่อนไขที่เลือก</td></tr>';
         }
         state.users.forEach((user, index) => {
             const row = document.createElement('tr');
@@ -62,12 +62,14 @@
             const permissionBadges = user.User_Status === 'Admin' ? '<span class="badge badge-admin">ทุกสิทธิ์</span>' : user.permissions.map(key => `<span class="badge">${escapeHTML(state.catalog[key]?.label || key)}</span>`).join('');
             const roleBadges = (user.sign_roles || []).map(role => `<span class="badge">${escapeHTML(role)}</span>`).join('');
             const badges = permissionBadges + roleBadges || '<span class="muted">สิทธิ์พื้นฐาน</span>';
-            row.innerHTML = `<td>${(state.page - 1) * state.limit + index + 1}</td><td><div class="name">${escapeHTML(user.User_Name)}</div><div class="muted">${escapeHTML(user.User_Email)}</div></td><td><span class="badge ${user.User_Status === 'Admin' ? 'badge-admin' : ''}">${status}</span></td><td><div class="badges">${badges}</div></td><td><div class="actions"></div></td>`;
+            const position = user.User_Position || 'staff';
+            row.innerHTML = `<td>${(state.page - 1) * state.limit + index + 1}</td><td><div class="name">${escapeHTML(user.User_Name)}</div><div class="muted">${escapeHTML(user.User_Email)}</div></td><td><span class="badge">${escapeHTML(state.positions[position] || position)}</span>${['director','deputy_director'].includes(position) ? '<div class="muted">ยกเว้นอีเมลคำสั่ง</div>' : ''}</td><td><span class="badge ${user.User_Status === 'Admin' ? 'badge-admin' : ''}">${status}</span></td><td><div class="badges">${badges}</div></td><td><div class="actions"></div></td>`;
             const actions = row.querySelector('.actions');
             if (user.can_edit) actions.append(button('แก้ไข', () => editMember(user)));
             else { const note = document.createElement('span'); note.className = 'muted'; note.textContent = 'เฉพาะ Admin สูงสุด'; actions.append(note); }
             if (state.canManage && user.User_Status !== 'Admin') actions.append(button('สิทธิ์', () => editPermissions(user), 'btn small eo-btn--soft'));
             if (state.canManage) actions.append(button('ระดับ', () => editStatus(user)));
+            if (state.canManage) actions.append(button('ตำแหน่ง', () => editPosition(user)));
             tbody.append(row);
         });
         el('member-count').textContent = `สมาชิกทั้งหมด ${state.total.toLocaleString('th-TH')} คน`;
@@ -87,6 +89,7 @@
             if (request !== state.request) return;
             state.users = data.data; state.total = data.total; state.page = data.page;
             state.catalog = data.permission_catalog; state.canManage = data.can_manage_permissions;
+            if (data.position_catalog) state.positions = data.position_catalog;
             el('add-member').disabled = false;
             renderFilter(); renderTable();
         } catch (error) {
@@ -256,6 +259,37 @@
             if (dialogRequest === state.dialogRequest) { state.permissionVersion = ''; message('permissions-loading', ''); message('permissions-error', error.message, true); }
         }
     }
+    async function editPosition(user) {
+        if (!state.canManage || state.busy) return;
+        const request = ++state.dialogRequest;
+        state.positionUser = null;
+        message('position-error', ''); el('position-member').textContent = user.User_Name;
+        el('position-select').replaceChildren(...Object.entries(state.positions).map(([value,label]) => new Option(label,value)));
+        el('position-select').disabled = el('save-position').disabled = true;
+        showDialog('modal_position');
+        try {
+            const data = await api(`get_user_departments_api.php?User_Id=${user.User_Id}`);
+            if (request !== state.dialogRequest || el('modal_position').hidden) return;
+            state.positionUser = {...data.user, member_version:data.member_version};
+            el('position-member').textContent = data.user.User_Name;
+            el('position-select').value = data.user.User_Position || 'staff';
+            el('position-select').disabled = el('save-position').disabled = false;
+        } catch (error) { if (request === state.dialogRequest) message('position-error', error.message, true); }
+    }
+    async function savePosition(event) {
+        event.preventDefault(); if (state.busy || !state.positionUser) return;
+        const position = el('position-select').value;
+        if (position === (state.positionUser.User_Position || 'staff')) { closeDialog('modal_position'); return; }
+        if (!confirm(`กำหนดตำแหน่งเป็น “${state.positions[position]}” หรือไม่?\nผอ. และรอง ผอ. จะถูกยกเว้นอีเมลคำสั่ง รวมถึงรายการที่ยังรอส่งในคิว`)) return;
+        state.busy = true; el('save-position').disabled = true;
+        try {
+            const data = await api('save_user_position_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:state.positionUser.User_Id,position,member_version:state.positionUser.member_version})});
+            markFormClean('form_position');
+            state.busy = false; closeDialog('modal_position');
+            message('page-message', data.message); await loadUsers();
+        } catch (error) { message('position-error', error.message, true); }
+        finally { state.busy = false; el('save-position').disabled = false; }
+    }
     async function savePermissions(event) {
         event.preventDefault(); if (state.busy || !state.permissionVersion) return;
         const permissions = new FormData(el('form_permissions')).getAll('permissions');
@@ -287,6 +321,7 @@
     el('form_user_data').addEventListener('submit', saveMember);
     el('form_permissions').addEventListener('submit', savePermissions);
     el('form_status').addEventListener('submit', saveStatus);
+    el('form_position').addEventListener('submit', savePosition);
     el('btn_delete_user').addEventListener('click', deleteMember);
     document.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => closeDialog(node.dataset.close)));
     document.addEventListener('keydown', event => {

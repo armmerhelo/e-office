@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/sign-routing.php';
+require_once __DIR__ . '/member-position.php';
 
 // All member mutations lock the routing gate, then the Admin roster. This
 // serializes demotion/deletion and prevents concurrent removal of the last Admin.
@@ -62,7 +63,7 @@ function app_member_version(array $user, array $departments): string {
     // passwords would turn it into an offline password-guess verification oracle.
     return hash_hmac('sha256', json_encode([
         (int)$user['User_Id'], $user['User_Name'], $user['User_Email'],
-        $user['User_Status'], $user['User_Password'],
+        $user['User_Status'], $user['User_Password'], $user['User_Position']??'staff',
         array_map('intval', array_column($departments, 'Department_Id')),
     ], JSON_THROW_ON_ERROR), app_member_version_key());
 }

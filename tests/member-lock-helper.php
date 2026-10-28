@@ -3,6 +3,9 @@ if(PHP_SAPI!=='cli')exit;
 require __DIR__.'/../config/bootstrap.php';
 if(!preg_match('/^eoffice_members_\d+_test$/D',app_settings()['database'])||!app_settings()['mock'])throw new RuntimeException('Member fixture only');
 $pdo=app_pdo();$action=$argv[1]??'';$id=(int)($argv[2]??0);
+if($action==='positions-remigrate'){
+    require __DIR__.'/../config/member-position.php';app_member_positions_migrate($pdo);app_member_positions_migrate($pdo);exit;
+}
 if($action==='legacy-password'){
     $pdo->prepare('UPDATE t_user SET User_Password=? WHERE User_Id=?')->execute([' Review-Legacy-2026! ',$id]);exit;
 }

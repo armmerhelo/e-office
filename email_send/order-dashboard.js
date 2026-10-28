@@ -59,10 +59,11 @@
     }
 
     function renderCounts(cell, item) {
+        if (Number(item.excluded_count)) cell.append(U.node('p', `ยกเว้น ผอ. / รอง ผอ. ${number(item.excluded_count)} คน`, 'muted history-summary'));
         if (!item.status && Number(item.history_count)) { renderHistorySummary(cell, item); return; }
         const success = Number(item.success_count || 0), pending = Number(item.pending_count || 0), attention = Number(item.attention_count || 0);
         if (!success && !pending && !attention) {
-            cell.append(U.node('span', item.status ? 'ยังไม่มีผลส่ง' : 'ยังไม่ได้รวบรวมผู้รับ', 'muted'));
+            if (!Number(item.excluded_count)) cell.append(U.node('span', item.status ? 'ยังไม่มีผลส่ง' : 'ยังไม่ได้รวบรวมผู้รับ', 'muted'));
             if (Number(item.history_count)) renderHistorySummary(cell, item);
             return;
         }
@@ -228,13 +229,13 @@
                 const tr = U.node('tr'), name = U.node('td'), status = U.node('td'), info = U.node('td'), actions = U.node('td'), buttons = U.node('div', undefined, 'detail-row-actions');
                 status.dataset.label = 'ผลส่ง'; info.dataset.label = 'เวลา / การส่ง';
                 name.append(U.node('strong', recipient.recipient_name), U.node('div', recipient.recipient_email, 'muted recipient-email'));
-                status.append(U.badge(recipient.status));
+                status.append(U.badge(recipient.error_code === 'executive_excluded' ? 'excluded' : recipient.status));
                 info.append(U.node('div', dateTime(recipient.sent_at || recipient.attempted_at, 'ยังไม่ได้ส่ง')), U.node('p', `${number(recipient.attempts)} ครั้ง`, 'muted'));
                 if (recipient.error_code) info.append(U.node('p', U.error(recipient.error_code), 'status-error'));
                 if (recipient.status === 'pending') buttons.append(U.button('ยกเลิก', () => {
                     if (confirm(`ยกเลิกการส่งถึง ${recipient.recipient_email}?`)) action(docId, 'cancel_recipient', {recipient_id: recipient.id});
                 }, true));
-                if (['failed', 'uncertain', 'sending', 'cancelled'].includes(recipient.status)) buttons.append(U.button('ส่งใหม่', () => {
+                if (['failed', 'uncertain', 'sending', 'cancelled'].includes(recipient.status) || (recipient.status === 'skipped' && recipient.error_code === 'executive_excluded')) buttons.append(U.button('ส่งใหม่', () => {
                     if (confirm(`ส่งใหม่ถึง ${recipient.recipient_email}?\nตรวจสอบผลส่งก่อนยืนยัน หากเซิร์ฟเวอร์รับอีเมลไปแล้ว ผู้รับอาจได้รับซ้ำ`)) action(docId, 'retry_recipient', {recipient_id: recipient.id, confirmed: true});
                 }));
                 if (!buttons.childElementCount) buttons.append(U.node('span', '—', 'muted'));

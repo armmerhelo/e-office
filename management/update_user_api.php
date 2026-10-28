@@ -4,6 +4,7 @@ $id=(int)($_POST['User_Id']??0);$name=app_text($_POST,'User_name',255,true);$ema
 $p1=app_password($_POST,'User_password1');$p2=app_password($_POST,'User_password2');
 if($id<=0||!filter_var($email,FILTER_VALIDATE_EMAIL)||($submittedRole!==''&&!in_array($submittedRole,['User','Editor','Admin'],true))||$p1!==$p2||($p1!==''&&mb_strlen($p1)<8))app_fail('ข้อมูลผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
 if (array_key_exists('permissions',$_POST)) app_fail('กรุณาใช้หน้าจอจัดการสิทธิ์โดย Admin สูงสุด',403);
+if (array_key_exists('User_Position',$_POST)) app_fail('กรุณากำหนดตำแหน่งจากปุ่มตำแหน่งโดย Admin สูงสุด',403);
 $pdo=app_pdo();$pdo->beginTransaction();$locked=app_lock_member($pdo,$actor,$id);
 // Accept the unchanged legacy status field, but never mutate roles here.
 if ($submittedRole!=='' && $submittedRole!==$locked['target']['User_Status']) { $pdo->rollBack();app_fail('เปลี่ยนระดับผู้ใช้จากหน้าจัดการระดับเท่านั้น กรุณาโหลดข้อมูลใหม่',$locked['actor']['User_Status']==='Admin'?409:403); }

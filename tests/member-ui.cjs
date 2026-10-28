@@ -20,7 +20,7 @@ const fetch=async (route,options)=>{
     if(route.startsWith('get_users_api'))return response({status:'success',data:[user],total:1,page:1,permission_catalog:{},can_manage_permissions:true});
     if(route.startsWith('get_user_departments_api'))return new Promise(resolve=>membershipRequests.push(resolve));
     if(route.startsWith('search_departments_api')){searches++;return response({status:'success',data:[{Department_Id:2,Department_Name:'Beta'}]});}
-    if(route==='update_user_api.php'||route==='save_user_status_api.php'||route==='save_user_permissions_api.php'){writes.push({route,body:options.body});if(nextWriteFailure){nextWriteFailure=false;return {ok:false,json:async()=>({status:'error',message:'write failed'})};}return response({status:'success',message:'Saved'});}
+    if(route==='update_user_api.php'||route==='save_user_status_api.php'||route==='save_user_permissions_api.php'||route==='save_user_position_api.php'){writes.push({route,body:options.body});if(nextWriteFailure){nextWriteFailure=false;return {ok:false,json:async()=>({status:'error',message:'write failed'})};}return response({status:'success',message:'Saved'});}
     throw Error('Unexpected route: '+route);
 };
 const source=fs.readFileSync('assets/member-management.js','utf8');
@@ -77,6 +77,20 @@ async function run(){
     const roleWrite=writes.at(-1);assert.equal(roleWrite.route,'save_user_status_api.php');
     assert.deepEqual(JSON.parse(roleWrite.body),{user_id:4,status:'Admin',member_version:'a'.repeat(64)});
     console.log('PASS explicit Admin promotion uses the separate version-checked status endpoint');
+    const position=el('userTableBody').children[0].actions.children.find(button=>button.textContent==='ตำแหน่ง');
+    position.events.click();await tick();
+    assert.equal(el('position-select').disabled,true);assert.equal(el('save-position').disabled,true);
+    const stalePosition=membershipRequests.shift();keydown({key:'Escape'});
+    position.events.click();await tick();const currentPosition=membershipRequests.shift();
+    currentPosition(snapshot('Alpha'));await tick();el('position-select').value='director';
+    stalePosition(response({user:{...user,User_Position:'deputy_director'},member_version:'c'.repeat(64)}));await tick();
+    assert.equal(el('position-select').value,'director','late reads cannot overwrite position edits');
+    dirtyForms.add('form_position');nextWriteFailure=true;
+    await el('form_position').events.submit({preventDefault(){}});assert.equal(dirtyForms.has('form_position'),true);
+    await el('form_position').events.submit({preventDefault(){}});
+    assert.equal(dirtyForms.has('form_position'),false);
+    assert.deepEqual(JSON.parse(writes.at(-1).body),{user_id:4,position:'director',member_version:'a'.repeat(64)});
+    console.log('PASS position dialog waits for the snapshot, rejects late reads, preserves failed drafts and saves independently');
     const rights=el('userTableBody').children[0].actions.children.find(button=>button.textContent==='สิทธิ์');
     rights.events.click();await tick();
     assert.equal(el('save-permissions').disabled,true);

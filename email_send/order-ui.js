@@ -21,5 +21,7 @@ window.OrderUI = (() => {
     errors.drive_temporary_failure='Drive ขัดข้องชั่วคราว ระบบจะลองใหม่ตามรอบที่กำหนด';
     errors.drive_retry_exhausted='Drive ขัดข้องครบจำนวนครั้งที่กำหนด กรุณาตรวจสอบแล้วสั่งทำต่อ';
     errors.cache_retry_exhausted='เตรียม cache ไม่สำเร็จครบจำนวนครั้งที่กำหนด กรุณาตรวจสอบ';
+    labels.excluded='ยกเว้นการส่ง';
+    errors.executive_excluded='ยกเว้นการส่ง: ผอ. / รอง ผอ. ตามตำแหน่งสมาชิก';
     return {node,badge,button,request,message,error:code=>errors[code]||code||'—'};
 })();

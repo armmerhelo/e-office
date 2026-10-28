@@ -32,6 +32,16 @@ if(in_array($action,['seed','drop'],true)){
     echo json_encode(['users'=>$users,'pdf'=>base64_encode($pdf)]);exit;
 }
 $pdo=app_pdo();
+if(str_starts_with($action,'position:')){
+    [, $id, $position]=explode(':',$action);
+    if(!ctype_digit($id)||!isset(app_member_positions()[$position]))throw new RuntimeException('Invalid fixture position');
+    $pdo->prepare('UPDATE t_user SET User_Position=? WHERE User_Id=?')->execute([$position,(int)$id]);echo '{}';exit;
+}
+if(str_starts_with($action,'email:')){
+    [, $id, $email]=explode(':',$action,3);
+    if(!ctype_digit($id)||!filter_var($email,FILTER_VALIDATE_EMAIL)||!str_ends_with($email,'@example.test'))throw new RuntimeException('Invalid fixture email');
+    $pdo->prepare('UPDATE t_user SET User_Email=? WHERE User_Id=?')->execute([$email,(int)$id]);echo '{}';exit;
+}
 if($action==='history-seed'){
     $ids=[];
     foreach(['sent','review','empty'] as $kind){
@@ -91,4 +101,9 @@ if($action==='snapshot'){
     echo json_encode($result);exit;
 }
 if($action==='behavior'){require __DIR__.'/order-email-behavior.php';exit;}
+if($action==='notification-position'){require __DIR__.'/notification-position.php';exit;}
+if($action==='notification-seed'){
+    $q=$pdo->prepare('INSERT INTO t_user (User_Name,User_Email,User_Status) VALUES (?,?,?)');
+    foreach(['owner','recipient'] as $name)$q->execute(['QA '.$name,'qa-'.$name.'@siya.ac.th','User']);echo '{}';exit;
+}
 throw new RuntimeException('Unknown fixture action');

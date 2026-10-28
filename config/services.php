@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/bootstrap.php';
+require_once __DIR__.'/member-position.php';
 class AppPushDeliveryException extends RuntimeException {
     public function __construct(public readonly int $retryAfter=0){parent::__construct('Push delivery failed');}
 }
@@ -92,10 +93,30 @@ function app_document_notification(int $id,array $payload,?array $transports=nul
         $state['status']='sending';$state['attempts']=(int)($state['attempts']??0)+1;
         $state['first_attempt_at']??=time();
         $payload['delivery'][$channel]=$state;app_outbox_progress($id,$payload);
+        $contacted=false;
         try{
             if($channel==='mail'){
-                if(!(($transports['mail']??'app_mail')((string)$title,$recipient['User_Email'],'<a href="'.htmlspecialchars($url,ENT_QUOTES).'">เปิดเอกสาร</a>')))throw new RuntimeException('Mail not accepted');
-                $state['status']='success';
+                // Marker is durable before SMTP. Revalidate type and current
+                // recipient under locks held until the mail result is saved.
+                $pdo->beginTransaction();
+                try{
+                    $q=$pdo->prepare('SELECT Doc_Name,Doc_Type,Is_Delete FROM t_document WHERE Doc_Id=? FOR UPDATE');$q->execute([$docId]);$currentDoc=$q->fetch();
+                    // Acquire recipient locks in the helper's stable ID order,
+                    // then recheck the current address if it changed since the
+                    // earlier nonlocking notification lookup.
+                    $excluded=$currentDoc&&$currentDoc['Doc_Type']==='External'&&app_order_executive_recipient($userId,(string)$recipient['User_Email'],true);
+                    $q=$pdo->prepare('SELECT User_Email FROM t_user WHERE User_Id=? LOCK IN SHARE MODE');$q->execute([$userId]);$currentEmail=$q->fetchColumn();
+                    if(!$currentDoc||$currentDoc['Is_Delete']!=='active'||$currentEmail===false)throw new RuntimeException('Notification target unavailable');
+                    if($currentDoc['Doc_Type']==='External'&&($excluded||app_order_executive_recipient($userId,(string)$currentEmail,true))){
+                        $state['status']='skipped';$state['reason']='executive_excluded';
+                        $state['attempts']=max(0,$state['attempts']-1);if(!$state['attempts'])unset($state['first_attempt_at']);
+                    }else{
+                        $contacted=true;
+                        if(!(($transports['mail']??'app_mail')((string)$currentDoc['Doc_Name'],$currentEmail,'<a href="'.htmlspecialchars($url,ENT_QUOTES).'">เปิดเอกสาร</a>')))throw new RuntimeException('Mail not accepted');
+                        $state['status']='success';
+                    }
+                    unset($state['error_class']);$payload['delivery'][$channel]=$state;app_outbox_progress($id,$payload);$pdo->commit();
+                }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
             }else{
                 $result=($transports['push']??'app_push')($userId,$docId,(string)$title,$url,$payload['idempotency_key']);
                 if(!in_array($result,['success','skipped'],true))throw new RuntimeException('Invalid push result');
@@ -104,7 +125,15 @@ function app_document_notification(int $id,array $payload,?array $transports=nul
             unset($state['error_class']);
         }catch(Throwable $e){
             error_log('Notification job '.$id.' '.$channel.' failed ('.get_class($e).')');$state['error_class']=get_class($e);
-            if($channel==='mail')$state['status']='uncertain';
+            if($channel==='mail'&&!$contacted){
+                // Nothing reached SMTP; release the persisted marker and retry
+                // boundedly instead of falsely reporting an ambiguous send.
+                $state['attempts']=max(0,$state['attempts']-1);if(!$state['attempts'])unset($state['first_attempt_at']);
+                $state['preflight_attempts']=(int)($state['preflight_attempts']??0)+1;
+                if($state['preflight_attempts']<5){$state['status']='pending';$payload['retry_at']=time()+min(1800,60*(2**($state['preflight_attempts']-1)));}
+                else $state['status']='failed';
+            }
+            elseif($channel==='mail')$state['status']='uncertain';
             elseif($state['attempts']<5){$state['status']='pending';$delay=min(1800,60*(2**($state['attempts']-1)));if($e instanceof AppPushDeliveryException)$delay=max($delay,min(86400,$e->retryAfter));$payload['retry_at']=time()+$delay;}
             else $state['status']='failed';
         }

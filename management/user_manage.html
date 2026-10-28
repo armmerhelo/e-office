@@ -69,7 +69,7 @@
         .permission-option strong { display: block; font-size: 14px; }
         @media (max-width: 600px) { body { padding: 8px; } .toolbar { padding: 16px; } .filters, .filters input, .filters select { width: 100%; } .form-grid, .permission-grid { grid-template-columns: 1fr; } .dialog-body { padding: 16px; } .dialog-foot .btn { flex: 1; } }
     </style>
-    <script src="../assets/member-management.js?v=20261015-routing-modal" defer></script>
+    <script src="../assets/member-management.js?v=20261028-positions" defer></script>
     <script src="../assets/sign-routing-management.js?v=20261015-routing-modal" defer></script>
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
@@ -96,13 +96,13 @@
             </div>
             <div class="table-scroll">
                 <table>
-                    <thead><tr><th>ลำดับ</th><th>ชื่อ – สกุล / อีเมล</th><th>ระดับผู้ใช้</th><th>สิทธิ์เพิ่มเติม</th><th>จัดการ</th></tr></thead>
-                    <tbody id="userTableBody"><tr><td colspan="5">กำลังตรวจสอบสิทธิ์และโหลดข้อมูล...</td></tr></tbody>
+                    <thead><tr><th>ลำดับ</th><th>ชื่อ – สกุล / อีเมล</th><th>ตำแหน่ง</th><th>ระดับผู้ใช้</th><th>สิทธิ์เพิ่มเติม</th><th>จัดการ</th></tr></thead>
+                    <tbody id="userTableBody"><tr><td colspan="6">กำลังตรวจสอบสิทธิ์และโหลดข้อมูล...</td></tr></tbody>
                 </table>
             </div>
             <div id="usersPagination" class="pagination"></div>
         </section>
-        <p class="muted">บุคลากรทั่วไปมีสิทธิ์พื้นฐานในการใช้งานระบบ การเพิ่ม–ถอนสิทธิ์และการเปลี่ยนระดับผู้ใช้ทำได้โดย Admin สูงสุดเท่านั้น</p>
+        <p class="muted">ตำแหน่งแยกจากสิทธิ์ใช้งานและกลุ่มงาน โดย ผอ. / รอง ผอ. จะไม่รับอีเมลคำสั่ง ให้ Admin สูงสุดกำหนดจากปุ่ม “ตำแหน่ง” สมาชิกใหม่เริ่มเป็นบุคลากรทั่วไป</p>
     </main>
 
     <div id="modal_sign_routes" class="overlay" hidden>
@@ -172,6 +172,18 @@
                 <button class="btn" type="button" data-close="modal_permissions">ยกเลิก</button>
                 <button id="save-permissions" class="btn primary" type="submit" form="form_permissions">บันทึกสิทธิ์</button>
             </footer>
+        </section>
+    </div>
+    <div id="modal_position" class="overlay" hidden>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="position-title" aria-describedby="position-help">
+            <header class="dialog-head"><h2 id="position-title">กำหนดตำแหน่งสมาชิก</h2><button class="btn small" type="button" data-close="modal_position" aria-label="ปิดหน้าต่าง">✕</button></header>
+            <div class="dialog-body">
+                <p id="position-member" class="name"></p>
+                <div id="position-error" class="message error" role="alert" hidden></div>
+                <form id="form_position" class="field"><label for="position-select">ตำแหน่ง</label><select id="position-select" disabled><option value="staff">บุคลากรทั่วไป</option><option value="director">ผู้อำนวยการ</option><option value="deputy_director">รองผู้อำนวยการ</option></select></form>
+                <p id="position-help" class="muted">ผอ. และรอง ผอ. จะถูกยกเว้นอีเมลคำสั่งทั้งจาก AI รายชื่อในเอกสาร และผู้รับที่เพิ่มเอง ระบบตรวจตำแหน่งอีกครั้งก่อนส่งรายการในคิว การกำหนดตำแหน่งไม่เปลี่ยนสิทธิ์ใช้งาน กลุ่มงาน หรือประวัติการส่งเดิม</p>
+            </div>
+            <footer class="dialog-foot actions"><button class="btn" type="button" data-close="modal_position">ยกเลิก</button><button id="save-position" class="btn primary" type="submit" form="form_position" disabled>บันทึกตำแหน่ง</button></footer>
         </section>
     </div>
     <div id="modal_status" class="overlay" hidden>

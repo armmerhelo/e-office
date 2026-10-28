@@ -3,6 +3,7 @@ require_once __DIR__.'/services.php';
 require_once __DIR__.'/order-ai.php';
 require_once __DIR__.'/drive-archive.php';
 require_once __DIR__.'/order-controls.php';
+require_once __DIR__.'/member-position.php';
 
 function app_order_audit(string $action,?int $actor=null,?int $doc=null): void {
     app_pdo()->prepare('INSERT INTO eoffice_order_audit (actor_id,doc_id,action) VALUES (?,?,?)')->execute([$actor,$doc,$action]);
@@ -35,7 +36,7 @@ function app_order_clear_retry(int $jobId): void {
 }
 
 function app_order_resume_pending(array $job): void {
-    if(!in_array($job['status'],['success','partial'],true)&&!($job['status']==='review'&&in_array($job['error_code'],['no_recipients','no_pending_recipients'],true)))return;
+    if(!in_array($job['status'],['success','partial','excluded'],true)&&!($job['status']==='review'&&in_array($job['error_code'],['no_recipients','no_pending_recipients'],true)))return;
     $q=app_pdo()->prepare("SELECT COUNT(*) FROM eoffice_order_recipients WHERE job_id=? AND status='pending'");$q->execute([$job['id']]);
     if($q->fetchColumn()){app_order_clear_retry((int)$job['id']);app_order_update((int)$job['id'],'queued');}
 }
@@ -123,7 +124,7 @@ function app_order_sync_files(array $job,array $files): bool {
             if(!isset($old[$name]))$pdo->prepare('INSERT INTO eoffice_order_files (job_id,file_name,caption,file_hash) VALUES (?,?,?,?)')->execute([$job['id'],$name,$file['caption'],$file['hash']]);
             elseif($old[$name]['file_hash']!==$file['hash'])$pdo->prepare("UPDATE eoffice_order_files SET file_hash=?,caption=?,status='pending',targets=NULL,attempts=0,retry_at=NULL,error_code=NULL WHERE id=?")->execute([$file['hash'],$file['caption'],$old[$name]['id']]);
         }
-        $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped')")->execute([$job['id']]);
+        $pdo->prepare("DELETE FROM eoffice_order_recipients WHERE job_id=? AND source='ai' AND status IN ('pending','failed','skipped') AND NOT (status='skipped' AND COALESCE(error_code,'')='executive_excluded')")->execute([$job['id']]);
     }
     if($owned)$pdo->commit();return true;
     }catch(Throwable $e){if($owned&&$pdo->inTransaction())$pdo->rollBack();throw $e;}
@@ -132,24 +133,33 @@ function app_order_sync_files(array $job,array $files): bool {
 function app_order_add_recipient(array $job,array $user,string $source='ai'): void {
     $pdo=app_pdo();$email=strtolower(trim((string)$user['User_Email']));$valid=(bool)filter_var($email,FILTER_VALIDATE_EMAIL);
     $key=hash('sha256',$valid?$email:'invalid-user:'.$user['User_Id']);
+    // An excluded account remains excluded even after its email is edited.
+    // Do not create another pending row that evades the retained exclusion.
+    $q=$pdo->prepare("SELECT id FROM eoffice_order_recipients WHERE job_id=? AND user_id=? AND status='skipped' AND error_code='executive_excluded' LIMIT 1");
+    $q->execute([$job['id'],$user['User_Id']]);if($q->fetchColumn())return;
     $q=$pdo->prepare('SELECT id,source FROM eoffice_order_recipients WHERE job_id=? AND email_key=?');$q->execute([$job['id'],$key]);$existing=$q->fetch();
     if($existing){
         // Selecting an AI match explicitly must survive future reanalysis.
-        // Never change its delivery/cancellation state as a side effect.
+        // Preserve accepted/uncertain/cancelled outcomes; only an unsent pending
+        // recipient can be excluded by its current organizational position.
         if($source==='manual'||($source==='document'&&$existing['source']==='ai'))$pdo->prepare('UPDATE eoffice_order_recipients SET source=? WHERE id=?')->execute([$source,$existing['id']]);
+        if(app_order_executive_recipient((int)$user['User_Id'],$email))$pdo->prepare("UPDATE eoffice_order_recipients SET status='skipped',error_code='executive_excluded' WHERE id=? AND status='pending'")->execute([$existing['id']]);
         return;
     }
     // Match the history dashboard's normalization before creating AI/document/
     // manual recipients; legacy imports run later and must not lose to pending.
-    $q=$pdo->prepare("SELECT delivery_status FROM email_logs WHERE doc_id=? AND LOWER(TRIM(COALESCE(recipient_email,'')))=?");$q->execute([(string)$job['doc_id'],$email]);$history=$q->fetchAll(PDO::FETCH_COLUMN);
+    $q=$pdo->prepare('SELECT recipient_email,delivery_status FROM email_logs WHERE doc_id=?');$q->execute([(string)$job['doc_id']]);$history=[];
+    foreach($q as $log)if(strtolower(trim((string)$log['recipient_email']))===$email)$history[]=$log['delivery_status'];
     $status=!$valid?'skipped':(in_array('success',$history,true)?'success':($history?'uncertain':'pending'));
+    $error=!$valid?'invalid_email':($status==='uncertain'?'legacy_delivery_unconfirmed':null);
+    if($status==='pending'&&app_order_executive_recipient((int)$user['User_Id'],$email)){$status='skipped';$error='executive_excluded';}
     $pdo->prepare('INSERT IGNORE INTO eoffice_order_recipients (job_id,user_id,recipient_name,recipient_email,email_key,source,status,error_code) VALUES (?,?,?,?,?,?,?,?)')->execute([
-        $job['id'],$user['User_Id'],$user['User_Name'],$email,$key,$source,$status,!$valid?'invalid_email':($status==='uncertain'?'legacy_delivery_unconfirmed':null)]);
+        $job['id'],$user['User_Id'],$user['User_Name'],$email,$key,$source,$status,$error]);
 }
 
 function app_order_document_recipients(array $job): void {
     $pdo=app_pdo();
-    $pdo->prepare("DELETE r FROM eoffice_order_recipients r WHERE r.job_id=? AND r.source='document' AND r.status IN ('pending','failed','skipped') AND NOT EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=? AND a.User_Id=r.user_id)")->execute([$job['id'],$job['doc_id']]);
+    $pdo->prepare("DELETE r FROM eoffice_order_recipients r WHERE r.job_id=? AND r.source='document' AND r.status IN ('pending','failed','skipped') AND NOT (r.status='skipped' AND COALESCE(r.error_code,'')='executive_excluded') AND NOT EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=? AND a.User_Id=r.user_id)")->execute([$job['id'],$job['doc_id']]);
     $q=$pdo->prepare('SELECT u.User_Id,u.User_Name,u.User_Email FROM t_access_rights a JOIN t_user u ON u.User_Id=a.User_Id WHERE a.Doc_Id=?');$q->execute([$job['doc_id']]);
     foreach($q->fetchAll() as $user)app_order_add_recipient($job,$user,'document');
 }
@@ -307,12 +317,17 @@ function app_order_body(array $doc,array $files,string $recipientName='',?array 
 
 function app_order_finish(array $job): void {
     if(app_order_job((int)$job['doc_id'])['status']==='cancelled')return;
-    $q=app_pdo()->prepare('SELECT status,COUNT(*) n FROM eoffice_order_recipients WHERE job_id=? GROUP BY status');$q->execute([$job['id']]);$counts=[];foreach($q as $row)$counts[$row['status']]=(int)$row['n'];
+    $q=app_pdo()->prepare("SELECT status,COUNT(*) n FROM eoffice_order_recipients WHERE job_id=? AND NOT (status='skipped' AND COALESCE(error_code,'')='executive_excluded') GROUP BY status");$q->execute([$job['id']]);$counts=[];foreach($q as $row)$counts[$row['status']]=(int)$row['n'];
     // A resumed pending job must retain its I/O failure budget until it really
     // finishes. Clearing here would make repeated cache eviction retry forever.
     if(($counts['pending']??0)>0){app_order_update((int)$job['id'],'sending');return;}
     app_order_clear_retry((int)$job['id']);
-    if(!$counts){app_order_update((int)$job['id'],'review','no_recipients');return;}
+    if(!$counts){
+        $q=app_pdo()->prepare("SELECT 1 FROM eoffice_order_recipients WHERE job_id=? AND error_code='executive_excluded' LIMIT 1");$q->execute([$job['id']]);
+        if($q->fetchColumn())app_order_update((int)$job['id'],'excluded','executive_excluded');
+        else app_order_update((int)$job['id'],'review','no_recipients');
+        return;
+    }
     if(count($counts)===1&&isset($counts['cancelled'])){app_order_update((int)$job['id'],'review','no_pending_recipients');return;}
     if(($counts['uncertain']??0)+($counts['sending']??0)+($counts['failed']??0)+($counts['skipped']??0)>0)app_order_update((int)$job['id'],'partial','recipient_attention');
     else app_order_update((int)$job['id'],'success');
@@ -325,6 +340,11 @@ function app_order_recipient_ready(array $doc,int $recipientId,string $expected)
     $pdo=app_pdo();if(!$pdo->inTransaction())throw new RuntimeException('Recipient check requires document transaction');
     $q=$pdo->prepare('SELECT * FROM eoffice_order_recipients WHERE id=?');$q->execute([$recipientId]);$recipient=$q->fetch();
     if(!$recipient||$recipient['status']!==$expected)return null;
+    // A locking current read in both phases also protects already queued rows,
+    // legacy recipients without an account ID, and position changes between phases.
+    if(app_order_executive_recipient($recipient['user_id']!==null?(int)$recipient['user_id']:null,$recipient['recipient_email'],true)){
+        $pdo->prepare("UPDATE eoffice_order_recipients SET status='skipped',error_code='executive_excluded' WHERE id=?")->execute([$recipientId]);return null;
+    }
     if($recipient['user_id']!==null){
         $q=$pdo->prepare('SELECT User_Email FROM t_user WHERE User_Id=? LOCK IN SHARE MODE');$q->execute([$recipient['user_id']]);$email=$q->fetchColumn();
         if($email===false||strtolower(trim($email))!==$recipient['recipient_email']){
