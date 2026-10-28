@@ -36,6 +36,9 @@
                     return !validDate(item.date) ||
                         typeof item.title !== 'string' || typeof item.summary !== 'string' ||
                         (item.version !== undefined && typeof item.version !== 'string') ||
+                        (item.commits !== undefined && (!Array.isArray(item.commits) || item.commits.some(commit =>
+                            !commit || typeof commit.hash !== 'string' || !/^[a-f0-9]{40}$/.test(commit.hash) ||
+                            typeof commit.summary !== 'string' || !commit.summary.trim() || !['added','improved','fixed'].includes(commit.category)))) ||
                         ['added','improved','fixed'].some(key => !Array.isArray(item[key]) || item[key].some(text => typeof text !== 'string'));
                 })) throw Error('รูปแบบข้อมูลอัปเดตไม่ถูกต้อง');
                 feed = items.filter(item => item.date <= new Date().toLocaleDateString('en-CA', {timeZone:'Asia/Bangkok'}))

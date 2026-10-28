@@ -1,5 +1,14 @@
 # Production deployment — E-Office
 
+## ประวัติการปรับปรุงหลัง deploy (ทุกครั้ง)
+
+ทำตาม [SYSTEM_UPDATES.md](SYSTEM_UPDATES.md#ทุกครั้งที่-deploy) สำหรับทุกวิธี deploy รวมถึงสคริปต์ targeted release ใน `scripts/*release.py`:
+
+- ตรวจ `git log` / `git show` ของ commit ที่นำขึ้นจริง และเตรียมสรุปภาษาไทยของแต่ละ commit ด้วย `node scripts/release-updates.cjs prepare` ก่อน deploy
+- เมื่อ deploy และตรวจสอบสำเร็จ ใช้คำสั่ง `record --notes <notes.json> --deployed-at <เวลาจริงพร้อมเขตเวลา>` เพื่อเพิ่มประวัติใน `data/system-updates.json`
+- เผยแพร่ feed แล้วตรวจหน้า `index.php?view=updates` ว่าเห็นสรุปและรายละเอียดแต่ละ commit ครบ จึงรายงานว่า deploy เสร็จ หากเผยแพร่ประวัติไม่ผ่านต้องดำเนินการให้ครบ
+- การ push ยังไม่ใช่หลักฐาน deployment ส่วน release เฉพาะงานต้องระบุ commit ที่ deploy จริงด้วย `--commits` เพื่อไม่ประกาศงานอื่นที่ยังไม่ขึ้น production
+
 ## Pending release completed (9 October 2026)
 
 - Reconciled the full deployable application against source commit `60a23f577b2a40876745fbdea0041eabf99fb809`. Published the **11 remaining production files**: member HMAC snapshots, member/routing lock order, signed-PDF compensation, short-lock PDF reading, document-edit file locking, order dashboard assets, the local configuration example and the development router.

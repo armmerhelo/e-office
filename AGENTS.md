@@ -15,3 +15,11 @@
 ## Additional instructions
 
 Follow any applicable nested `AGENTS.md` files, including `e-sign/AGENTS.md`.
+
+## Deployment update history
+
+- Every successful production deployment must include a user-facing update in `data/system-updates.json`, displayed at `index.php?view=updates`.
+- Review the actual deployed commits and their diffs (`git log` / `git show`), then write concise Thai descriptions of what changed and how users benefit. Include each deployed commit's full hash and a reviewed summary; never infer deployment from a commit or push alone.
+- Use `node scripts/release-updates.cjs prepare --from <previous-commit> --to <deployed-commit> --output <notes.json>` to collect commits and changed paths for review. For targeted releases, use the exact deployed commit hashes with `--commits <hash1,hash2>` instead of a range; exclude unrelated work.
+- Complete the draft's title, summary and each commit's summary/category (`added`, `improved`, `fixed`). After deployment and verification succeed, run `node scripts/release-updates.cjs record --notes <notes.json> --deployed-at <ISO-8601-with-offset>`, publish the updated feed, and verify the production updates page/feed. The deployment is not complete until its history is published and checked.
+- Preserve existing history and stable release IDs. Do not announce undeployed changes, failed deployments, private configuration, personal data, or internal operational details. If feed publication fails, report the deployment as incomplete and finish publishing it before claiming completion.

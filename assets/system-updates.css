@@ -19,4 +19,10 @@
 .update-section li + li { margin-top: 6px; }
 .updates-feedback { padding: 20px 0; color: #64748b; }
 .updates-note { margin: 24px 0 0; font-size: 12px; }
+.update-commits { margin-top: 20px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 13px; color: #475569; }
+.update-commits summary { cursor: pointer; color: #4338ca; font-weight: 600; }
+.update-commits summary:focus-visible { outline: 2px solid #6366f1; outline-offset: 4px; }
+.update-commits ul { padding-left: 24px; list-style: disc; }
+.update-commits li + li { margin-top: 8px; }
+.update-commits code { font-family: monospace; background: #f1f5f9; border-radius: 4px; padding: 2px 5px; }
 @media (max-width: 639px) { .update-card { padding: 20px 16px; } .update-card h2 { font-size: 18px; } }

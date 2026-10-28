@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
+require('./release-updates.cjs');
 const source = fs.readFileSync('assets/system-updates.js', 'utf8');
 const pageSource = fs.readFileSync('assets/system-updates-page.js', 'utf8');
 const releases = JSON.parse(fs.readFileSync('data/system-updates.json', 'utf8'));
@@ -93,6 +94,22 @@ async function run() {
     console.log('PASS network failure/retry, empty feed and invalid duplicate IDs');
     const actual=setup();assert.ok((await actual.window.eofficeSystemUpdates.load()).length);
     console.log('PASS published release feed schema');
+    const commit = {hash:'a'.repeat(40), category:'fixed', summary:'<script>อธิบายเป็นข้อความ</script>'};
+    const withCommits = setup([{...item('deployed'), commits:[commit]}]);
+    await withCommits.window.eofficeSystemUpdates.load();
+    vm.runInContext(pageSource, withCommits.context);
+    await new Promise(resolve=>setImmediate(resolve));
+    const details = withCommits.node('updates-list').children[0].children.at(-1);
+    assert.equal(details.children[0].textContent, 'รายละเอียดแต่ละ commit (1 รายการ)');
+    const row = details.children[1].children[0];
+    assert.equal(row.children[0].textContent, 'aaaaaaa');
+    assert.equal(row.children[0].title, commit.hash);
+    assert.equal(row.children[1].textContent, ` — ${commit.summary}`, 'commit summaries render as plain text');
+    for (const invalidCommit of [{...commit, hash:'bad'}, {...commit, summary:''}, {...commit, category:'unknown'}, null]) {
+        const malformed = setup([{...item('bad-commit'), commits:[invalidCommit]}]);
+        await assert.rejects(malformed.window.eofficeSystemUpdates.load());
+    }
+    console.log('PASS per-commit details, safe text and invalid commit metadata rejection');
 
     const shared=new Map(), marker='eoffice:system-updates:read:1:"v2"';
     const tabA=setup([item('v1')],false,shared), tabB=setup([item('v2','2026-02-01')],false,shared);

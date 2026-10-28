@@ -36,6 +36,19 @@
                     for (const text of item[key]) bullets.append(make('li', '', text));
                     section.append(make('h3', '', label), bullets); card.append(section);
                 }
+                if (item.commits?.length) {
+                    const details = make('details', 'update-commits');
+                    const bullets = make('ul', '');
+                    for (const commit of item.commits) {
+                        const row = make('li', '');
+                        const hash = make('code', '', commit.hash.slice(0, 7));
+                        hash.title = commit.hash;
+                        row.append(hash, make('span', '', ` — ${commit.summary}`));
+                        bullets.append(row);
+                    }
+                    details.append(make('summary', '', `รายละเอียดแต่ละ commit (${item.commits.length} รายการ)`), bullets);
+                    card.append(details);
+                }
                 return card;
             });
             list.replaceChildren(...cards);

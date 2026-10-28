@@ -6,6 +6,25 @@
 
 ## เพิ่มรายการ
 
+### ทุกครั้งที่ deploy
+
+ต้องตรวจ commit และ diff ของงานที่นำขึ้นจริง แล้วเขียนสรุปภาษาไทยที่ผู้ใช้เข้าใจได้ บันทึกหลัง deploy และตรวจสอบสำเร็จเท่านั้น การ commit/push ยังไม่นับว่า deploy แล้ว
+
+1. เตรียมรายการจากช่วง commit ที่นำขึ้นจริง:
+   `node scripts/release-updates.cjs prepare --from <commit-ก่อนหน้า> --to <commit-ที่-deploy> --output <notes.json>`
+   หรือ release เฉพาะส่วนใช้ `prepare --commits <hash1,hash2> --output <notes.json>` โดยเลือกเฉพาะ commit ที่ deploy จริง
+2. ตรวจ `subject`, `paths` และ `git show <hash>` ของแต่ละรายการ เติม `title`, `summary` ของ release และ `summary`, `category` ของ **ทุก commit** (`added`, `improved`, `fixed`) อย่าใส่รายละเอียดภายในหรือข้อมูลส่วนบุคคลในคำอธิบาย ไฟล์ draft ใช้ตรวจงานเท่านั้น ไม่ต้องเผยแพร่
+3. หลัง deploy และตรวจระบบผ่าน รัน:
+   `node scripts/release-updates.cjs record --notes <notes.json> --deployed-at 2026-10-28T14:30:00+07:00`
+   ใช้เวลาที่ deploy จริง เครื่องมือเพิ่มรายการโดยเก็บประวัติเดิม วันที่แสดงใช้เขตเวลาไทย และใช้เวลา deploy เป็น ID เพื่อเรียงรอบวันเดียวกันได้
+4. เผยแพร่ `data/system-updates.json` พร้อมตรวจว่าหน้า `index.php?view=updates` แสดงรายการและรายละเอียดแต่ละ commit ตรงกับ release จริง บันทึกไฟล์ประวัติใน source ด้วย หากเผยแพร่ประวัติไม่สำเร็จให้ทำขั้นตอนนี้ให้ครบก่อนรายงานว่า deploy เสร็จ
+
+หน้าเว็บสรุปตามหมวดและมีส่วนพับได้ “รายละเอียดแต่ละ commit” แสดงรหัสอ้างอิงกับคำอธิบายที่ตรวจแล้ว ไม่ดึง Git จาก production และไม่เผยแพร่ commit message/รายชื่อไฟล์โดยอัตโนมัติ รายการเดิมที่ไม่มี `commits` ยังแสดงได้ตามปกติ
+
+รันทดสอบเครื่องมือด้วย `node tests/release-updates.cjs`
+
+### รูปแบบข้อมูล
+
 เพิ่ม object ใน array ของไฟล์ JSON โดยใช้ `id` ไม่ซ้ำและคงเดิมหลังเผยแพร่:
 
 ```json
