@@ -8,7 +8,7 @@
         try {
             await OneSignal.init({appId, notifyButton:{enable:true}});
             const subscription = OneSignal.User.PushSubscription;
-            let saved = null, pending = false, queued = false, retry = null, failures = 0, previousId = null;
+            let saved = null, pending = false, queued = false, retry = null, failures = 0, previousId = null, sessionEpoch = 0;
             const sync = async () => {
                 if (pending) { queued = true; return; }
                 const state = window.eofficeSessionState;
@@ -19,6 +19,7 @@
                 previousId = id;
                 const active = Boolean(subscription.id && subscription.optedIn);
                 const key = `${owner}:${id}:${active}`;
+                const epoch = sessionEpoch;
                 if (saved === key) return;
                 pending = true;
                 if (retry !== null) { clearTimeout(retry); retry = null; }
@@ -33,7 +34,7 @@
                     });
                     const data = await response.json();
                     if (!response.ok || data.status !== 'success') throw new Error('Subscription registration failed');
-                    if (window.eofficeSessionState?.status === 'authenticated' && window.eofficeSessionState.user?.id === owner) saved = key;
+                    if (sessionEpoch === epoch && window.eofficeSessionState?.status === 'authenticated' && window.eofficeSessionState.user?.id === owner) saved = key;
                     failures = 0;
                 } catch (error) {
                     console.warn('Unable to register push notifications', error);
@@ -45,11 +46,22 @@
                 }
             };
             subscription.addEventListener('change', sync);
-            window.addEventListener('eoffice:session-updated', sync);
+            window.addEventListener('eoffice:session-updated', () => { sessionEpoch++; saved = null; return sync(); });
             window.addEventListener('online', sync);
             await sync();
         } catch (error) {
             console.warn('Unable to initialize push notifications', error);
+            // OneSignal locks init() before awaiting network setup, including
+            // failed attempts. A new page is required; never reload over edits
+            // automatically or call init() again in this document.
+            const retryButton = document.createElement('button');
+            retryButton.type = 'button';
+            retryButton.textContent = 'โหลดหน้าใหม่เพื่อเชื่อมต่อการแจ้งเตือน';
+            retryButton.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:10000;padding:12px;border:1px solid #fff;border-radius:8px;background:#4338ca;color:white;max-width:calc(100vw - 32px)';
+            retryButton.addEventListener('click', () => {
+                if (window.confirm('ต้องโหลดหน้าใหม่เพื่อเชื่อมต่อการแจ้งเตือน กรุณาบันทึกงานที่กำลังแก้ไขก่อน ต้องการโหลดหน้าใหม่หรือไม่?')) location.reload();
+            });
+            document.body.appendChild(retryButton);
         }
     });
 })();

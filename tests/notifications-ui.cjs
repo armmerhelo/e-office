@@ -3,18 +3,21 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync('assets/notifications.js','utf8');
 function setup({mock=false,hostname='e-office.example',appId='configured-app-id',user=null}={}) {
-    const events = new Map(), requests = [], warnings = [];
+    const events = new Map(), requests = [], warnings = [], buttons = [];
+    let reloads=0, confirmReload=false;
     const window = {
         EOFFICE_MOCK_SERVICES:mock, EOFFICE_PUSH_APP_ID:appId,
         eofficeSessionState:{status:user?'authenticated':'pending',user},
-        addEventListener:(name,fn)=>events.set(name,fn)
+        addEventListener:(name,fn)=>events.set(name,fn),
+        removeEventListener:(name,fn)=>{if(events.get(name)===fn)events.delete(name);}
     };
-    let fail = false, init, held = null;
+    window.confirm=()=>confirmReload;
+    let fail = false, init, held = null, initFailures = 0, initCalls = 0;
     const timers = [];
     const subscription = {id:'subscription-id',optedIn:true,addEventListener:(name,fn)=>events.set('push:'+name,fn)};
     vm.runInNewContext(source, {
-        window, location:{hostname}, URL, AbortController,
-        document:{currentScript:{src:'https://e-office.example/office/assets/notifications.js?v=1'}},
+        window, location:{hostname,reload:()=>{reloads++;}}, URL, AbortController,
+        document:{currentScript:{src:'https://e-office.example/office/assets/notifications.js?v=1'},body:{appendChild:b=>buttons.push(b)},createElement:()=>({style:{},addEventListener(name,fn){this[name]=fn;}})},
         console:{warn:(...args)=>warnings.push(args)},
         setTimeout:fn=>{timers.push(fn);return timers.length;},clearTimeout:()=>{},
         fetch:async (url,options)=>{
@@ -24,10 +27,12 @@ function setup({mock=false,hostname='e-office.example',appId='configured-app-id'
         }
     });
     return {window,requests,warnings,subscription,
-        start:async()=>window.OneSignalDeferred[0]({init:async options=>{init=options;},User:{PushSubscription:subscription}}),
+        start:async()=>window.OneSignalDeferred[0]({init:async options=>{init=options;initCalls++;if(initFailures-->0)throw Error('SDK unavailable');},User:{PushSubscription:subscription}}),
         session:async(status,user=null)=>{window.eofficeSessionState={status,user};await events.get('eoffice:session-updated')();},
         change:async()=>events.get('push:change')(), fail:value=>{fail=value;}, timers,
-        hold:promise=>{held=promise;},get init(){return init;}
+        hold:promise=>{held=promise;},get init(){return init;},
+        failInit:count=>{initFailures=count;},get initCalls(){return initCalls;},
+        online:async()=>events.get('online')?.(),buttons,get reloads(){return reloads;},confirmReload:value=>{confirmReload=value;}
     };
 }
 (async()=>{
@@ -57,6 +62,19 @@ function setup({mock=false,hostname='e-office.example',appId='configured-app-id'
     assert.equal(concurrent.requests.length,2,'in-flight changes are serialized and replayed');
     assert.equal(concurrent.requests.at(-1).body._expected_owner,22);
     assert.equal(concurrent.requests.at(-1).body.target_Id,'changed-while-pending');
+    const sameOwner=setup({user:{id:21}});let finish;
+    sameOwner.hold(new Promise(resolve=>{finish=resolve;}));
+    const oldRequest=sameOwner.start();await new Promise(resolve=>setImmediate(resolve));
+    await sameOwner.session('pending');await sameOwner.session('authenticated',{id:21});
+    finish();await oldRequest;
+    assert.equal(sameOwner.requests.length,2,'old same-owner response must not suppress registration for the refreshed session');
+    const recovering=setup({user:{id:21}});recovering.failInit(1);await recovering.start();
+    assert.equal(recovering.requests.length,0);
+    await recovering.online();assert.equal(recovering.initCalls,1,'SDK single-init lock is respected even after failure');
+    assert.equal(recovering.buttons.length,1,'failed init exposes actionable recovery');
+    assert.equal(recovering.reloads,0,'failure never automatically discards edits');
+    recovering.buttons[0].click();assert.equal(recovering.reloads,0,'cancel preserves current page');
+    recovering.confirmReload(true);recovering.buttons[0].click();assert.equal(recovering.reloads,1,'confirmed recovery reloads a fresh SDK instance');
     const ready=setup({user:{id:14}});await ready.start();assert.equal(ready.requests.length,1,'session ready before SDK also registers');
     for(const options of [{mock:true},{hostname:'localhost'},{hostname:'127.0.0.1'},{hostname:'[::1]'},{appId:''}]) {
         assert.equal(setup(options).window.OneSignalDeferred,undefined);

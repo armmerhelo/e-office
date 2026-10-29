@@ -55,6 +55,14 @@ try{
     $id=job($payload+['delivery'=>['mail'=>['status'=>'success','attempts'=>1],'push'=>['status'=>'sending','attempts'=>1,'first_attempt_at'=>time()-31*86400]]]);
     app_process_notifications(100,['mail'=>static fn()=>true,'push'=>static function()use(&$push){$push++;return 'success';}]);
     verify($push===0&&state($id)['status']==='manual','expired provider idempotency window never causes an automatic resend');
+    $pdo->exec('DELETE FROM eoffice_outbox');$push=0;$id=job($payload);
+    app_process_notifications(100,['mail'=>static function()use($pdo,$docId,$recipient){$pdo->prepare('DELETE FROM t_access_rights WHERE Doc_Id=? AND User_Id=?')->execute([$docId,$recipient]);return true;},'push'=>static function()use(&$push){$push++;return 'success';}]);
+    $row=state($id);verify($push===0&&$row['payload']['delivery']['mail']['status']==='success'&&$row['payload']['delivery']['push']['status']==='skipped'&&$row['payload']['delivery']['push']['attempts']===0,'access revoked during SMTP prevents push without losing accepted mail result');
+    $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,'',0)")->execute([$recipient,$docId]);
+    $pdo->exec('DELETE FROM eoffice_outbox');$push=0;$id=job($payload);
+    app_process_notifications(100,['mail'=>static function()use($pdo,$docId){$pdo->prepare("UPDATE t_document SET Is_Delete='delete' WHERE Doc_Id=?")->execute([$docId]);return true;},'push'=>static function()use(&$push){$push++;return 'success';}]);
+    verify($push===0&&state($id)['payload']['delivery']['push']['status']==='skipped','document deleted during SMTP prevents push');
+    $pdo->prepare("UPDATE t_document SET Is_Delete='active' WHERE Doc_Id=?")->execute([$docId]);
     $pdo->exec('DELETE FROM eoffice_outbox');
     $pdo->prepare('DELETE FROM t_access_rights WHERE Doc_Id=? AND User_Id=?')->execute([$docId,$recipient]);
     $id=job($payload);$mail=0;

@@ -119,7 +119,17 @@ function app_document_notification(int $id,array $payload,?array $transports=nul
                     unset($state['error_class']);$payload['delivery'][$channel]=$state;app_outbox_progress($id,$payload);$pdo->commit();
                 }catch(Throwable $error){if($pdo->inTransaction())$pdo->rollBack();throw $error;}
             }else{
-                $result=($transports['push']??'app_push')($userId,$docId,(string)$title,$url,$payload['idempotency_key']);
+                // SMTP can take seconds. Re-read the document and current role/
+                // grants after it completes, rather than using the initial snapshot.
+                $q=$pdo->prepare("SELECT d.Doc_Name FROM t_document d JOIN t_user u ON u.User_Id=? WHERE d.Doc_Id=? AND d.Is_Delete='active' AND (u.User_Status='Admin' OR d.Doc_Type='External' OR d.User_Id=u.User_Id OR EXISTS(SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=d.Doc_Id AND a.User_Id=u.User_Id) OR EXISTS(SELECT 1 FROM t_access_rights_department a JOIN t_user_department ud ON ud.Department_Id=a.Department_Id WHERE a.Doc_Id=d.Doc_Id AND ud.User_Id=u.User_Id))");
+                $q->execute([$userId,$docId]);$pushTitle=$q->fetchColumn();
+                if($pushTitle===false){
+                    $state['status']='skipped';$state['reason']='access_revoked_or_document_unavailable';
+                    $state['attempts']=max(0,$state['attempts']-1);
+                    if(!$state['attempts'])unset($state['first_attempt_at']);
+                    $payload['delivery'][$channel]=$state;app_outbox_progress($id,$payload);continue;
+                }
+                $result=($transports['push']??'app_push')($userId,$docId,(string)$pushTitle,$url,$payload['idempotency_key']);
                 if(!in_array($result,['success','skipped'],true))throw new RuntimeException('Invalid push result');
                 $state['status']=$result;
             }
