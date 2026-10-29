@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## จุดแดงของหนังสือรอลงนาม — 29 ตุลาคม 2026
+
+- เผยแพร่ **2 runtime files** (`api/document_list.php`, `assets/api-service.js`) จาก `f4f0988e19d6aa0778277dd92673e7a1b69d6299` เวลา **2026-10-29 15:45:54 +07:00** หลังเทียบซอร์สเดิมและสำรองซอร์ส/ฐานข้อมูล ใช้ maintenance gate ชั่วคราวระหว่างติดตั้ง คืน `.htaccess` เดิมและ invalidate PHP opcache ไม่เปลี่ยน schema หรือ private configuration
+- จุดแดงในรายการหนังสือส่งถึงยึดสถานะลงนามของผู้รับแต่ละคน ไม่หายเมื่อเปิดอ่านหรือโหลดรายการใหม่ และไม่แสดงบนหนังสือที่ลงนามแล้วแม้ดูในหมวดทั้งหมด โดยยังบันทึกสถานะการอ่านตามเดิม
+- Local integration **49 checks** และ regression จุดแดงทั้งสถานะอ่าน/ลงนามและตัวกรองผ่าน; syntax PHP **154** / JS-CJS **87** / inline **23** ผ่าน Production HTTP smoke **13 checks** ผ่าน รวม signing flag ก่อน/หลังเปิดอ่านและลงนาม โดยลบข้อมูลสังเคราะห์ครบและไม่ส่งอีเมลหรือ Push จริง
+- Chromium production **8 checks ผ่าน**: เปิดอ่านแล้วจุดยังอยู่, โหลดรายการใหม่แล้วยังคงจุด, หมวดทั้งหมดแยกเซ็นแล้ว/ยังไม่เซ็น, หมวดลงนามแล้วไม่มีจุด, feed ตรง reviewed commit, หน้าอัปเดตขนาด **390/320px**, ไม่มี uncaught JavaScript exception ลบบัญชีและเอกสารทดสอบครบ
+- เผยแพร่และตรวจประวัติบน production ทั้ง JSON และหน้าอัปเดต Release ID **`deploy-20261029T084554000Z`** รักษาประวัติเดิมครบ ตรวจ checksum ของไฟล์ runtime ตรงและไม่มี temporary deployment helpers
+
 ## หนังสือรอดำเนินการและ Push follow-up — 29 ตุลาคม 2026
 
 - เผยแพร่ **8 runtime files** จาก `f08145a86ed59747a94ed1d0e55f599eb15e7b51`, `8669cd8cd832942246c17338643e53482d04cafb` และ `b8f3792b4b3f571349a7aaf062483d3603ae37c1` เวลา **2026-10-29 15:27:05 +07:00** หลังเทียบ production กับเวอร์ชันก่อนหน้า สำรองซอร์ส/ฐานข้อมูล และติดตั้งแบบ atomic ภายใต้ maintenance gate ชั่วคราว คืน `.htaccess` เดิมและ invalidate PHP opcache แล้ว ไม่แก้ private configuration หรือเพิ่ม migration
