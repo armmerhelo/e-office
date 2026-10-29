@@ -1,5 +1,15 @@
 # Production deployment — E-Office
 
+## หนังสือรอดำเนินการและ Push follow-up — 29 ตุลาคม 2026
+
+- เผยแพร่ **8 runtime files** จาก `f08145a86ed59747a94ed1d0e55f599eb15e7b51`, `8669cd8cd832942246c17338643e53482d04cafb` และ `b8f3792b4b3f571349a7aaf062483d3603ae37c1` เวลา **2026-10-29 15:27:05 +07:00** หลังเทียบ production กับเวอร์ชันก่อนหน้า สำรองซอร์ส/ฐานข้อมูล และติดตั้งแบบ atomic ภายใต้ maintenance gate ชั่วคราว คืน `.htaccess` เดิมและ invalidate PHP opcache แล้ว ไม่แก้ private configuration หรือเพิ่ม migration
+- หนังสือส่งถึงยังอยู่ใน **รอดำเนินการ** หลังเปิดอ่าน และย้ายไป **ลงนามแล้ว** ตามการลงนามของผู้รับแต่ละคน ป้องกันบันทึกโดยไม่มีลายเส้น/ตราประทับ รวมถึงแก้ refresh หลังกลับจากหน้าเซ็นและหน้าสุดท้ายที่ว่าง ผู้ที่เปิดหน้าเซ็นค้างก่อน release ต้องโหลดใหม่ก่อนบันทึก
+- Push ตรวจสิทธิ์หนังสืออีกครั้งหลัง SMTP ก่อนส่ง ลงทะเบียนอุปกรณ์ใหม่เมื่อ session เปลี่ยน และแสดงทางเลือกโหลดหน้าใหม่เมื่อ SDK เชื่อมต่อไม่สำเร็จ โดยไม่ reload ทับงานอัตโนมัติ
+- `npm.cmd test` ผ่านครบ รวม integration **48**, document races **12**, notification queue **19**, sign routing **18**, signing concurrency **6**, syntax PHP **154** / JS-CJS **87** / inline **23** และชุดอื่นทั้งหมด
+- Production HTTP smoke **13 กลุ่มผ่าน**: สิทธิ์ inbox, เปิดอ่านแล้วยังค้าง, PDF/revision, missing intent/no-op save, บันทึกสำเร็จ, แยกผู้รับ, stale revision, อ่านซ้ำ, filter labels และ logout; Push registration smoke **9 checks ผ่าน** ครอบคลุม HttpOnly/session/device isolation/opt-out/account switch โดยไม่ส่งอีเมลหรือแจ้งเตือนจริง
+- Chromium production **6 checks ผ่าน**: ตัวกรองรอดำเนินการ/ลงนามแล้ว, feed ที่มี 3 reviewed commits, layout หน้าอัปเดต **390/320px**, ไม่มี uncaught JavaScript exception ลบเฉพาะบัญชี/เอกสาร/PDF/สิทธิ์/registry/Log สังเคราะห์ครบ โดยกัน archive workers ระหว่างอายุ fixture เพื่อไม่ส่งไฟล์ทดสอบไป Drive
+- เผยแพร่ feed และตรวจทั้ง public JSON กับหน้า `index.php?view=updates` แล้ว Release ID **`deploy-20261029T082705000Z`** รักษาประวัติเดิมครบ ตรวจ SHA-256 runtime ทั้ง 8 paths ตรงทั้งหมดและไม่มี temporary deployment helpers
+
 ## Push notification registration — 28 October 2026
 
 - Published the **8 runtime files** from `6dc2343b2454791e918210515aa9652dc337e5ae`, after verifying the previous production bytes against its parent and taking a private source rollback archive. Added only `eoffice_push_subscriptions`; the legacy registry and all existing document/outbox data remain unchanged.
