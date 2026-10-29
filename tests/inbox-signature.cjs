@@ -8,7 +8,7 @@ const vm = require('node:vm');
         nodes.set(id, {style: {}, textContent: '20', innerHTML: ''});
     }
     const stored = new Map([['read_status_change', 'NotRead'], ['currentPage', 'received']]);
-    const opened = {doc_id: 42, status: 'NotRead', Is_Signed: 'false'};
+    const opened = {doc_id: 42, status: 'NotRead', is_signed: false};
     const requests = [];
     let listResponse = () => [];
     const context = vm.createContext({
@@ -25,8 +25,22 @@ const vm = require('node:vm');
     await context.update_read_status(42, '', 'received');
     assert.equal(requests.length, 1, 'opening must not refetch/remove the pending item');
     assert.equal(opened.status, 'Readed', 'reading is still tracked independently');
-    assert.equal(opened.Is_Signed, 'false', 'reading must not complete signing');
-    assert.equal(nodes.get('doc_status_42').style.display, 'none', 'read indicator still clears');
+    assert.equal(opened.is_signed, false, 'reading must not complete signing');
+    assert.notEqual(nodes.get('doc_status_42').style.display, 'none', 'pending signature dot must survive opening');
+    for (const filter of ['NotRead', 'Readed', '']) {
+        stored.set('read_status_change', filter);
+        context.window.innerWidth = 390;
+        for (const status of ['NotRead', 'Readed']) {
+            for (const signed of [false, true]) {
+                listResponse = () => [{doc_id: 42, status, is_signed: signed, Pagination: 1, Total_Records: 1}];
+                await context.get_data_api_received(1);
+                assert.equal(nodes.get('loop_receive').innerHTML.includes('id="doc_status_42"'), !signed, `${filter}/${status}/${signed}`);
+                if (!signed) assert.ok(nodes.get('loop_receive').innerHTML.includes('aria-label="รอลงนาม"'));
+            }
+        }
+    }
+    context.window.innerWidth = 1400;
+    listResponse = () => [];
     for (const [filter, message] of [['NotRead', 'ไม่มีหนังสือรอดำเนินการ'], ['Readed', 'ไม่มีหนังสือที่ลงนามแล้ว'], ['', 'ไม่พบข้อมูล']]) {
         stored.set('read_status_change', filter);
         await context.get_data_api_received(1);
@@ -58,5 +72,5 @@ const vm = require('node:vm');
     context.read_status_change('NotRead');assert.equal(nodes.get('sub_head').innerHTML, 'รอดำเนินการ');
     context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ลงนามแล้ว');
     context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
-    console.log('PASS inbox filters: reading preserves pending work, separate read indicator, signing labels, empty states and counters');
+    console.log('PASS inbox filters: pending dots survive reading and reload, signed dots disappear, all filters/read states, signing labels, empty states and counters');
 })().catch(error => { console.error(error); process.exitCode = 1; });

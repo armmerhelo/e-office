@@ -38,6 +38,7 @@ function document_list(string $mode): never {
     $rows=[];foreach($documents as $doc){$a=$access[$doc['Doc_Id']][$uid]??[];$recipients=[];$i=0;foreach($access[$doc['Doc_Id']]??[] as $recipient)$recipients[]=[$i++=>['user_id'=>$recipient['User_Id'],'user_name'=>$recipient['User_Name'],'user_status'=>$recipient['Status'],'date'=>$recipient['Date'],'Is_Signed'=>$recipient['Is_Signed']]];
       $row=[];foreach(['Doc_Id','Doc_Number','Doc_Year','Doc_Name','Doc_Url_Name','Doc_Url','Doc_Type','Doc_Date','Doc_Date_Update','Doc_Number_Receive','Doc_Date_Receive','Doc_Receive_From','Doc_Action','Doc_Other','Doc_File_Link','External_Number'] as $key)$row[strtolower($key)]=$doc[$key];
       $row+=['send_from'=>$doc['owner_name'],'status'=>$mode==='received'?($a['Status']??'NotRead'):$doc['Status'],'status_read'=>$a['Status']??null,'status_urgent'=>$doc['Status'],'date'=>$a['Date']??$doc['Doc_Date_Update'],'doc_number_receive_stamp'=>$a['Stamp_Recieve_Number']??'','doc_date_receive_stamp'=>$a['Stamp_Date_Recieve']??'','doc_upload_path'=>$files[$doc['Doc_File_Link']]??[],'Pagination'=>$pages,'Total_Records'=>$total,'user_send_to'=>[$recipients],'department_id'=>$groups[$doc['Doc_Id']]??[]];
+      if($mode==='received')$row['is_signed']=($a['Is_Signed']??'false')==='true';
       if($mode==='public')$row['doc_date']=$doc['Doc_Date_Receive'];if($stamp)$row['doc_date']=$a['Date']??$doc['Doc_Date'];$rows[]=$row;
     }
     app_json($rows);

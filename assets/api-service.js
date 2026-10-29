@@ -268,13 +268,8 @@ ${escapeHtml(data[i]['doc_date'])}
       header_color = 'bg-gray-200';
   }
 
-  if (data[i]['status'] == 'NotRead') {
-       doc_status = `<span id="doc_status_${docId}" class="flex items-center w-full"><span class="w-4 h-4 bg-red-500 rounded-full ml-auto"></span></span>`;
-  }else if (data[i]['status'] == 'Readed') {
-    doc_status = ``;
-  } else {
-     doc_status = `<span id="doc_status_${docId}" class="flex items-center w-full"><span class="w-4 h-4 bg-red-500 rounded-full ml-auto"></span></span>`;
-  }
+  // The red dot represents pending signing, independently of read status.
+  doc_status = data[i]['is_signed'] === true ? '' : `<span id="doc_status_${docId}" class="flex items-center w-full" role="img" aria-label="รอลงนาม" title="รอลงนาม"><span class="w-4 h-4 bg-red-500 rounded-full ml-auto"></span></span>`;
 
   var text_add = `
   <a onclick="view_doc_detail(${docId},'received')" >
@@ -1220,20 +1215,13 @@ async function update_read_status(doc_id, user_token, type) {
             const openedDoc = data_save.find((item) => String(item.doc_id) === String(doc_id));
             if (openedDoc) openedDoc.status = 'Readed';
 
-            let doc_id_text = 'doc_status_' + doc_id;
             let tb_status_read = 'tb_status_read_' + doc_id;
-            if (document.getElementById(doc_id_text)) {
-                console.log("✅ บันทึกสถานะการอ่านสำเร็จ!");
-
-                console.log('doc_id_text : ' + doc_id_text);
-                document.getElementById(doc_id_text).style.display = 'none';
-
-            }else if (document.getElementById(tb_status_read)) {
+            if (document.getElementById(tb_status_read)) {
               document.getElementById(tb_status_read).classList.remove("bg-gray-200");
               console.log("✅ บันทึกสถานะการอ่านสำเร็จ!" + tb_status_read );
             }
 
-            // Opening only updates read indicators; it must not remove pending signing work.
+            // Opening only updates read styling; pending-signature dots stay visible.
 
 
         } else {

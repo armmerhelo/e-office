@@ -67,11 +67,12 @@ async function run(){
   async function inboxSignature(cookie, signed, expected) {
     const result=await request('/api/get_data_received.php',{cookie,data:{Year:'2569',Doc_Id:doc,Read_Status_find:signed?'Readed':'NotRead'}});
     assert.equal(result.body.some(row=>row.doc_id===doc),expected);
+    if(expected)assert.equal(result.body.find(row=>row.doc_id===doc).is_signed,signed,'current recipient signing flag');
   }
   await test('opening keeps the document pending and out of signed inbox',async()=>{
     await inboxSignature(recipient,false,true);await inboxSignature(recipient,true,false);
     const all=await request('/api/get_data_received.php',{cookie:recipient,data:{Year:'2569',Doc_Id:doc}});
-    assert.equal(all.body[0].status,'Readed');assert.equal(all.body[0].Total_Records,1);
+    assert.equal(all.body[0].status,'Readed');assert.equal(all.body[0].is_signed,false);assert.equal(all.body[0].Total_Records,1);
   });
   await test('missing signing intent and unchanged PDF cannot complete pending work',async()=>{
     const current=await request(`/api/view_file.php?Doc_Id=${doc}&File_Path=${fileName}&Type=signed`,{cookie:recipient});
@@ -133,6 +134,11 @@ async function run(){
  await test('private static paths blocked',async()=>{for(const path of ['/email_send/User_Data.json','/config/config.php']){const result=await request(path,{status:remote?[403,302]:403});if(result.r.status===302)assert.equal(new URL(result.r.headers.get('Location'),base).port,'2222','Only hosting access-denied redirect is accepted');}});
  await test('outbox worker records mocked SMTP/push',async()=>{cli('scripts/notifications.php');const rows=inspect('outbox','');assert.ok(rows.some(r=>r.payload.type==='mail'&&r.payload.email==='qa-recipient@siya.ac.th'));assert.ok(rows.some(r=>r.payload.type==='push'&&r.payload.user_id===seed.users.recipient));assert.ok(rows.some(r=>r.payload.type==='drive_image'));});
  await test('logout revokes server session and returns JSON only',async()=>{const r=await request('/api/logout.php',{cookie:owner,data:{}});assert.equal(r.body.status,'success');await request('/api/get_data_send.php',{cookie:owner,data:{Year:2569},status:401});});
+  await test('public orders never expose the current recipient signing flag',async()=>{
+    const result=await request('/api/get_data_public.php',{data:{Year:'2569',search_txt:values.doc_number}});
+    assert.ok(result.body.length>0);
+    for(const row of result.body)assert.equal(Object.hasOwn(row,'is_signed'),false);
+  });
   await test('group-only recipient stays pending before and after opening',async()=>{
     await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
     await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc}});
