@@ -340,7 +340,6 @@ window.addEventListener('load', function() {
               <button id="received-all-filter" type="button" class="menu-item pt-1 pr-2 pl-2" aria-pressed="false" onclick="read_status_change('','load');">
                 <span class="block text-sm">ทั้งหมด</span>
               </button>
-              <span id="received-filter-description" class="w-full text-xs text-gray-500" aria-live="polite">ส่งถึงก่อน 31 ต.ค. 2569: อ่านแล้วถือว่าเสร็จ • ตั้งแต่วันนั้น: ต้องลงนามหรือประทับตราและบันทึก • จุดแดง = รอดำเนินการ</span>
               <div class="p-1">
 
               </div>

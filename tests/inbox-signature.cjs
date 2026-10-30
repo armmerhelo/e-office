@@ -128,7 +128,8 @@ const vm = require('node:vm');
     const main = fs.readFileSync('assets/main.js', 'utf8');
     vm.runInContext(main.slice(main.indexOf('function restoreReceivedFilter('), main.indexOf('function read_show(')), context);
     nodes.set('sub_head', {});
-    nodes.set('received-filter-description', {});
+    assert.equal(fs.readFileSync('index.php','utf8').includes('received-filter-description'),false,'category explanation is not displayed');
+    assert.equal(main.includes('received-filter-description'),false,'filter switching cannot restore the removed explanation');
     for (const id of ['received-pending-filter', 'received-signed-filter', 'received-all-filter']) {
         const classes = new Set();
         nodes.set(id, {classList:{add:name=>classes.add(name),remove:name=>classes.delete(name),contains:name=>classes.has(name)},setAttribute(name,value){this[name]=value;}});
@@ -148,7 +149,6 @@ const vm = require('node:vm');
     context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ดำเนินการแล้ว');
     context.read_status_change('');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
     assert.equal(nodes.get('received-all-filter')['aria-pressed'],'true');
-    assert.ok(nodes.get('received-filter-description').textContent.includes('31 ต.ค. 2569'));
     stored.set('read_status_change','Readed');
     listResponse=()=>[{doc_id:43,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}];
     await context.get_data_api_received(1);
