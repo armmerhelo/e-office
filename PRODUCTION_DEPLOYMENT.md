@@ -1,5 +1,12 @@
 # Production deployment — E-Office
 
+## นำคำอธิบายใต้หมวดหนังสือออก — 30 ตุลาคม 2026
+
+- เผยแพร่ `assets/main.js` และ `index.php` จาก `c1795622f881b1fd2bb4db20a34af3eb7212b6b5` เวลา **2026-10-30 13:08:03 +07:00** ตรวจ diff/ซอร์สเดิมและสำรองไฟล์ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache เรียบร้อย ไม่เปลี่ยนฐานข้อมูลหรือกติกาการนับสถานะ
+- นำข้อความคำอธิบายใต้ปุ่มสามหมวดออกจาก HTML และโค้ดเปลี่ยนหมวด จึงไม่กลับมาแสดงเมื่อเลือกหมวดอื่น ปุ่ม สถานะ จุดแดง และเกณฑ์หนังสือเก่า/ใหม่คงเดิม
+- Inbox regression และ syntax ผ่าน Chromium production ก่อนเผยแพร่ประวัติ **11 checks** และหลังเผยแพร่ **12 checks** ผ่าน ยืนยันไม่มีคำอธิบายใน pending/completed, การกรอง/legacy read/new unsigned/Back/storage/deep link/503-retry, มือถือ **390/320px** และไม่มี uncaught JavaScript exception ลบข้อมูลสังเคราะห์ครบ ไม่ส่งอีเมลหรือ Push
+- เผยแพร่และตรวจหน้าอัปเดตพร้อม exact deployed commit เรียบร้อย Release ID **`deploy-20261030T060803000Z`** ตรวจ checksum runtime ตรงทั้งสองไฟล์และไม่มี deployment helpers ตกค้าง
+
 ## เกณฑ์หนังสือเก่า/ใหม่ตามเวลาส่งถึงผู้รับ — 30 ตุลาคม 2026
 
 - เผยแพร่ **11 runtime paths** จาก `ce7c51e041cf354f5e52706a8f20a7499c3bc8ff` และ `e29fb4602d9aaca6ac82d4b0cc205054f22b5c39` เวลา **2026-10-30 12:17:19 +07:00** ก่อนจุดตัด **31 ต.ค. 2569 เวลา 00:00 Asia/Bangkok** ตรวจ production เทียบแหล่งเดิม สำรองซอร์สและฐานข้อมูลครบ **42 ตาราง** พร้อมตรวจ JSON/จำนวนแถว/SHA-256 ก่อนติดตั้งผ่าน atomic replacement ภายใต้ maintenance gate และ invalidate PHP opcache คืน `.htaccess` เดิมเรียบร้อย ไม่แก้ private configuration
