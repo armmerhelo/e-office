@@ -3,6 +3,16 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 (async () => {
+    const deleteButton={style:{},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];}};
+    const deleteContext=vm.createContext({document:{getElementById:()=>deleteButton}});
+    const utils=fs.readFileSync('assets/utils.js','utf8');
+    vm.runInContext(utils.slice(utils.indexOf('function syncDocumentDeleteButton('),utils.indexOf('function edit_doc(')),deleteContext);
+    for(const row of [{doc_id:1,can_delete:true},{doc_id:2,can_delete:false},{doc_id:3,can_delete:true},{doc_id:4},{doc_id:5,can_delete:'true'},undefined,{doc_id:'bad',can_delete:true}]){
+        deleteContext.syncDocumentDeleteButton(row);
+        const allowed=row?.can_delete===true&&Number.isSafeInteger(Number(row.doc_id))&&Number(row.doc_id)>0;
+        assert.equal(deleteButton.style.display,allowed?'block':'none');
+        assert.equal(deleteButton.onclick,allowed?`delete_doc(${Number(row.doc_id)})`:undefined,'non-owners, missing metadata and invalid IDs clear stale handlers');
+    }
     const nodes = new Map();
     for (const id of ['loop_receive', 'content_received', 'load_data', 'doc_status_42', 'All_Doc', 'All_Doc_1', 'All_Doc_2', 'received-retry', 'Pagination', 'Pagination_PREV', 'Pagination_NEXT']) {
         nodes.set(id, {style: {}, textContent: '20', innerHTML: '',dataset:{},classList:{add(){},remove(){}}});

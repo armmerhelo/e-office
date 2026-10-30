@@ -372,10 +372,23 @@ function delete_doc(id) {
 }
 
 
+function syncDocumentDeleteButton(doc) {
+  const button = document.getElementById('delete_doc_btn');
+  if (!button) return;
+  button.removeAttribute('onclick');
+  button.style.display = 'none';
+  const docId = Number(doc?.doc_id);
+  if (doc?.can_delete !== true || !Number.isSafeInteger(docId) || docId <= 0) return;
+  button.setAttribute('onclick', `delete_doc(${docId})`);
+  button.style.display = 'block';
+}
+
 function edit_doc(doc_id) {
-  // เลือกปุ่มด้วย ID
-const deleteBtn = document.querySelector('#delete_doc_btn');
-deleteBtn.setAttribute('onclick', `delete_doc(${doc_id})`);
+  const data_edit = data_save_send.find(
+    (item) => String(item.doc_id) === String(doc_id),
+  );
+  syncDocumentDeleteButton(data_edit);
+  if (!data_edit) return;
 var doc_type_send = localStorage.getItem("doc_type");
 if (doc_type_send == 'Stamp') {
 display_style('addNewInputFile_btn','none');
@@ -421,7 +434,6 @@ display_style('DocDetail_0','none');
 //display_style('data_send_div','grid');
 display_style('file_and_link','block');
 }
-  display_style('delete_doc_btn','block');
   document.getElementById("read_show").style.display = 'block';
   document.getElementById("read_head").style.display = 'block';
  document.getElementById('submit_add_doc').style.display = 'block';
@@ -429,9 +441,6 @@ display_style('file_and_link','block');
   document.getElementById("doc_id").value = doc_id;
 console.log('doc_id : '+doc_id);
   window.toggleModal(true);
-  const data_edit = data_save_send.find(
-    (item) => String(item.doc_id) === String(doc_id),
-  );
 
   if (data_edit.doc_type == 'External') {
     document.getElementById('doc_type').value = 'คำสั่ง';

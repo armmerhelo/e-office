@@ -93,6 +93,11 @@ async function run(){
  await test('recipient cannot modify shared document',async()=>{await request('/api/create_document.php',{cookie:recipient,form:form({formtype:'edit_document',doc_id:doc,doc_name:'ATTACK',doc_type:'คำสั่ง',doc_number_receive_stamp:'123'})});const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.equal(list.body[0].doc_name,'QA landscape document');});
   await test('signed PDF save and stale revision rejected',async()=>{const f=()=>form({Doc_Id:doc,year:2569,revision},{file:{name:fileName,data:Buffer.concat([pdf,Buffer.from('\n% signed\n')])}});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f()});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f(),status:409});});
   await test('successful signature moves only the signer out of pending',async()=>{
+    const stampList=(await request('/api/get_data_send.php',{cookie:recipient,data:{Year:'2569',doc_type:'Stamp',search_txt:values.doc_number}})).body;
+    assert.equal(stampList.find(row=>row.doc_id===doc).can_delete,false,'signing never grants document deletion');
+    await request('/api/api_soft_delete_doc.php',{cookie:recipient,data:{Doc_Id:doc},status:403});
+    const ownerList=(await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:values.doc_number}})).body;
+    assert.equal(ownerList.find(row=>row.doc_id===doc).can_delete,true);
     await inboxSignature(recipient,false,false);await inboxSignature(recipient,true,true);
     await request('/api/update_read_status.php',{cookie:recipient,data:{doc_id:doc}});
     await inboxSignature(recipient,false,false);await inboxSignature(recipient,true,true);
@@ -179,13 +184,15 @@ async function run(){
        const view=await request(`/api/view_file.php?Doc_Id=${created.doc_id}&File_Path=${file}&Type=signed`,{cookie});
        await request('/e-sign/upload_pdf.php',{cookie,form:form({Doc_Id:created.doc_id,year:2569,revision:view.r.headers.get('X-Document-Revision')},{file:{name:file,data:Buffer.concat([pdf,Buffer.from('\n% owner/admin signature\n')])}})});
        const row=inspect('access',created.doc_id)[0];assert.equal(row.Is_Signed,'true');assert.match(row.Inbox_Delivered_At,/^\d{4}-\d{2}-\d{2} /);
+       const stamped=(await request('/api/get_data_send.php',{cookie,data:{Year:'2569',doc_type:'Stamp',search_txt:'OWNER-SIGN-'+index+'-'+stamp}})).body;
+       assert.equal(stamped.find(row=>row.doc_id===created.doc_id).can_delete,true,'owner and Admin retain deletion permission in stamped documents');
      }
    });
    await test('logout revokes server session and returns JSON only',async()=>{const r=await request('/api/logout.php',{cookie:owner,data:{}});assert.equal(r.body.status,'success');await request('/api/get_data_send.php',{cookie:owner,data:{Year:2569},status:401});});
   await test('public orders never expose the current recipient signing flag',async()=>{
     const result=await request('/api/get_data_public.php',{data:{Year:'2569',search_txt:values.doc_number}});
     assert.ok(result.body.length>0);
-    for(const row of result.body)for(const key of ['is_signed','is_completed','requires_signature','completion_reason','inbox_delivery_utc'])assert.equal(Object.hasOwn(row,key),false);
+    for(const row of result.body)for(const key of ['is_signed','is_completed','requires_signature','completion_reason','inbox_delivery_utc','can_delete'])assert.equal(Object.hasOwn(row,key),false);
   });
   await test('group-only recipient stays pending before and after opening',async()=>{
     if(!remote)inspect('inbox_after_cutoff',doc);
