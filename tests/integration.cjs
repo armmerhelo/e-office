@@ -157,7 +157,31 @@ async function run(){
       assert.equal((await filters('Readed'))[0].is_signed,false);
     }
   });
-  await test('logout revokes server session and returns JSON only',async()=>{const r=await request('/api/logout.php',{cookie:owner,data:{}});assert.equal(r.body.status,'success');await request('/api/get_data_send.php',{cookie:owner,data:{Year:2569},status:401});});
+   if(!remote)await test('owner and Admin inspection never creates a grandfathered recipient grant',async()=>{
+     const created=(await request('/api/create_document.php',{cookie:owner,form:form({...values,doc_number:'NO-PATH-'+stamp,doc_file_name:[],file_id:[],send_to:[]})})).body.doc_id;
+     for(const cookie of [owner,admin]){
+       const result=await request('/api/update_read_status.php',{cookie,data:{doc_id:created}});
+       assert.equal(result.body.is_recipient,false);assert.equal(result.body.requires_signature,true);
+     }
+     assert.equal(inspect('access',created).length,0);
+     await request('/api/create_document.php',{cookie:owner,form:form({...values,doc_number:'NO-PATH-'+stamp,formtype:'edit_document',doc_id:created,doc_file_name:[],file_id:[],send_to:[seed.users.owner,seed.users.admin],replace_recipients:1})});
+     inspect('inbox_after_cutoff',created);
+     for(const cookie of [owner,admin]){
+       await request('/api/update_read_status.php',{cookie,data:{doc_id:created}});
+       const rows=(await request('/api/get_data_received.php',{cookie,data:{Doc_Id:created,Read_Status_find:'NotRead'}})).body;
+       assert.equal(rows.length,1);assert.equal(rows[0].requires_signature,true);assert.equal(rows[0].is_completed,false);assert.equal(rows[0].is_signed,false);
+     }
+   });
+   if(!remote)await test('owner and Admin signatures without recipient grants record real signing and a known delivery time',async()=>{
+     for(const [index,cookie] of [owner,admin].entries()){
+       const created=(await request('/api/create_document.php',{cookie:owner,form:form({...values,doc_number:'OWNER-SIGN-'+index+'-'+stamp,send_to:[]},{'doc_upload[]':{name:'owner-sign.pdf',data:pdf}})})).body;
+       const file=created.files.entries[0].path;
+       const view=await request(`/api/view_file.php?Doc_Id=${created.doc_id}&File_Path=${file}&Type=signed`,{cookie});
+       await request('/e-sign/upload_pdf.php',{cookie,form:form({Doc_Id:created.doc_id,year:2569,revision:view.r.headers.get('X-Document-Revision')},{file:{name:file,data:Buffer.concat([pdf,Buffer.from('\n% owner/admin signature\n')])}})});
+       const row=inspect('access',created.doc_id)[0];assert.equal(row.Is_Signed,'true');assert.match(row.Inbox_Delivered_At,/^\d{4}-\d{2}-\d{2} /);
+     }
+   });
+   await test('logout revokes server session and returns JSON only',async()=>{const r=await request('/api/logout.php',{cookie:owner,data:{}});assert.equal(r.body.status,'success');await request('/api/get_data_send.php',{cookie:owner,data:{Year:2569},status:401});});
   await test('public orders never expose the current recipient signing flag',async()=>{
     const result=await request('/api/get_data_public.php',{data:{Year:'2569',search_txt:values.doc_number}});
     assert.ok(result.body.length>0);

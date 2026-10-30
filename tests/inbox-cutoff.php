@@ -15,6 +15,7 @@ try {
     $pdo->exec("INSERT INTO t_document VALUES (1),(2),(3),(4),(5),(6)");
     $pdo->exec("INSERT INTO t_access_rights (User_Id,Doc_Id,Status) VALUES (1,1,'Readed')");
     app_inbox_migrate($pdo);app_inbox_migrate($pdo);
+    check(app_inbox_delivery($pdo,2,1)===false,'No recipient path must not be mistaken for a historical NULL grant');
     check($pdo->query('SELECT Inbox_Delivered_At FROM t_access_rights')->fetchColumn()===null,'Migration must preserve unknown history');
     $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Status,Inbox_Delivered_At) VALUES (1,?,'Readed',?)");
     foreach([2=>'2026-10-30 16:59:59',3=>'2026-10-30 17:00:00',4=>'2026-10-30 17:00:01'] as $id=>$time)$q->execute([$id,$time]);

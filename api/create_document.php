@@ -14,6 +14,7 @@ if(!$canEdit){
  app_document_transaction();$doc=app_locked_document($id,$user);
  $number=app_text($_POST,'doc_number_receive_stamp',20);$date=app_text($_POST,'stamp_date_recieve',20);
  $delivery=app_inbox_delivery($pdo,(int)$user['User_Id'],$id);
+ if($delivery===false)throw new LogicException('Receipt requires an active recipient delivery');
  $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Stamp_Recieve_Number,Stamp_Date_Recieve,Inbox_Delivered_At) VALUES (?,?,'',0,?,?,?) ON DUPLICATE KEY UPDATE Stamp_Recieve_Number=VALUES(Stamp_Recieve_Number),Stamp_Date_Recieve=VALUES(Stamp_Date_Recieve)");
  $q->execute([$user['User_Id'],$id,$number,$date,$delivery]);app_audit('document.receipt',$user,$id);$pdo->commit();app_json(['status'=>'success','message'=>'บันทึกเลขรับของคุณสำเร็จ','doc_id'=>$id]);
 }

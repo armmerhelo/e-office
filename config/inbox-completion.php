@@ -24,10 +24,13 @@ function app_inbox_delivery_sql(int $uid, string $doc = 'd.Doc_Id'): string {
     ) delivery WHERE delivery.Doc_Id=$doc)";
 }
 
-function app_inbox_delivery(PDO $pdo, int $uid, int $docId): ?string {
+// false = no recipient path; null = an existing historical path of unknown age.
+// Never turn owner/Admin visibility alone into a grandfathered inbox grant.
+function app_inbox_delivery(PDO $pdo, int $uid, int $docId): string|false|null {
     $sql=app_inbox_delivery_sql($uid,(string)$docId);
     $time=$pdo->query("SELECT $sql")->fetchColumn();
-    return !$time || $time===APP_INBOX_LEGACY_TIME ? null : $time;
+    if ($time===null || $time===false) return false;
+    return $time===APP_INBOX_LEGACY_TIME ? null : $time;
 }
 
 function app_inbox_completed_sql(int $uid): string {

@@ -40,8 +40,8 @@ async function request(route,body,auth=''){
  await until("document.getElementById('sub_head')?.textContent==='รอดำเนินการ'&&document.getElementById('load_data')?.style.display==='none'");
  assert.equal(await evaluate("document.getElementById('received-pending-filter').getAttribute('aria-pressed')"),'true');
  await evaluate(`view_doc_detail(${doc},'received')`);await evaluate("document.querySelector('#Sign_File_API a').click()");
- await until("typeof window.saveToServer==='function'&&document.querySelector('.drawing-canvas')&&document.querySelector('#btn-hand')?.classList.contains('active')");
- await evaluate("setTool('stamp');document.querySelector('.drawing-canvas').dispatchEvent(new MouseEvent('mousedown',{bubbles:true,clientX:150,clientY:400}))");
+  await until("typeof window.saveToServer==='function'&&document.querySelector('.drawing-canvas')&&document.getElementById('loading').classList.contains('hidden')&&document.querySelector('#btn-hand')?.classList.contains('active')");
+  await evaluate("setTool('stamp');{const canvas=document.querySelector('.drawing-canvas'),rect=canvas.getBoundingClientRect();canvas.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2}));}");
  const saved=await evaluate("(async()=>{let saved=null;const original=window.fetch;window.fetch=async(...args)=>{const response=await original(...args);if(String(args[0]).includes('upload_pdf'))saved=await response.clone().json();return response;};await saveToServer();return saved;})()");
  assert.equal(saved?.status,'success','real stamp-only save must succeed');
  assert.equal((await request('/api/get_data_received.php',{Year:'2569',Doc_Id:doc},cookie)).body[0].is_signed,true);

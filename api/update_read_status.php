@@ -4,6 +4,11 @@ require_once __DIR__ . '/../config/inbox-completion.php';
 app_method('POST'); $user=app_user(); $data=app_input(); $id=(int)($data['doc_id']??0);
 app_document_transaction();app_locked_document($id,$user);
 $delivery=app_inbox_delivery(app_pdo(),(int)$user['User_Id'],$id);
+if ($delivery===false) {
+    // Owner/Admin may inspect a document without becoming its recipient.
+    app_pdo()->commit();
+    app_json(['status'=>'success','is_recipient'=>false,'requires_signature'=>true]);
+}
 $q=app_pdo()->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Status,Date,alert_to,Inbox_Delivered_At) VALUES (?,?,'Readed',?,0,?) ON DUPLICATE KEY UPDATE Status='Readed',Date=IF(Date='',VALUES(Date),Date)");
 $q->execute([$user['User_Id'],$id,date('d/m/Y H:i'),$delivery]);
 if ($q->rowCount()>0) app_audit('document.read',$user,$id);
