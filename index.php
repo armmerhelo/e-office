@@ -337,8 +337,13 @@ window.addEventListener('load', function() {
                   </div>
                 <span class="block text-xs">ดำเนินการแล้ว</span>
               </button>
-              <button id="received-all-filter" type="button" class="menu-item pt-1 pr-2 pl-2" aria-pressed="false" onclick="read_status_change('','load');">
-                <span class="block text-sm">ทั้งหมด</span>
+              <button id="received-all-filter" type="button" class="menu-item item-all pt-1 pr-2 pl-2" title="ทั้งหมด" aria-label="ทั้งหมด" aria-pressed="false" onclick="read_status_change('','load');">
+                <div class="icon-wrapper">
+                  <svg class="envelope-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 3h16v2H4V3zm-2 4h20v2H2V7zm0 4h20v10H2V11zm2 2v6h16v-6h-4l-2 3h-4l-2-3H4z"/>
+                  </svg>
+                </div>
+                <span class="block text-xs">ทั้งหมด</span>
               </button>
               <div class="p-1">
 

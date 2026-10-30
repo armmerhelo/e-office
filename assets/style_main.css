@@ -41,7 +41,7 @@
   color: #007bff; /* Blue color for icon */
 }
 /* Read State */
-.item-read {
+.item-read, .item-all {
   color: #8e8e93; /* Gray color for icon */
 }
 .item-read .menu-label {

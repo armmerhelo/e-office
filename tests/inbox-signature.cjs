@@ -3,6 +3,10 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 (async () => {
+    const allButton=fs.readFileSync('index.php','utf8').match(/<button id="received-all-filter"[\s\S]*?<\/button>/)?.[0];
+    assert.ok(allButton?.includes('class="icon-wrapper"'),'All has an icon aligned with the other categories');
+    assert.ok(allButton.includes('aria-hidden="true"'),'decorative icon does not repeat the accessible label');
+    assert.ok(allButton.includes('class="block text-xs">ทั้งหมด'),'All uses the same label size as the other categories');
     const deleteButton={style:{},setAttribute(name,value){this[name]=value;},removeAttribute(name){delete this[name];}};
     const deleteContext=vm.createContext({document:{getElementById:()=>deleteButton}});
     const utils=fs.readFileSync('assets/utils.js','utf8');
