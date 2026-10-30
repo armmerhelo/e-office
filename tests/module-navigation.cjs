@@ -142,7 +142,7 @@ sidebarParityChecks();
 const router = main.slice(main.indexOf('function showView('), main.indexOf('function view_doc_public('));
 const elements = new Map();
 const el = id => {
-    if (!elements.has(id)) elements.set(id, {style:{}, value:'', innerHTML:''});
+    if (!elements.has(id)) elements.set(id, {style:{}, value:'', innerHTML:'',classList:{add(){},remove(){}},setAttribute(){}});
     return elements.get(id);
 };
 const values = new Map();
@@ -176,6 +176,7 @@ for (const name of ['components_pagination','search_menu','send_email','menu_mai
 vm.createContext(context);
 vm.runInContext(main.slice(main.indexOf('const DOCUMENT_VIEWS'),main.indexOf("window.addEventListener('eoffice:permissions-changed'")),context);
 vm.runInContext(router, context);
+vm.runInContext(main.slice(main.indexOf('function restoreReceivedFilter('),main.indexOf('function read_show(')),context);
 for (const [view,path] of Object.entries(context.MODULE_ROUTES)) {
     context.navigated=null;
     context.showView(view,'load');

@@ -316,10 +316,10 @@ window.addEventListener('load', function() {
 
       <main id="main-content-area" class="min-w-0">
         <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-4 ">
-          <div  class="menu-item flex ">
+          <div class="menu-item flex flex-col min-w-0">
 
-            <div id="read_icon_show" class="menu-item flex pl-3 pb-2">
-              <button type="button" class="menu-item item-unread pt-1 pl-2 pr-2 " title="รอดำเนินการ (ยังไม่ลงนาม)" aria-label="รอดำเนินการ (ยังไม่ลงนาม)" onclick="toggleSelection(this); read_status_change('NotRead','load'); ">
+            <div id="read_icon_show" class="menu-item flex flex-wrap items-center gap-1 pl-3 pb-2">
+              <button id="received-pending-filter" type="button" class="menu-item item-unread pt-1 pl-2 pr-2 " title="รอดำเนินการ (ยังไม่ลงนาม)" aria-label="รอดำเนินการ (ยังไม่ลงนาม)" aria-pressed="false" onclick="read_status_change('NotRead','load');">
                 <div class="icon-wrapper">
                   <svg class="envelope-icon" viewBox="0 0 24 24">
                     <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
@@ -329,7 +329,7 @@ window.addEventListener('load', function() {
                 <span class="block text-xs">รอดำเนินการ</span>
               </button>
 
-              <button type="button" class="menu-item item-read pt-1 pr-2 pl-2 " title="ลงนามแล้ว" aria-label="ลงนามแล้ว" onclick="toggleSelection(this); read_status_change('Readed','load');" >
+              <button id="received-signed-filter" type="button" class="menu-item item-read pt-1 pr-2 pl-2 " title="ลงนามแล้ว" aria-label="ลงนามแล้ว" aria-pressed="false" onclick="read_status_change('Readed','load');" >
                 <div class="icon-wrapper">
                   <svg class="envelope-icon" viewBox="0 0 24 24">
                     <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
@@ -337,6 +337,10 @@ window.addEventListener('load', function() {
                   </div>
                 <span class="block text-xs">ลงนามแล้ว</span>
               </button>
+              <button id="received-all-filter" type="button" class="menu-item pt-1 pr-2 pl-2" aria-pressed="false" onclick="read_status_change('','load');">
+                <span class="block text-sm">ทั้งหมด</span>
+              </button>
+              <span id="received-filter-description" class="w-full text-xs text-gray-500" aria-live="polite">เปิดอ่านแล้ว แต่ยังไม่เซ็น = ยังรอดำเนินการ</span>
               <div class="p-1">
 
               </div>

@@ -48,6 +48,16 @@
   color: #8e8e93; /* Gray text */
 }
 
+#read_icon_show button {
+  min-height: 56px;
+  min-width: 72px;
+  cursor: pointer;
+}
+#read_icon_show button:focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 2px;
+}
+
   @keyframes progress {
     0% { left: -40%; width: 40%; }
     100% { left: 100%; width: 40%; }

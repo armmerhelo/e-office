@@ -15,6 +15,7 @@
     "test:members": "node tests/member-key-setup.cjs && python tests/staging-member-key.py && python tests/staging-dependency-plan.py && node tests/member-version.cjs && node tests/member-permissions.cjs && node tests/member-ui.cjs",
     "test:order-ui": "node tests/order-email-ui.cjs",
     "test:sign-routing": "node tests/signature-presence.cjs && node tests/sign-routing.cjs && node tests/sign-stamp-ui.cjs && node tests/sign-concurrency.cjs",
+    "test:sign-browser": "node tests/sign-inbox-browser.cjs",
     "test:races": "node tests/document-races.cjs",
     "test:notifications": "node tests/notifications-ui.cjs && node tests/push-subscriptions.cjs && node tests/notification-queue.cjs",
     "test:orders": "node tests/order-emails.cjs",

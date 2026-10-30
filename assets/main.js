@@ -267,7 +267,9 @@ window.onload = async () => {
       display_style('menu-maintenance-admin','none');
     }
 
-    localStorage.setItem("read_status_change", '');
+    // Keep the selected inbox category across full reloads and browser Back.
+    // Signed documents may remain in All, but must not look like pending work.
+    restoreReceivedFilter();
     if (window.eofficeUser?.permissions?.includes('email')) {
         display_style('send_email','flex');
         display_style('group_send_email','block');
@@ -629,7 +631,7 @@ if (! page_number) {
           }
 
         }
-        sub_head.innerHTML = localStorage.getItem('read_status_change') === 'NotRead' ? 'รอดำเนินการ' : localStorage.getItem('read_status_change') === 'Readed' ? 'ลงนามแล้ว' : 'ทั้งหมด';
+        syncReceivedFilter();
         menu_received.className = className_click;
         content_received.style.display = "block";
         add_doc_btn.style.display = "none";
@@ -1163,28 +1165,30 @@ function toggleSelection(element) {
     }
 }
 
+function restoreReceivedFilter() {
+  const stored = localStorage.getItem('read_status_change');
+  if (!['NotRead', 'Readed', ''].includes(stored)) localStorage.setItem('read_status_change', 'NotRead');
+}
+
+function syncReceivedFilter() {
+  const status = localStorage.getItem('read_status_change') || '';
+  document.getElementById('sub_head').innerHTML = status === 'NotRead' ? 'รอดำเนินการ' : status === 'Readed' ? 'ลงนามแล้ว' : 'ทั้งหมด';
+  const description = document.getElementById('received-filter-description');
+  if (description) description.textContent = status === '' ? 'รวมทั้งรอดำเนินการและลงนามแล้ว • จุดแดง = ยังรอลงนาม' : status === 'Readed' ? 'บันทึกการลงนามหรือประทับตราสำเร็จแล้ว' : 'เปิดอ่านแล้ว แต่ยังไม่เซ็น = ยังรอดำเนินการ';
+  for (const [id, value] of [['received-pending-filter', 'NotRead'], ['received-signed-filter', 'Readed'], ['received-all-filter', '']]) {
+    const button = document.getElementById(id);
+    if (!button) continue;
+    const selected = status === value;
+    if (selected) button.classList.add('is-active');
+    else button.classList.remove('is-active');
+    button.setAttribute('aria-pressed', String(selected));
+  }
+}
+
 function read_status_change(status,api){
-  var read_status = localStorage.getItem("read_status_change");
-  if (read_status == status) {
-    localStorage.setItem('read_status_change' ,'');
-  }else {
-    localStorage.setItem('read_status_change' ,status);
-  }
-  read_status = localStorage.getItem("read_status_change");
-
-        if (read_status == 'NotRead') {
-      document.getElementById('sub_head').innerHTML = 'รอดำเนินการ';
-      }else if (read_status =='Readed') {
-        document.getElementById('sub_head').innerHTML = 'ลงนามแล้ว';
-      }else {
-        document.getElementById('sub_head').innerHTML = 'ทั้งหมด';
-      }
-
-  console.log('read_status_change:'+read_status);
-  if (api == 'load') {
-    get_data_api_received();
-
-  }
+  localStorage.setItem('read_status_change', ['NotRead', 'Readed'].includes(status) ? status : '');
+  syncReceivedFilter();
+  if (api == 'load') get_data_api_received();
 }
 
 function read_show() {

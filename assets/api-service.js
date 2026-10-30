@@ -174,7 +174,8 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
         Page_number: Page_number,
         Year: Year,
         search_txt: search_txt,
-        Read_Status_find : read_status,
+        // A direct document link must open even when it has already been signed.
+        Read_Status_find : doc_id ? '' : read_status,
         Doc_Id : doc_id
     };
 
@@ -348,7 +349,9 @@ if (width >= 1300) {
               loop_receive.innerHTML = html_buffer;
             }else {
               view_doc_detail(doc_id,'received');
-
+              // The detail can belong to another category. Render it first,
+              // then restore the selected list/counters behind the modal.
+              return await get_data_api_received(Page_number, search_txt, undefined, Year, user_token);
             }
 
             console.log('Page_number is 2:'+Page_number);

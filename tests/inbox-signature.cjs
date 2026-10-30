@@ -65,12 +65,40 @@ const vm = require('node:vm');
     const beforeTarget = requests.length;
     await context.get_data_api_received(2, '', 42);
     assert.equal(requests.length - beforeTarget, 1, 'targeted document lookups must not fall back to unrelated documents');
+    assert.equal(requests.at(-1).payload.Read_Status_find, '', 'direct document links bypass the category without changing its selection');
+    const details = [];
+    context.view_doc_detail = (...args) => details.push(args);
+    stored.set('read_status_change','NotRead');
+    listResponse = payload => payload.Doc_Id ? [{doc_id:42,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}] : [];
+    const beforeSignedLink = requests.length;
+    await context.get_data_api_received(1,'',42);
+    assert.deepEqual(details,[[42,'received']]);
+    assert.equal(requests.length-beforeSignedLink,2,'direct links restore the selected list after opening details');
+    assert.equal(requests.at(-1).payload.Read_Status_find,'NotRead');
+    assert.equal(nodes.get('All_Doc').textContent,'0','a signed deep link must not inflate pending counters');
     const main = fs.readFileSync('assets/main.js', 'utf8');
-    vm.runInContext(main.slice(main.indexOf('function read_status_change('), main.indexOf('function read_show(')), context);
+    vm.runInContext(main.slice(main.indexOf('function restoreReceivedFilter('), main.indexOf('function read_show(')), context);
     nodes.set('sub_head', {});
+    nodes.set('received-filter-description', {});
+    for (const id of ['received-pending-filter', 'received-signed-filter', 'received-all-filter']) {
+        const classes = new Set();
+        nodes.set(id, {classList:{add:name=>classes.add(name),remove:name=>classes.delete(name),contains:name=>classes.has(name)},setAttribute(name,value){this[name]=value;}});
+    }
+    for (const filter of ['NotRead', 'Readed', '']) {
+        stored.set('read_status_change', filter);context.restoreReceivedFilter();
+        assert.equal(stored.get('read_status_change'), filter, 'reload/Back preserves the selected category');
+    }
+    stored.delete('read_status_change');context.restoreReceivedFilter();
+    assert.equal(stored.get('read_status_change'),'NotRead','new users start with pending work');
     stored.set('read_status_change', '');
     context.read_status_change('NotRead');assert.equal(nodes.get('sub_head').innerHTML, 'รอดำเนินการ');
+    context.read_status_change('NotRead');assert.equal(nodes.get('sub_head').innerHTML, 'รอดำเนินการ','repeated clicks cannot switch silently to All');
+    assert.equal(nodes.get('received-pending-filter')['aria-pressed'],'true');
+    assert.equal(nodes.get('received-all-filter')['aria-pressed'],'false');
     context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ลงนามแล้ว');
-    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
+    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ลงนามแล้ว');
+    context.read_status_change('');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
+    assert.equal(nodes.get('received-all-filter')['aria-pressed'],'true');
+    assert.ok(nodes.get('received-filter-description').textContent.includes('รวมทั้งรอดำเนินการและลงนามแล้ว'));
     console.log('PASS inbox filters: pending dots survive reading and reload, signed dots disappear, all filters/read states, signing labels, empty states and counters');
 })().catch(error => { console.error(error); process.exitCode = 1; });
