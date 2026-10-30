@@ -1,5 +1,14 @@
 # Production deployment — E-Office
 
+## หมวดหนังสือที่ชัดเจนและกู้รายการเมื่อโหลดล้มเหลว — 30 ตุลาคม 2026
+
+- เผยแพร่ **4 runtime files** (`index.php`, `assets/main.js`, `assets/api-service.js`, `assets/style_main.css`) จาก `e800df1e93e8be6c8a33b8ac58f88d33ef46bcc8` และ `f7b10c68be6d91104207ab08ce41eb461cc10b1e` เวลา **2026-10-30 10:17:31 +07:00** หลังตรวจ diff/ซอร์ส production และสำรองซอร์สกับฐานข้อมูลครบ 42 ตาราง สำรองฐานข้อมูลรอบแรก timeout ก่อนติดตั้ง จึงลบ helper ที่ค้างและสำรองแบบบีบอัดพร้อมตรวจ JSON/จำนวนแถว/SHA-256 ใหม่สำเร็จ จากนั้นติดตั้งผ่าน atomic replacement ภายใต้ maintenance gate ชั่วคราว คืน `.htaccess` และ invalidate PHP opcache ไม่แก้ schema/private configuration
+- แยกปุ่ม **รอดำเนินการ / ลงนามแล้ว / ทั้งหมด** พร้อมคำอธิบายและสถานะเลือก กดซ้ำไม่เปลี่ยนหมวดเอง เปิดครั้งแรกเริ่มที่รอดำเนินการ และกลับจากหน้าเซ็นหรือ reload แล้วยังคงหมวดเดิม ลิงก์ตรงเปิดรายละเอียดได้โดยรายการด้านหลังยังยึดหมวดที่เลือก
+- ซิงก์หัวข้อ ปุ่ม และข้อมูลตามตัวกรองของคำขอที่ยอมรับ รวมถึงเปลี่ยนหมวดจากอีกแท็บ หาก HTTP/network/JSON/response shape ผิดพลาด แสดงข้อความกับปุ่มลองใหม่ ล้าง cache รายการที่ไม่ตรงหมวด แสดงตัวนับเป็นไม่ทราบแทนยอดเก่า และไม่ปิดรายละเอียดเอกสารที่เปิดแล้ว
+- รีวิวซ้ำไม่พบ blocking finding ที่ยืนยันได้ในขอบเขตนี้ `npm.cmd test` ผ่านครบ (integration **49**, document races **12**, notifications **19**, syntax PHP **154** / JS-CJS **88** / inline **23** และชุดอื่นทั้งหมด) Chromium local ผ่านประทับตราอย่างเดียว → บันทึก → Back, หมวด/active state, signed deep link, storage event จริงระหว่างเอกสาร, HTTP 503/retry และ layout **390/320px**
+- Chromium production ก่อนเผยแพร่ประวัติ **10 checks ผ่าน** และหลังเผยแพร่ **11 checks ผ่าน** ครอบคลุมหมวด/Back/จุดแดง/หลายเอกสารต้นทางเดียวกัน/ลิงก์ตรง/จำลอง 503 เฉพาะ browser/ลองใหม่/หน้าอัปเดตพร้อม 2 commits/มือถือ และไม่มี uncaught JavaScript exception ลบเฉพาะบัญชี เอกสาร สิทธิ์ session และ Log สังเคราะห์ครบ ไม่ส่งอีเมล Push หรือเอกสารทดลองไป Drive
+- ตรวจ SHA-256 ตรงทั้ง 4 runtime paths และ public assets เผยแพร่ feed พร้อมรักษาประวัติเดิม Release ID **`deploy-20261030T031731000Z`** ตรวจ JSON กับหน้า `index.php?view=updates` ตรงกัน ไม่มี temporary deployment helpers
+
 ## จุดแดงของหนังสือรอลงนาม — 29 ตุลาคม 2026
 
 - เผยแพร่ **2 runtime files** (`api/document_list.php`, `assets/api-service.js`) จาก `f4f0988e19d6aa0778277dd92673e7a1b69d6299` เวลา **2026-10-29 15:45:54 +07:00** หลังเทียบซอร์สเดิมและสำรองซอร์ส/ฐานข้อมูล ใช้ maintenance gate ชั่วคราวระหว่างติดตั้ง คืน `.htaccess` เดิมและ invalidate PHP opcache ไม่เปลี่ยน schema หรือ private configuration
