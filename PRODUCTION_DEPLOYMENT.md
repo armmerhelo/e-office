@@ -1,5 +1,12 @@
 # Production deployment — E-Office
 
+## เพิ่ม padding ปุ่มหมวดหนังสือ — 30 ตุลาคม 2026
+
+- เผยแพร่เฉพาะ `assets/style_main.css` จาก `450cb2b3fcb09d727cb3146e3f31ecea07288635` เวลา **2026-10-30 15:02:46 +07:00** ตรวจ diff/ซอร์สเดิม สำรองไฟล์ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` เรียบร้อย ไม่เปลี่ยน schema ข้อมูล หรือกติกาเอกสาร
+- ปุ่มสามหมวดมี padding บน/ล่าง **10px** ซ้าย/ขวา **12px** และช่องว่างไอคอน/ข้อความ **4px** จัดเนื้อหาเป็นคอลัมน์กึ่งกลาง ใช้ไอคอนขนาดเดิม
+- Inbox regression ผ่าน Chromium production ก่อนเผยแพร่ประวัติ **15 checks** และหลังเผยแพร่ **16 checks** ผ่าน ตรวจ computed padding/gap บน **320/390px** ไม่ล้นจอ และตรวจภาพหน้าจอจริงแล้ว รวมหมวด/สิทธิ์ปุ่มลบ/Back/หลายแท็บ/503-retry ไม่มี uncaught JavaScript exception ลบข้อมูลสังเคราะห์ครบ ไม่ส่งอีเมลหรือ Push
+- เผยแพร่และตรวจหน้าอัปเดตพร้อม exact deployed commit เรียบร้อย Release ID **`deploy-20261030T080246000Z`** ตรวจ checksum CSS และ feed ตรง ไม่มี deployment helpers ตกค้าง
+
 ## Auto send หลังเซ็นปากกาและปุ่มทะเบียนหนังสือ — 30 ตุลาคม 2026
 
 - เผยแพร่ **8 runtime paths** จาก `101591397fd93db407dd4e14fb3be6d12f8dec57`, `7e5e7bb65c59b180a4d44c894d15ebd6061b5da7` และ `36638e6b11046b5392aacbf86b964f2e47665dfc` เวลา **2026-10-30 14:03:44 +07:00** รีวิว diff เทียบ production สำรองซอร์สและฐานข้อมูล **42 ตาราง** พร้อมตรวจ JSON/จำนวนแถว/SHA-256 ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache เรียบร้อย ไม่มี schema/private configuration changes
