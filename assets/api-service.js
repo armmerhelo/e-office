@@ -140,6 +140,7 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
 
     var read_status = localStorage.getItem("read_status_change");
     if (!read_status) { read_status = ''; }
+    if (typeof syncReceivedFilter === 'function') syncReceivedFilter(read_status);
     Page_number = Math.max(1, parseInt(Page_number, 10) || 1);
     if (Year === undefined) Year = getCookie('yearSelect');
     const requestSequence = ++receivedRequestSequence;
@@ -195,6 +196,10 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
 
         const data = await response.json(); // ตัวแปร data ชื่อเดิม
         if (requestSequence !== receivedRequestSequence) return;
+        if (!Array.isArray(data)) throw new Error('Invalid received-document response');
+        // Another tab may have changed storage during the request. Labels must
+        // describe this accepted response, not a different category in storage.
+        if (typeof syncReceivedFilter === 'function') syncReceivedFilter(read_status);
         console.log('ข้อมูลที่ได้รับ:', data);
         //data_save = data;
         updateDataSave(data);
@@ -394,6 +399,22 @@ if (width >= 1300) {
     } catch (error) {
         if (requestSequence === receivedRequestSequence) {
             console.error('⚠️ ข้อผิดพลาดเครือข่าย หรือ โค้ด:', error);
+            updateDataSave([]);
+            loop_receive.innerHTML = '<div role="alert">โหลดรายการหนังสือไม่สำเร็จ กรุณาลองใหม่ <button id="received-retry" type="button" class="eo-btn eo-btn--sm eo-btn--secondary">ลองใหม่</button></div>';
+            const retry = document.getElementById('received-retry');
+            if (retry) retry.onclick = () => {
+                if (requestSequence !== receivedRequestSequence) return;
+                return get_data_api_received(Page_number, search_txt, doc_id, Year, user_token);
+            };
+            for (const id of ['All_Doc', 'All_Doc_1', 'All_Doc_2']) {
+                const counter = document.getElementById(id);
+                if (counter) counter.textContent = '—';
+            }
+            const pagination = document.getElementById('Pagination');
+            if (pagination) pagination.innerHTML = '';
+            for (const id of ['Pagination_PREV', 'Pagination_NEXT']) {
+                document.getElementById(id)?.classList.add('opacity-30', 'pointer-events-none');
+            }
         }
     } finally {
         if (requestSequence === receivedRequestSequence) {if(load_data)load_data.style.display = "none";setDocumentLoading(false);}

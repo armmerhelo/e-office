@@ -135,6 +135,11 @@ window.addEventListener('pageshow', event => {
         refreshPermissionMenus();
     }
 });
+window.addEventListener('storage', event => {
+    if (event.key !== 'read_status_change' && event.key !== null) return;
+    if (window.eofficeSessionState?.status !== 'authenticated' || localStorage.getItem('currentPage') !== 'received') return;
+    get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
+});
 
 var Page_number = 1;
 var data_save = [];
@@ -1170,8 +1175,7 @@ function restoreReceivedFilter() {
   if (!['NotRead', 'Readed', ''].includes(stored)) localStorage.setItem('read_status_change', 'NotRead');
 }
 
-function syncReceivedFilter() {
-  const status = localStorage.getItem('read_status_change') || '';
+function syncReceivedFilter(status = localStorage.getItem('read_status_change') || '') {
   document.getElementById('sub_head').innerHTML = status === 'NotRead' ? 'รอดำเนินการ' : status === 'Readed' ? 'ลงนามแล้ว' : 'ทั้งหมด';
   const description = document.getElementById('received-filter-description');
   if (description) description.textContent = status === '' ? 'รวมทั้งรอดำเนินการและลงนามแล้ว • จุดแดง = ยังรอลงนาม' : status === 'Readed' ? 'บันทึกการลงนามหรือประทับตราสำเร็จแล้ว' : 'เปิดอ่านแล้ว แต่ยังไม่เซ็น = ยังรอดำเนินการ';

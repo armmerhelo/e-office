@@ -4,20 +4,27 @@ const vm = require('node:vm');
 
 (async () => {
     const nodes = new Map();
-    for (const id of ['loop_receive', 'content_received', 'load_data', 'doc_status_42', 'All_Doc', 'All_Doc_1', 'All_Doc_2']) {
-        nodes.set(id, {style: {}, textContent: '20', innerHTML: ''});
+    for (const id of ['loop_receive', 'content_received', 'load_data', 'doc_status_42', 'All_Doc', 'All_Doc_1', 'All_Doc_2', 'received-retry', 'Pagination', 'Pagination_PREV', 'Pagination_NEXT']) {
+        nodes.set(id, {style: {}, textContent: '20', innerHTML: '',dataset:{},classList:{add(){},remove(){}}});
     }
     const stored = new Map([['read_status_change', 'NotRead'], ['currentPage', 'received']]);
     const opened = {doc_id: 42, status: 'NotRead', is_signed: false};
     const requests = [];
     let listResponse = () => [];
+    let listFailure = '';
     const context = vm.createContext({
         document: {getElementById: id => nodes.get(id)}, window: {innerWidth: 1400, location: {href: 'https://example.test/'}, history: {replaceState() {}}},
         localStorage: {getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value)},
         console: {log() {}, error() {}, warn() {}}, data_save: [opened], getCookie: () => '2569',
-        pagination_create() {}, updateDataSave() {}, URL,
+        pagination_create() {}, updateDataSave:rows=>{context.data_save=rows;}, URL,
         fetch: async (url, options) => {
             requests.push({url, payload: JSON.parse(options.body)});
+            if (!url.includes('update_read') && !JSON.parse(options.body).Doc_Id) {
+                if (listFailure === 'network') throw Error('Network unavailable');
+                if (listFailure === 'http') return {ok:false,status:503};
+                if (listFailure === 'json') return {ok:true,json:async()=>{throw SyntaxError('Invalid JSON');}};
+                if (listFailure === 'shape') return {ok:true,json:async()=>({status:'error'})};
+            }
             return {ok: true, json: async () => url.includes('update_read') ? {status: 'success'} : listResponse(JSON.parse(options.body))};
         }
     });
@@ -76,6 +83,31 @@ const vm = require('node:vm');
     assert.equal(requests.length-beforeSignedLink,2,'direct links restore the selected list after opening details');
     assert.equal(requests.at(-1).payload.Read_Status_find,'NotRead');
     assert.equal(nodes.get('All_Doc').textContent,'0','a signed deep link must not inflate pending counters');
+    for (const failure of ['http','network','json','shape']) {
+        listFailure=failure;
+        const beforeDetails=details.length;
+        await context.get_data_api_received(2,'kept search',42,'2568');
+        assert.equal(details.length,beforeDetails+1,'background failure must not dismiss an opened document');
+        assert.ok(nodes.get('loop_receive').innerHTML.includes('role="alert"'));
+        assert.ok(nodes.get('loop_receive').innerHTML.includes('ลองใหม่'));
+        assert.equal(context.data_save.length,0,'signed deep-link data must not remain as pending-list data');
+        assert.equal(nodes.get('All_Doc').textContent,'—','failed counts must be unknown, not stale or zero');
+        assert.equal(nodes.get('load_data').style.display,'none');
+        const retry=nodes.get('received-retry').onclick;
+        listFailure='';listResponse=()=>[{doc_id:43,status:'Readed',is_signed:false,Pagination:2,Total_Records:21}];
+        const beforeRetry=requests.length;
+        await retry();
+        assert.equal(requests.length,beforeRetry+1,'background retry must load the category, not reopen the deep link');
+        assert.equal(requests.at(-1).payload.Doc_Id,undefined);
+        assert.equal(requests.at(-1).payload.Page_number,2);
+        assert.equal(requests.at(-1).payload.search_txt,'kept search');
+        assert.equal(requests.at(-1).payload.Year,'2568');
+        assert.equal(nodes.get('All_Doc').textContent,21);
+        assert.ok(!nodes.get('loop_receive').innerHTML.includes('role="alert"'));
+        const afterRetry=requests.length;await retry();
+        assert.equal(requests.length,afterRetry,'an obsolete retry cannot replace a newer list');
+        listResponse=payload=>payload.Doc_Id?[{doc_id:42,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}]:[];
+    }
     const main = fs.readFileSync('assets/main.js', 'utf8');
     vm.runInContext(main.slice(main.indexOf('function restoreReceivedFilter('), main.indexOf('function read_show(')), context);
     nodes.set('sub_head', {});
@@ -100,5 +132,17 @@ const vm = require('node:vm');
     context.read_status_change('');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
     assert.equal(nodes.get('received-all-filter')['aria-pressed'],'true');
     assert.ok(nodes.get('received-filter-description').textContent.includes('รวมทั้งรอดำเนินการและลงนามแล้ว'));
+    stored.set('read_status_change','Readed');
+    listResponse=()=>[{doc_id:43,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}];
+    await context.get_data_api_received(1);
+    assert.equal(nodes.get('sub_head').innerHTML,'ลงนามแล้ว','loading after another tab changes storage must sync the selected category');
+    assert.equal(nodes.get('received-signed-filter')['aria-pressed'],'true');
+    let resolveList;
+    listResponse=()=>new Promise(resolve=>{resolveList=resolve;});
+    const pending=context.get_data_api_received(1);
+    await new Promise(resolve=>setImmediate(resolve));
+    stored.set('read_status_change','NotRead');
+    resolveList([{doc_id:43,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}]);await pending;
+    assert.equal(nodes.get('sub_head').innerHTML,'ลงนามแล้ว','accepted response labels must reflect its captured filter, not newer storage');
     console.log('PASS inbox filters: pending dots survive reading and reload, signed dots disappear, all filters/read states, signing labels, empty states and counters');
 })().catch(error => { console.error(error); process.exitCode = 1; });

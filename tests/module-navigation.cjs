@@ -1080,6 +1080,14 @@ async function mainPermissionRefreshChecks() {
     window.dispatchEvent({type:'pageshow',persisted:true});
     requests.shift()({ok:true,json:async()=>({user:null})});await new Promise(resolve=>setImmediate(resolve));
     assert.equal(inboxLoads.length,2,'guest replies must not refresh private documents');
+    vm.runInContext(main.match(/window\.addEventListener\('storage', event => \{[\s\S]*?\n\}\);/)[0],runtime);
+    window.dispatchEvent({type:'storage',key:'read_status_change'});
+    assert.equal(inboxLoads.length,2,'guest storage events cannot load private documents');
+    const verify=runtime.refreshPermissionMenus();requests.shift()({ok:true,json:async()=>({user:{id:9,permissions:[]}})});await verify;
+    window.dispatchEvent({type:'storage',key:'other-key'});assert.equal(inboxLoads.length,2);
+    window.dispatchEvent({type:'storage',key:'read_status_change'});assert.equal(inboxLoads.length,3,'another tab category change reloads the inbox');
+    window.dispatchEvent({type:'storage',key:null});assert.equal(inboxLoads.length,4,'storage clear reloads with the current default');
+    current='public';window.dispatchEvent({type:'storage',key:'read_status_change'});assert.equal(inboxLoads.length,4,'other views must not load the inbox');
     console.log('PASS main session refresh: latest reply wins and confirmed logout invalidates outstanding permission responses');
 }
 mainPermissionRefreshChecks().catch(error=>{console.error(error);process.exitCode=1;});

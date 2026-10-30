@@ -58,9 +58,32 @@ async function request(route,body,auth=''){
  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','a direct signed link preserves the pending category');
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'the background list remains pending');
  await evaluate('closeModal()');
+ // A same-origin sibling document updates localStorage, producing an actual
+ // cross-document storage event in the inbox rather than a synthetic event.
+ await evaluate("(async()=>{const frame=document.createElement('iframe');frame.hidden=true;const loaded=new Promise(resolve=>frame.onload=resolve);frame.src='/offline.html';document.body.append(frame);await loaded;frame.contentWindow.localStorage.setItem('read_status_change','Readed');})()");
+ await until(ready+"&&document.getElementById('sub_head').textContent==='ลงนามแล้ว'");
+ assert.equal(await evaluate("document.getElementById('received-signed-filter').getAttribute('aria-pressed')"),'true');
+ assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),true,'cross-document selection must match the loaded category');
+ await evaluate("document.getElementById('received-pending-filter').click()");await until(ready);
+ const injection=await send('Page.addScriptToEvaluateOnNewDocument',{source:`{
+  const original=window.fetch;let fail=true;
+  window.fetch=(url,options)=>{
+   if(String(url).includes('get_data_received.php')&&!JSON.parse(options.body).Doc_Id&&fail){fail=false;return Promise.resolve(new Response('{}',{status:503}));}
+   return original(url,options);
+  };
+ }`});
+ await send('Page.navigate',{url:base+'/index.php?view=received&id='+doc});
+ await until(ready+"&&document.getElementById('received-retry')");
+ assert.equal(await evaluate("document.getElementById('doc_detail').classList.contains('active')"),true,'a background error must preserve details');
+ assert.equal(await evaluate("document.getElementById('loop_receive').textContent.includes('โหลดรายการหนังสือไม่สำเร็จ')"),true,'the list must show an error rather than an empty result');
+ assert.equal(await evaluate('data_save.length'),0,'a signed deep link is not pending-list data');
+ await evaluate("closeModal();document.getElementById('received-retry').click()");
+ await until(ready+"&&!document.getElementById('received-retry')");
+ assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'retry must restore pending work, not reopen the signed document');
+ await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:injection.identifier});
  for(const width of [390,320]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:true});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'no mobile overflow '+width);}
  assert.equal(exceptions.length,0,JSON.stringify(exceptions));
- console.log('PASS real stamp-only PDF save, browser Back, persisted pending filter, explicit categories, active states and mobile 390/320px');
+ console.log('PASS real stamp-only save/Back, categories, cross-document storage, failed background list/retry and mobile 390/320px');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
  if(socket)socket.close();if(chrome){const done=new Promise(resolve=>chrome.once('exit',resolve));chrome.kill();await done;}server.kill();
  if(doc)cp.execFileSync(php,['-r',`require 'config/bootstrap.php';$p=app_pdo();$q=$p->prepare('DELETE FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([(string)${doc}]);$q=$p->prepare('DELETE FROM t_document WHERE Doc_Id=?');$q->execute([${doc}]);`],{env,stdio:'ignore'});
