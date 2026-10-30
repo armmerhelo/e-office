@@ -1,5 +1,15 @@
 # Production deployment — E-Office
 
+## Auto send หลังเซ็นปากกาและปุ่มทะเบียนหนังสือ — 30 ตุลาคม 2026
+
+- เผยแพร่ **8 runtime paths** จาก `101591397fd93db407dd4e14fb3be6d12f8dec57`, `7e5e7bb65c59b180a4d44c894d15ebd6061b5da7` และ `36638e6b11046b5392aacbf86b964f2e47665dfc` เวลา **2026-10-30 14:03:44 +07:00** รีวิว diff เทียบ production สำรองซอร์สและฐานข้อมูล **42 ตาราง** พร้อมตรวจ JSON/จำนวนแถว/SHA-256 ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache เรียบร้อย ไม่มี schema/private configuration changes
+- เซ็นด้วยปากกาที่มีหมึกเหลือจริงและบันทึก PDF ที่เปลี่ยนสำเร็จ ประกาศ pen intent แยกจากใบรับตรา และส่งให้รองทุกฝ่ายที่กำหนดกับเลขาคนนั้นใน transaction เดียวกัน รองซ้ำ/มีสิทธิ์อยู่แล้วไม่ถูกแจ้งซ้ำหรือ reset ประวัติ อ่าน/ลงนาม ผู้ไม่ได้เป็นเลขาไม่เพิ่มผู้รับ การประทับตราอย่างเดียวยังต้องยืนยันฝ่ายเหมือนเดิม ไม่ปลอมประวัติ receipt และ pen-only ใช้ routing gate ก่อน document/user locks
+- API ส่ง `can_delete` เฉพาะรายการที่ต้อง login ไม่รั่วไป public response ปุ่มลบแสดงเฉพาะเจ้าของ/Admin และล้าง handler เดิมเมื่อเปลี่ยนเอกสาร ผู้ลงนามที่ไม่ใช่เจ้าของยังถูก API ปฏิเสธลบ เพิ่มไอคอนถาดเอกสารซ้อนในปุ่มทั้งหมดให้ขนาด/สีสอดคล้องกับหมวดอื่น
+- รีวิวซ้ำไม่พบ blocking finding เพิ่มเติมที่ยืนยันได้ `npm.cmd test` ผ่านครบ รวม sign routing **20**, signing concurrency **8**, integration **53**, document races **12** และชุดอื่นทั้งหมด Chromium local ผ่านประทับตราและเซ็นปากกาจริง → Save/Back/legacy completion/503-retry/หลายแท็บ/มือถือ รวมยืนยัน pen declaration ในคำขอจริง
+- Production routing smoke ใช้ข้อมูลสังเคราะห์ใน transaction ที่ปล่อยให้ PDO rollback เมื่อปิด request ตรวจส่งครบทุกฝ่าย รองซ้ำครั้งเดียว ไม่เพิ่ม receipt ไม่ reset signed/read และผู้ไม่มี assignment ไม่เพิ่มผู้รับ โดย shutdown callback เห็น transaction ยังเปิดจึงไม่เรียก transports ตรวจซ้ำไม่มีผู้ใช้หรือเอกสารสังเคราะห์เหลือ ไม่ส่งอีเมล/Push จริง และไม่ทดสอบเขียน PDF จริงบน production; การ save endpoint และไฟล์จริงยืนยันใน local HTTP/Chromium tests
+- Chromium production ก่อนเผยแพร่ประวัติ **14 checks ผ่าน** ครอบคลุมไอคอน/active state, edit dialog ผู้ลงนามที่ไม่ใช่เจ้าของซ่อนลบ, เปิดสลับ owner/non-owner ไม่ค้างปุ่ม/handler, cutoff/Back/storage/deep link/503-retry/มือถือ **390/320px** และไม่มี uncaught JavaScript exception หลังเผยแพร่ตรวจซ้ำรวมหน้าอัปเดตและ exact 3 deployed commits ลบข้อมูลสังเคราะห์ครบ
+- ตรวจ checksum ตรงครบ **8 paths**, public assets และ feed Release ID **`deploy-20261030T070344000Z`** เผยแพร่และตรวจหน้า `index.php?view=updates` กับ JSON ตรงกัน รักษาประวัติเดิม และไม่มี deployment helpers ตกค้าง
+
 ## นำคำอธิบายใต้หมวดหนังสือออก — 30 ตุลาคม 2026
 
 - เผยแพร่ `assets/main.js` และ `index.php` จาก `c1795622f881b1fd2bb4db20a34af3eb7212b6b5` เวลา **2026-10-30 13:08:03 +07:00** ตรวจ diff/ซอร์สเดิมและสำรองไฟล์ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache เรียบร้อย ไม่เปลี่ยนฐานข้อมูลหรือกติกาการนับสถานะ
