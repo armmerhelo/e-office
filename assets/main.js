@@ -1176,9 +1176,9 @@ function restoreReceivedFilter() {
 }
 
 function syncReceivedFilter(status = localStorage.getItem('read_status_change') || '') {
-  document.getElementById('sub_head').innerHTML = status === 'NotRead' ? 'รอดำเนินการ' : status === 'Readed' ? 'ลงนามแล้ว' : 'ทั้งหมด';
+  document.getElementById('sub_head').innerHTML = status === 'NotRead' ? 'รอดำเนินการ' : status === 'Readed' ? 'ดำเนินการแล้ว' : 'ทั้งหมด';
   const description = document.getElementById('received-filter-description');
-  if (description) description.textContent = status === '' ? 'รวมทั้งรอดำเนินการและลงนามแล้ว • จุดแดง = ยังรอลงนาม' : status === 'Readed' ? 'บันทึกการลงนามหรือประทับตราสำเร็จแล้ว' : 'เปิดอ่านแล้ว แต่ยังไม่เซ็น = ยังรอดำเนินการ';
+  if (description) description.textContent = status === 'Readed' ? 'ลงนามแล้ว หรืออ่านแล้วตามเกณฑ์เดิม (ก่อน 31 ต.ค. 2569)' : 'ส่งถึงก่อน 31 ต.ค. 2569: อ่านแล้วถือว่าเสร็จ • ตั้งแต่วันนั้น: ต้องลงนามหรือประทับตราและบันทึก • จุดแดง = รอดำเนินการ';
   for (const [id, value] of [['received-pending-filter', 'NotRead'], ['received-signed-filter', 'Readed'], ['received-all-filter', '']]) {
     const button = document.getElementById(id);
     if (!button) continue;

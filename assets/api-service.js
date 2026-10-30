@@ -232,6 +232,7 @@ async function get_data_api_received(Page_number,search_txt,doc_id, Year, user_t
 
 
 let date_stamp = '';
+const completionLabel = data[i].is_signed === true ? 'ลงนามแล้ว' : data[i].completion_reason === 'legacy_read' ? 'อ่านแล้วตามเกณฑ์เดิม' : data[i].requires_signature === false ? 'รออ่านตามเกณฑ์เดิม' : 'รอลงนาม';
 if (width >= 1300) {
 
   if (data[i]['status_urgent'] == 'Urgent') {
@@ -251,7 +252,7 @@ if (width >= 1300) {
 <tr id="tb_status_read_${docId}" onclick="view_doc_detail(${docId},'received')" class="hover:bg-gray-200 transition-colors ${header_color}">
 
 <td class="border border-gray-300 p-2 text-[11px] leading-tight text-nowrap font-medium">
-${escapeHtml(docId)}
+${escapeHtml(docId)}<br><span class="text-xs text-gray-500">${completionLabel}</span>
 </td>
 <td class="border border-gray-300 p-2 leading-tight text-nowrap font-medium   ">
 ${escapeHtml(data[i]['doc_date'])}
@@ -274,8 +275,8 @@ ${escapeHtml(data[i]['doc_date'])}
       header_color = 'bg-gray-200';
   }
 
-  // The red dot represents pending signing, independently of read status.
-  doc_status = data[i]['is_signed'] === true ? '' : `<span id="doc_status_${docId}" class="flex items-center w-full" role="img" aria-label="รอลงนาม" title="รอลงนาม"><span class="w-4 h-4 bg-red-500 rounded-full ml-auto"></span></span>`;
+  // Server completion applies the same delivery cutoff as the list filters.
+  doc_status = (data[i].is_completed ?? data[i].is_signed) === true ? '' : `<span id="doc_status_${docId}" class="flex items-center w-full" role="img" aria-label="${completionLabel}" title="${completionLabel}"><span class="w-4 h-4 bg-red-500 rounded-full ml-auto"></span></span>`;
 
   var text_add = `
   <a onclick="view_doc_detail(${docId},'received')" >
@@ -302,6 +303,7 @@ ${escapeHtml(data[i]['doc_date'])}
 
       <div class="p-3 space-y-2 text-gray-700 text-left ">
            <p class="text-s font-semibold ">${escapeHtml(data[i]['doc_name'])}</p>
+           <p class="text-xs text-gray-500">${completionLabel}</p>
       </div>
 
       <div class="bg-gray-50 p-3 text-xs text-gray-500 text-right">
@@ -377,7 +379,7 @@ if (width >= 1300) {
             // กรณีไม่มีข้อมูล หรือไม่ได้ Login
             currentPage = localStorage.getItem("currentPage");
             if (currentPage == 'received') {
-              if (content_received) content_received.innerHTML = `<div id="loop_receive">${read_status === 'NotRead' ? 'ไม่มีหนังสือรอดำเนินการ' : read_status === 'Readed' ? 'ไม่มีหนังสือที่ลงนามแล้ว' : 'ไม่พบข้อมูล'}<br></div>`;
+              if (content_received) content_received.innerHTML = `<div id="loop_receive">${read_status === 'NotRead' ? 'ไม่มีหนังสือรอดำเนินการ' : read_status === 'Readed' ? 'ไม่มีหนังสือที่ดำเนินการแล้ว' : 'ไม่พบข้อมูล'}<br></div>`;
 
             }else {
               if (content_received) content_received.innerHTML = `<div id="loop_receive">ไม่พบข้อมูล<br></div>`;
@@ -1245,7 +1247,17 @@ async function update_read_status(doc_id, user_token, type) {
               console.log("✅ บันทึกสถานะการอ่านสำเร็จ!" + tb_status_read );
             }
 
-            // Opening only updates read styling; pending-signature dots stay visible.
+            // Only legacy deliveries complete on read; signing facts stay untouched.
+            if (data.requires_signature === false) {
+                if (openedDoc) {
+                    openedDoc.is_completed = true;
+                    openedDoc.completion_reason = openedDoc.is_signed ? 'signed' : 'legacy_read';
+                }
+                const dot = document.getElementById('doc_status_' + doc_id);
+                if (dot) dot.style.display = 'none';
+                // Refresh the background category/count, not the open detail modal.
+                if (type === 'received' && localStorage.getItem('currentPage') === 'received') await get_data_api_received(localStorage.getItem('page_number') || 1, document.getElementById('search_txt')?.value || '');
+            }
 
 
         } else {

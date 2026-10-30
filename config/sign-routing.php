@@ -117,7 +117,7 @@ function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, array $departm
         $exists=$pdo->prepare('SELECT 1 FROM t_access_rights WHERE User_Id=? AND Doc_Id=?');
         $exists->execute([$deputy,$docId]);
         if ($exists->fetchColumn()) continue;
-        $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,'',0)")->execute([$deputy,$docId]);
+        $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Inbox_Delivered_At) VALUES (?,?,'',0,UTC_TIMESTAMP())")->execute([$deputy,$docId]);
         app_queue(['type'=>'document_notification','user_id'=>$deputy,'doc_id'=>$docId]);
         $added[]=$deputy;
     }

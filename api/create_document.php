@@ -2,6 +2,7 @@
 require_once __DIR__.'/../config/order-emails.php';
 require_once __DIR__.'/../config/amss-links.php';
 require_once __DIR__.'/../config/drive-archive.php';
+require_once __DIR__.'/../config/inbox-completion.php';
 app_method('POST');$user=app_user();$pdo=app_pdo();
 app_expected_owner($_POST,$user);
 $edit=($_POST['formtype']??'')==='edit_document';$id=(int)($_POST['doc_id']??0);
@@ -12,8 +13,9 @@ $canEdit=!$edit || (int)$doc['User_Id']===(int)$user['User_Id'] || $user['User_S
 if(!$canEdit){
  app_document_transaction();$doc=app_locked_document($id,$user);
  $number=app_text($_POST,'doc_number_receive_stamp',20);$date=app_text($_POST,'stamp_date_recieve',20);
- $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Stamp_Recieve_Number,Stamp_Date_Recieve) VALUES (?,?,'',0,?,?) ON DUPLICATE KEY UPDATE Stamp_Recieve_Number=VALUES(Stamp_Recieve_Number),Stamp_Date_Recieve=VALUES(Stamp_Date_Recieve)");
- $q->execute([$user['User_Id'],$id,$number,$date]);app_audit('document.receipt',$user,$id);$pdo->commit();app_json(['status'=>'success','message'=>'บันทึกเลขรับของคุณสำเร็จ','doc_id'=>$id]);
+ $delivery=app_inbox_delivery($pdo,(int)$user['User_Id'],$id);
+ $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Stamp_Recieve_Number,Stamp_Date_Recieve,Inbox_Delivered_At) VALUES (?,?,'',0,?,?,?) ON DUPLICATE KEY UPDATE Stamp_Recieve_Number=VALUES(Stamp_Recieve_Number),Stamp_Date_Recieve=VALUES(Stamp_Date_Recieve)");
+ $q->execute([$user['User_Id'],$id,$number,$date,$delivery]);app_audit('document.receipt',$user,$id);$pdo->commit();app_json(['status'=>'success','message'=>'บันทึกเลขรับของคุณสำเร็จ','doc_id'=>$id]);
 }
 $year=$edit?(string)$doc['Doc_Year']:(string)(date('Y')+543);
 $type=app_text($_POST,'doc_type',30,true)==='คำสั่ง'?'External':'Internal';
@@ -77,11 +79,14 @@ try{
   $recipients=array_values(array_unique(array_map('intval',$_POST['send_to']??[])));
   $q=$pdo->prepare('SELECT * FROM t_access_rights WHERE Doc_Id=?');$q->execute([$id]);
   foreach($q->fetchAll() as $access){if(!in_array((int)$access['User_Id'],$recipients,true)){$pdo->prepare('INSERT INTO eoffice_access_history (Doc_Id,User_Id,snapshot) VALUES (?,?,?)')->execute([$id,$access['User_Id'],json_encode($access)]);$pdo->prepare('DELETE FROM t_access_rights WHERE id=?')->execute([$access['id']]);}}
-  $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to) VALUES (?,?,'',0) ON DUPLICATE KEY UPDATE Doc_Id=VALUES(Doc_Id)");
+   $q=$pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Inbox_Delivered_At) VALUES (?,?,'',0,UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE Doc_Id=VALUES(Doc_Id)");
   foreach($recipients as $recipient){$q->execute([$recipient,$id]);if($q->rowCount()===1){$payload=['type'=>'document_notification','user_id'=>$recipient,'doc_id'=>$id];if($type==='External'&&((!$edit&&$orderSettings['activated_at']!==null)||app_order_job($id)))$payload['delivery']=['mail'=>['status'=>'skipped','attempts'=>0]];app_queue($payload);}}
  }
  if(isset($_POST['send_to_group'])||($_POST['replace_recipients']??'')==='1'){
-  $pdo->prepare('DELETE FROM t_access_rights_department WHERE Doc_Id=?')->execute([$id]);$q=$pdo->prepare('INSERT INTO t_access_rights_department (Doc_Id,Department_Id) VALUES (?,?)');foreach(array_unique(array_map('intval',$_POST['send_to_group']??[])) as $dept)$q->execute([$id,$dept]);
+   $departments=array_values(array_unique(array_map('intval',$_POST['send_to_group']??[])));
+   $q=$pdo->prepare('SELECT Department_Id FROM t_access_rights_department WHERE Doc_Id=?');$q->execute([$id]);$previous=array_map('intval',$q->fetchAll(PDO::FETCH_COLUMN));
+   foreach(array_diff($previous,$departments) as $dept)$pdo->prepare('DELETE FROM t_access_rights_department WHERE Doc_Id=? AND Department_Id=?')->execute([$id,$dept]);
+   $q=$pdo->prepare('INSERT INTO t_access_rights_department (Doc_Id,Department_Id,Inbox_Delivered_At) VALUES (?,?,UTC_TIMESTAMP())');foreach(array_diff($departments,$previous) as $dept)$q->execute([$id,$dept]);
  }
  $dir=app_storage('original',$year);if(!is_dir($dir)&&!@mkdir($dir,0755,true)&&!is_dir($dir))throw new RuntimeException('Storage unavailable');
   foreach($fileNames as $i=>$detail){$fid=(int)($fileIds[$i]??0);$path=$fid?$existing[$fid]['Doc_Upload_Path']:'';

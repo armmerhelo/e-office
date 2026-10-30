@@ -17,6 +17,7 @@ if(in_array($action,['seed','drop'],true)){
     $db->exec("CREATE TABLE t_access_rights (id INT PRIMARY KEY AUTO_INCREMENT,User_Id INT,Doc_Id INT,Date VARCHAR(30),alert_to INT,Is_Signed VARCHAR(10) DEFAULT 'false',Stamp_Recieve_Number VARCHAR(20),Stamp_Date_Recieve VARCHAR(30),UNIQUE(User_Id,Doc_Id)) ENGINE=InnoDB");
     $db->exec("CREATE TABLE t_access_rights_department (Doc_Id INT,Department_Id INT) ENGINE=InnoDB");
     $db->exec("CREATE TABLE t_user_department (User_Id INT,Department_Id INT) ENGINE=InnoDB");
+    require_once __DIR__.'/../config/inbox-completion.php';app_inbox_migrate($db);
     $db->exec("CREATE TABLE eoffice_access_history (id INT PRIMARY KEY AUTO_INCREMENT,Doc_Id INT,User_Id INT,snapshot JSON) ENGINE=InnoDB");
     $db->exec("CREATE TABLE eoffice_outbox (id BIGINT PRIMARY KEY AUTO_INCREMENT,payload JSON,status VARCHAR(20),created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     $db->exec("CREATE TABLE email_logs (id INT PRIMARY KEY AUTO_INCREMENT,doc_id VARCHAR(50),file_name VARCHAR(255),recipient_name VARCHAR(255),recipient_email VARCHAR(255),delivery_status VARCHAR(20),error_message TEXT,created_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");

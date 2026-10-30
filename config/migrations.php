@@ -1,5 +1,7 @@
 <?php
 function app_migrate(PDO $pdo): void {
+    require_once __DIR__.'/inbox-completion.php';
+    app_inbox_migrate($pdo);
     app_audit_migrate($pdo);
     require_once __DIR__.'/order-email-schema.php';
     app_order_email_migrate($pdo);

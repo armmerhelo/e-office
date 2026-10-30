@@ -28,6 +28,14 @@ All exposed database, mail, AI and push credentials from the previous source mus
 
 ## Migration and rollout
 
+### Inbox delivery cutoff (31 October 2026, Bangkok)
+
+- Received documents delivered before **2026-10-31 00:00 Asia/Bangkok** complete on read under the old rule. Deliveries at/after that instant require a successful signature/stamp save. The completed category is “ดำเนินการแล้ว”; legacy reads are labeled “อ่านแล้วตามเกณฑ์เดิม”, never falsely marked signed.
+- `config/inbox-completion.php` compares UTC delivery timestamps with `2026-10-30 17:00:00`. Run `php scripts/migrate.php` before publishing the changed endpoints: it adds nullable `Inbox_Delivered_At` columns to direct grants, group grants and group memberships without changing read/sign history. Existing NULL timestamps are intentionally grandfathered; they are not document dates or migration time.
+- Roll out the migration and **all delivery writers together under a maintenance gate before the cutoff**. New direct/group/automatic deputy grants and memberships record UTC time; unchanged recipient/group assignments retain their timestamps. Read, receipt-edit and signature endpoints materialize group-derived access using the original delivery time, not the time of opening/signing. A group's delivery is the later of its grant and membership time; the earliest active access path determines the rule.
+- If rollout happens after the cutoff, stop and reconcile deliveries in the gap using verified records before proceeding. The old schema cannot reconstruct those delivery times, and silently grandfathering all of them would violate the cutoff. Never infer them from printed document dates or mutable read dates.
+- Verify both legacy read-but-unsigned and post-cutoff unsigned recipients, group recipients, red dots, completed/pending filters, Back and public-response isolation. `npm run test:integration`, `npm run test:inbox-cutoff`, and `npm run test:sign-browser` cover these rules locally. This section documents rollout requirements, not a claim of production deployment.
+
 1. Back up source, database and document files.
 2. Configure the database/origin/storage. Existing original PDFs belong under `original/{year}/`; existing signed files under `e-sign/{year}/`.
 3. Run `php scripts/migrate.php` using the same environment as the app. The migration is additive/idempotent and adds sessions, counters, signed-file revisions, an outbox and access-history archive.

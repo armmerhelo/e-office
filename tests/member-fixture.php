@@ -14,7 +14,7 @@ $pdo->exec("CREATE TABLE eoffice_sessions (token_hash CHAR(64) PRIMARY KEY, User
 $pdo->exec("CREATE TABLE eoffice_permissions (User_Id INT, permission VARCHAR(50), PRIMARY KEY(User_Id,permission), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
 $pdo->exec("CREATE TABLE t_document (Doc_Id INT PRIMARY KEY AUTO_INCREMENT, User_Id INT) ENGINE=InnoDB");
 $pdo->exec("CREATE TABLE t_department (Department_Id INT PRIMARY KEY AUTO_INCREMENT, Department_Name VARCHAR(255), Department_Detail TEXT) ENGINE=InnoDB");
-$pdo->exec("CREATE TABLE t_user_department (User_Id INT, Department_Id INT, PRIMARY KEY(User_Id,Department_Id), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE, FOREIGN KEY(Department_Id) REFERENCES t_department(Department_Id) ON DELETE CASCADE) ENGINE=InnoDB");
+$pdo->exec("CREATE TABLE t_user_department (User_Id INT, Department_Id INT, Inbox_Delivered_At DATETIME NULL, PRIMARY KEY(User_Id,Department_Id), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE, FOREIGN KEY(Department_Id) REFERENCES t_department(Department_Id) ON DELETE CASCADE) ENGINE=InnoDB");
 $pdo->exec("CREATE TABLE t_access_rights_department (Doc_Id INT, Department_Id INT) ENGINE=InnoDB");
 $pdo->exec("CREATE TABLE eoffice_counters (counter_key VARCHAR(100) PRIMARY KEY,value INT NOT NULL) ENGINE=InnoDB");
 $pdo->exec("CREATE TABLE eoffice_migrations (name VARCHAR(100) PRIMARY KEY,applied_at DATETIME DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");

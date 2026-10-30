@@ -7,7 +7,7 @@ if(!database.endsWith('_test'))throw Error('Only test databases may be used');
 const env={...process.env,DB_DATABASE:database,APP_URL:base,EOFFICE_MOCK_SERVICES:'true',EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(temp,'eoffice-test-storage')};
 const seed=JSON.parse(cp.execFileSync(php,['tests/seed.php'],{env,encoding:'utf8'}));
 const server=cp.spawn(php,['-S',`localhost:${port}`,'scripts/router.php'],{env,stdio:'ignore'});
-const profile=fs.mkdtempSync(path.join(temp,'stamp-inbox-browser-'));let chrome,socket,id=0,doc,cookie,attachment;const waiting=new Map(),exceptions=[];
+const profile=fs.mkdtempSync(path.join(temp,'stamp-inbox-browser-'));let chrome,socket,id=0,doc,legacy,cookie,attachment;const waiting=new Map(),exceptions=[];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function send(method,params={}){const n=++id;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{waiting.delete(n);reject(Error('CDP timeout '+method));},30000);waiting.set(n,{resolve:x=>{clearTimeout(timer);resolve(x);},reject});socket.send(JSON.stringify({id:n,method,params}));});}
 async function evaluate(expression){const result=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.exceptionDetails)throw Error(JSON.stringify(result.exceptionDetails));return result.result.value;}
@@ -22,7 +22,8 @@ async function request(route,body,auth=''){
  const owner=await login('owner');cookie=await login('recipient');
  const form=new FormData();for(const [k,v]of Object.entries({doc_number:'STAMP-BROWSER-'+Date.now(),doc_name:'Synthetic stamp inbox regression',doc_type:'หนังสือ',doc_date_receive:'2026-10-30','doc_file_name[]':'Synthetic PDF','file_id[]':'','send_to[]':seed.users.recipient}))form.append(k,v);
  form.append('doc_upload[]',new Blob([Buffer.from(seed.pdf,'base64')],{type:'application/pdf'}),'regression.pdf');
- const created=(await request('/api/create_document.php',form,owner)).body;doc=created.doc_id;
+  const created=(await request('/api/create_document.php',form,owner)).body;doc=created.doc_id;
+  cp.execFileSync(php,['tests/inspect.php','inbox_after_cutoff',String(doc)],{env,encoding:'utf8'});
  attachment={name:created.files.entries[0].path,year:created.files.year};
  chrome=cp.spawn(process.env.CHROME_BIN||'C:/Program Files/Google/Chrome/Application/chrome.exe',['--headless=new',`--remote-debugging-port=${cdp}`,`--user-data-dir=${profile}`,'--no-first-run','--no-default-browser-check','about:blank'],{stdio:'ignore'});
  let pages;for(let i=0;i<100;i++){try{pages=await fetch(`http://127.0.0.1:${cdp}/json`).then(r=>r.json());break;}catch{await sleep(100);}}
@@ -61,7 +62,7 @@ async function request(route,body,auth=''){
  // A same-origin sibling document updates localStorage, producing an actual
  // cross-document storage event in the inbox rather than a synthetic event.
  await evaluate("(async()=>{const frame=document.createElement('iframe');frame.hidden=true;const loaded=new Promise(resolve=>frame.onload=resolve);frame.src='/offline.html';document.body.append(frame);await loaded;frame.contentWindow.localStorage.setItem('read_status_change','Readed');})()");
- await until(ready+"&&document.getElementById('sub_head').textContent==='ลงนามแล้ว'");
+  await until(ready+"&&document.getElementById('sub_head').textContent==='ดำเนินการแล้ว'");
  assert.equal(await evaluate("document.getElementById('received-signed-filter').getAttribute('aria-pressed')"),'true');
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),true,'cross-document selection must match the loaded category');
  await evaluate("document.getElementById('received-pending-filter').click()");await until(ready);
@@ -80,13 +81,28 @@ async function request(route,body,auth=''){
  await evaluate("closeModal();document.getElementById('received-retry').click()");
  await until(ready+"&&!document.getElementById('received-retry')");
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'retry must restore pending work, not reopen the signed document');
- await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:injection.identifier});
+  await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:injection.identifier});
+  const legacyForm=new FormData();
+  for(const [k,v]of Object.entries({doc_number:'LEGACY-BROWSER-'+Date.now(),doc_name:'Synthetic legacy inbox regression',doc_type:'หนังสือ',doc_date_receive:'2026-10-30','send_to[]':seed.users.recipient}))legacyForm.append(k,v);
+  legacy=(await request('/api/create_document.php',legacyForm,owner)).body.doc_id;
+  cp.execFileSync(php,['tests/inspect.php','inbox_before_cutoff',String(legacy)],{env,encoding:'utf8'});
+  await evaluate('get_data_api_received(1)');await until(ready+`&&data_save.some(row=>Number(row.doc_id)===${legacy})`);
+  await evaluate(`view_doc_detail(${legacy},'received')`);
+  await until(ready+`&&!data_save.some(row=>Number(row.doc_id)===${legacy})`);
+  assert.equal(await evaluate("document.getElementById('doc_detail').classList.contains('active')"),true,'legacy read refreshes the list without closing details');
+  await evaluate("closeModal();document.getElementById('received-signed-filter').click()");
+  await until(ready+`&&data_save.some(row=>Number(row.doc_id)===${legacy})`);
+  assert.equal(await evaluate(`data_save.find(row=>Number(row.doc_id)===${legacy}).is_signed`),false,'reading never invents a signature');
+  assert.equal(await evaluate(`data_save.find(row=>Number(row.doc_id)===${legacy}).completion_reason`),'legacy_read');
+  assert.equal(await evaluate("document.getElementById('loop_receive').textContent.includes('อ่านแล้วตามเกณฑ์เดิม')"),true);
+  assert.equal(await evaluate(`!!document.getElementById('doc_status_${legacy}')`),false,'completed legacy document has no pending dot');
  for(const width of [390,320]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:true});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'no mobile overflow '+width);}
  assert.equal(exceptions.length,0,JSON.stringify(exceptions));
- console.log('PASS real stamp-only save/Back, categories, cross-document storage, failed background list/retry and mobile 390/320px');
+ console.log('PASS real stamp-only save/Back, legacy read completion without signature, categories, cross-document storage, failed background list/retry and mobile 390/320px');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
  if(socket)socket.close();if(chrome){const done=new Promise(resolve=>chrome.once('exit',resolve));chrome.kill();await done;}server.kill();
  if(doc)cp.execFileSync(php,['-r',`require 'config/bootstrap.php';$p=app_pdo();$q=$p->prepare('DELETE FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([(string)${doc}]);$q=$p->prepare('DELETE FROM t_document WHERE Doc_Id=?');$q->execute([${doc}]);`],{env,stdio:'ignore'});
+ if(legacy)cp.execFileSync(php,['-r',`require 'config/bootstrap.php';app_pdo()->prepare('DELETE FROM t_document WHERE Doc_Id=?')->execute([${legacy}]);`],{env,stdio:'ignore'});
  if(attachment&&path.basename(attachment.name)===attachment.name&&/^\d{4}$/.test(String(attachment.year))){
   for(const file of [path.join(env.EOFFICE_STORAGE,'original',String(attachment.year),attachment.name),path.join(env.EOFFICE_STORAGE,'e-sign',String(attachment.year),`signed_${doc}_${attachment.name}`)])fs.rmSync(file,{force:true});
  }

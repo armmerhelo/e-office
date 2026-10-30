@@ -12,6 +12,7 @@ if ($action==='seed') {
     $pdo->exec("CREATE TABLE t_access_rights (User_Id INT,Doc_Id INT,Date VARCHAR(30) DEFAULT '',alert_to INT DEFAULT 0,Status VARCHAR(20) DEFAULT 'Unread',Is_Signed VARCHAR(10) DEFAULT 'false',PRIMARY KEY(User_Id,Doc_Id),FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE,FOREIGN KEY(Doc_Id) REFERENCES t_document(Doc_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE eoffice_signed_files (Doc_Id INT,file_name VARCHAR(255),revision CHAR(64),signed_at DATETIME,PRIMARY KEY(Doc_Id,file_name)) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE eoffice_outbox (id BIGINT AUTO_INCREMENT PRIMARY KEY,payload JSON,created_at DATETIME DEFAULT CURRENT_TIMESTAMP,status VARCHAR(20)) ENGINE=InnoDB");
+    require_once __DIR__.'/../config/inbox-completion.php';app_inbox_migrate($pdo);
     $pdo->exec("INSERT INTO t_document (User_Id,Doc_Year,Doc_File_Link,Is_Delete) VALUES (1,'2569','routing-test','active')");
     $pdo->exec("INSERT INTO t_document_upload VALUES ('routing-test','routing.pdf')");
     $pdo->exec("INSERT INTO t_access_rights (User_Id,Doc_Id) VALUES (2,1),(4,1)");

@@ -50,7 +50,9 @@ try{
  if(!rename($temp,$target))throw new RuntimeException('File save failed');
  $installed=true;
  $revision=hash_file('sha256',$target);
- $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Status,Is_Signed) VALUES (?,?,?,0,'Readed','true') ON DUPLICATE KEY UPDATE Date=VALUES(Date),Status='Readed',Is_Signed='true'")->execute([$user['User_Id'],$id,date('d/m/Y H:i')]);
+  require_once __DIR__.'/../config/inbox-completion.php';
+  $delivery=app_inbox_delivery($pdo,(int)$user['User_Id'],$id);
+  $pdo->prepare("INSERT INTO t_access_rights (User_Id,Doc_Id,Date,alert_to,Status,Is_Signed,Inbox_Delivered_At) VALUES (?,?,?,0,'Readed','true',?) ON DUPLICATE KEY UPDATE Date=VALUES(Date),Status='Readed',Is_Signed='true'")->execute([$user['User_Id'],$id,date('d/m/Y H:i'),$delivery]);
  $pdo->prepare('INSERT INTO eoffice_signed_files VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE revision=VALUES(revision),signed_at=NOW()')->execute([$id,$name,$revision]);
  app_drive_archive_track($id,$name,'signed',$target);
   $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);

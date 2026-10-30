@@ -12,6 +12,7 @@ const vm = require('node:vm');
     const requests = [];
     let listResponse = () => [];
     let listFailure = '';
+    let readResponse = {status:'success'};
     const context = vm.createContext({
         document: {getElementById: id => nodes.get(id)}, window: {innerWidth: 1400, location: {href: 'https://example.test/'}, history: {replaceState() {}}},
         localStorage: {getItem: key => stored.get(key), setItem: (key, value) => stored.set(key, value)},
@@ -25,7 +26,7 @@ const vm = require('node:vm');
                 if (listFailure === 'json') return {ok:true,json:async()=>{throw SyntaxError('Invalid JSON');}};
                 if (listFailure === 'shape') return {ok:true,json:async()=>({status:'error'})};
             }
-            return {ok: true, json: async () => url.includes('update_read') ? {status: 'success'} : listResponse(JSON.parse(options.body))};
+            return {ok: true, json: async () => url.includes('update_read') ? readResponse : listResponse(JSON.parse(options.body))};
         }
     });
     vm.runInContext(fs.readFileSync('assets/api-service.js', 'utf8'), context);
@@ -34,6 +35,16 @@ const vm = require('node:vm');
     assert.equal(opened.status, 'Readed', 'reading is still tracked independently');
     assert.equal(opened.is_signed, false, 'reading must not complete signing');
     assert.notEqual(nodes.get('doc_status_42').style.display, 'none', 'pending signature dot must survive opening');
+    readResponse={status:'success',requires_signature:false};
+    listResponse=()=>[];
+    const beforeLegacyRead=requests.length;
+    await context.update_read_status(42,'','received');
+    assert.equal(opened.is_signed,false);
+    assert.equal(opened.is_completed,true);
+    assert.equal(opened.completion_reason,'legacy_read');
+    assert.equal(nodes.get('doc_status_42').style.display,'none');
+    assert.equal(requests.length-beforeLegacyRead,2,'legacy read refreshes background pending/count');
+    readResponse={status:'success',requires_signature:true};
     for (const filter of ['NotRead', 'Readed', '']) {
         stored.set('read_status_change', filter);
         context.window.innerWidth = 390;
@@ -47,8 +58,14 @@ const vm = require('node:vm');
         }
     }
     context.window.innerWidth = 1400;
+    context.window.innerWidth = 390;
+    listResponse = () => [{doc_id:42,status:'Readed',is_signed:false,is_completed:true,requires_signature:false,completion_reason:'legacy_read',Pagination:1,Total_Records:1}];
+    await context.get_data_api_received(1);
+    assert.ok(nodes.get('loop_receive').innerHTML.includes('อ่านแล้วตามเกณฑ์เดิม'));
+    assert.equal(nodes.get('loop_receive').innerHTML.includes('id="doc_status_42"'),false,'legacy completion hides the dot without claiming a signature');
+    context.window.innerWidth = 1400;
     listResponse = () => [];
-    for (const [filter, message] of [['NotRead', 'ไม่มีหนังสือรอดำเนินการ'], ['Readed', 'ไม่มีหนังสือที่ลงนามแล้ว'], ['', 'ไม่พบข้อมูล']]) {
+    for (const [filter, message] of [['NotRead', 'ไม่มีหนังสือรอดำเนินการ'], ['Readed', 'ไม่มีหนังสือที่ดำเนินการแล้ว'], ['', 'ไม่พบข้อมูล']]) {
         stored.set('read_status_change', filter);
         await context.get_data_api_received(1);
         assert.equal(requests.at(-1).payload.Read_Status_find, filter);
@@ -127,15 +144,15 @@ const vm = require('node:vm');
     context.read_status_change('NotRead');assert.equal(nodes.get('sub_head').innerHTML, 'รอดำเนินการ','repeated clicks cannot switch silently to All');
     assert.equal(nodes.get('received-pending-filter')['aria-pressed'],'true');
     assert.equal(nodes.get('received-all-filter')['aria-pressed'],'false');
-    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ลงนามแล้ว');
-    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ลงนามแล้ว');
+    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ดำเนินการแล้ว');
+    context.read_status_change('Readed');assert.equal(nodes.get('sub_head').innerHTML, 'ดำเนินการแล้ว');
     context.read_status_change('');assert.equal(nodes.get('sub_head').innerHTML, 'ทั้งหมด');
     assert.equal(nodes.get('received-all-filter')['aria-pressed'],'true');
-    assert.ok(nodes.get('received-filter-description').textContent.includes('รวมทั้งรอดำเนินการและลงนามแล้ว'));
+    assert.ok(nodes.get('received-filter-description').textContent.includes('31 ต.ค. 2569'));
     stored.set('read_status_change','Readed');
     listResponse=()=>[{doc_id:43,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}];
     await context.get_data_api_received(1);
-    assert.equal(nodes.get('sub_head').innerHTML,'ลงนามแล้ว','loading after another tab changes storage must sync the selected category');
+    assert.equal(nodes.get('sub_head').innerHTML,'ดำเนินการแล้ว','loading after another tab changes storage must sync the selected category');
     assert.equal(nodes.get('received-signed-filter')['aria-pressed'],'true');
     let resolveList;
     listResponse=()=>new Promise(resolve=>{resolveList=resolve;});
@@ -143,6 +160,6 @@ const vm = require('node:vm');
     await new Promise(resolve=>setImmediate(resolve));
     stored.set('read_status_change','NotRead');
     resolveList([{doc_id:43,is_signed:true,status:'Readed',Pagination:1,Total_Records:1}]);await pending;
-    assert.equal(nodes.get('sub_head').innerHTML,'ลงนามแล้ว','accepted response labels must reflect its captured filter, not newer storage');
+    assert.equal(nodes.get('sub_head').innerHTML,'ดำเนินการแล้ว','accepted response labels must reflect its captured filter, not newer storage');
     console.log('PASS inbox filters: pending dots survive reading and reload, signed dots disappear, all filters/read states, signing labels, empty states and counters');
 })().catch(error => { console.error(error); process.exitCode = 1; });
