@@ -104,11 +104,18 @@ function app_register_document_receipts(PDO $pdo, int $secretary, int $docId, st
 }
 
 // Called inside the same transaction as the PDF revision and signer access.
-function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, array $departments): array {
-    if (!$departments) return [];
-    $marks=implode(',',array_fill(0,count($departments),'?'));
-    $q=$pdo->prepare("SELECT deputy_id FROM eoffice_sign_routes WHERE secretary_id=? AND (department='' OR department IN ($marks)) ORDER BY deputy_id LOCK IN SHARE MODE");
-    $q->execute([$secretary,...$departments]);
+function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, ?array $departments): array {
+    // NULL is an explicit pen-signature declaration: use all server-assigned
+    // routes, without claiming the user stamped/registered any department.
+    if ($departments===[]) return [];
+    $filter='';$params=[$secretary];
+    if ($departments!==null) {
+        $marks=implode(',',array_fill(0,count($departments),'?'));
+        $filter=" AND (department='' OR department IN ($marks))";
+        array_push($params,...$departments);
+    }
+    $q=$pdo->prepare("SELECT deputy_id FROM eoffice_sign_routes WHERE secretary_id=? $filter ORDER BY deputy_id LOCK IN SHARE MODE");
+    $q->execute($params);
     $recipients=array_values(array_unique(array_map('intval',$q->fetchAll(PDO::FETCH_COLUMN))));
     $added=[];
     foreach ($recipients as $deputy) {

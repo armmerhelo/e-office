@@ -17,6 +17,9 @@ $expected=app_text($_POST,'revision',64,true);if(!preg_match('/^[a-f0-9]{64}$/',
 // This is an authenticated declaration of signing intent, not verification of
 // handwriting pixels. Old/no-op clients must not silently complete the inbox.
 if(($_POST['confirm_signature']??'')!=='1')app_fail('กรุณาโหลดหน้าใหม่และลงนามก่อนบันทึก');
+$penDeclaration=$_POST['confirm_pen_signature']??'';
+if(!in_array($penDeclaration,['','1'],true))app_fail('ข้อมูลยืนยันการลงนามด้วยปากกาไม่ถูกต้อง');
+$penSignature=$penDeclaration==='1';
 $dir=app_storage('e-sign',$year);if(!is_dir($dir)&&!@mkdir($dir,0755,true)&&!is_dir($dir))throw new RuntimeException('Storage unavailable');
 $target=$dir.'signed_'.$id.'_'.$name;$original=app_storage('original',$year,$name);$legacy=$dir.'signed_'.$name;
 $remoteCurrent=null;
@@ -24,7 +27,7 @@ if(app_drive_archive_enabled())$remoteCurrent=app_drive_archive_resolve($doc,$na
 $fileLock=app_document_file_lock($id);
 $pdo=app_document_transaction();$backup=null;$installed=false;$temp=$dir.bin2hex(random_bytes(16)).'.tmp';
 try{
- if($receiptDepartments)app_lock_sign_routing($pdo);
+ if($receiptDepartments || $penSignature)app_lock_sign_routing($pdo);
  $doc=app_locked_document($id,$user);
  if((string)$doc['Doc_Year']!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง กรุณาโหลดใหม่',409);}
  app_bound_file($doc,$name);
@@ -39,7 +42,8 @@ try{
   if(!$cloud||!hash_equals($cloud['revision'],$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
  }
  if(!is_file($current)||!hash_equals(hash_file('sha256',$current),$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
- if(hash_equals(hash_file('sha256',$file['tmp_name']),$expected)){
+ $changedSignature=!hash_equals(hash_file('sha256',$file['tmp_name']),$expected);
+ if(!$changedSignature){
   $signed=$pdo->prepare("SELECT Is_Signed FROM t_access_rights WHERE Doc_Id=? AND User_Id=?");$signed->execute([$id,$user['User_Id']]);
   // A previously signed secretary may retry registering a saved receipt after
   // their routing role changes, without changing the already-persisted PDF.
@@ -58,6 +62,7 @@ try{
  $pdo->prepare('INSERT INTO eoffice_signed_files VALUES (?,?,?,NOW()) ON DUPLICATE KEY UPDATE revision=VALUES(revision),signed_at=NOW()')->execute([$id,$name,$revision]);
  app_drive_archive_track($id,$name,'signed',$target);
   $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);
+  if($penSignature && $changedSignature)$autoSent=array_values(array_unique([...$autoSent,...app_sign_auto_send($pdo,(int)$user['User_Id'],$id,null)]));
   app_audit('document.sign',$user,$id,['receipt_departments'=>$receiptDepartments,'auto_sent_user_ids'=>$autoSent]);
  $pdo->commit();
 }catch(Throwable $e){

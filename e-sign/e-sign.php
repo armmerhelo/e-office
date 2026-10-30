@@ -739,6 +739,34 @@ const CONFIG = {
             });
         }
 
+        function hasVisiblePenSignature() {
+            return Object.entries(documentHistory).some(([page, actions]) => {
+                if (!actions.some(action => action.tool === 'pen' && action.points?.some(point => point.x !== action.points[0].x || point.y !== action.points[0].y))) return false;
+                const visible = document.getElementById(`draw-layer-${page}`);
+                if (!visible) return false;
+                // Replay only pen/eraser actions: a surviving stamp must not
+                // turn fully erased pen marks into an all-department send.
+                const layer = document.createElement('canvas');
+                layer.width = visible.width; layer.height = visible.height;
+                const ctx = layer.getContext('2d');
+                for (const action of actions) {
+                    if (!['pen', 'eraser'].includes(action.tool) || !action.points?.length) continue;
+                    ctx.beginPath(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = action.width;
+                    ctx.globalCompositeOperation = action.tool === 'eraser' ? 'destination-out' : 'source-over';
+                    ctx.strokeStyle = action.color || '#000000';
+                    let last = action.points[0]; ctx.moveTo(last.x, last.y);
+                    for (const point of action.points.slice(1)) {
+                        ctx.quadraticCurveTo(last.x, last.y, (last.x + point.x) / 2, (last.y + point.y) / 2);
+                        last = point;
+                    }
+                    ctx.stroke(); ctx.closePath();
+                }
+                const pixels = ctx.getImageData(0, 0, layer.width, layer.height).data;
+                for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) return true;
+                return false;
+            });
+        }
+
         // UPDATE: Function to Save to Server (Real Implementation Logic Added)
         async function saveToServer() {
             if (!currentPDF || savingDocument || isDrawing) return;
@@ -768,6 +796,8 @@ const CONFIG = {
                 formData.append('revision', documentRevision || '');
                 // Explicit signing intent, separate from the optional secretary receipt.
                 formData.append('confirm_signature', '1');
+                const penSignature = hasVisiblePenSignature();
+                if (penSignature) formData.append('confirm_pen_signature', '1');
                 formData.append('receipt_departments', JSON.stringify(registeredDepartments));
                 if (registeredDepartments.length) formData.append('confirm_receipt', '1');
 

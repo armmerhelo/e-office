@@ -25,11 +25,12 @@ async function save(routes, extra={}) {
     const snapshot = await read();
     return request('/management/save_sign_routes_api.php', {data:{routes, route_version:snapshot.route_version}, ...extra});
 }
-async function sign(as='manager', departments, {status=200, revision, legacy=false, confirm=true, unchanged=false}={}) {
+async function sign(as='manager', departments, {status=200, revision, legacy=false, confirm=true, unchanged=false, pen=false}={}) {
     const view = await fetch(base + '/api/view_file.php?Doc_Id=1&File_Path=routing.pdf&Type=signed', {headers:{Cookie:users[as].cookie}});
     assert.equal(view.status,200); const pdf = await view.arrayBuffer();
     const body = new FormData(); body.append('file',new Blob(unchanged?[pdf]:[pdf, `\n% saved-${Date.now()}-${Math.random()}\n`],{type:'application/pdf'}),'routing.pdf');
     body.append('confirm_signature','1');
+    if(pen)body.append('confirm_pen_signature','1');
     body.append('Doc_Id','1'); body.append('year','2569'); body.append('revision',revision || view.headers.get('X-Document-Revision'));
     if (departments !== undefined) body.append(legacy?'stamp_departments':'receipt_departments',JSON.stringify(departments));
     if (confirm && !legacy) body.append('confirm_receipt','1');
@@ -76,7 +77,7 @@ async function run() {
         await request('/management/save_sign_routes_api.php',{data:{routes:[],route_version:old.route_version},status:409});
         assert.deepEqual((await read()).routes,[route(department)]);
     });
-    await test('ordinary signatures, wrong departments and non-secretaries never auto-send',async()=>{
+    await test('legacy clients without pen declaration, wrong receipt departments and non-secretaries never auto-send',async()=>{
         for (const departments of [undefined,[]]) assert.deepEqual((await sign('manager',departments)).auto_sent_user_ids,[]);
         const url=base+'/api/view_file.php?Doc_Id=1&File_Path=routing.pdf&Type=signed';
         const before=await fetch(url,{headers:{Cookie:users.manager.cookie}});const revision=before.headers.get('X-Document-Revision');await before.arrayBuffer();
@@ -100,9 +101,15 @@ async function run() {
         assert.equal(after.headers.get('X-Document-Revision'),revision);await after.arrayBuffer();
         assert.equal(inspect().notifications.length,0);
     });
-    await test('matching secretary stamp adds deputy access and one notification atomically',async()=>{
+    await test('pen-only secretary save routes named departments, rejects stale writes and never creates stamp receipts',async()=>{
+        await sign('basic',[],{pen:true});assert.equal(inspect().notifications.length,0);
+        await sign('manager',[],{pen:true,revision:'0'.repeat(64),status:409});assert.equal(inspect().notifications.length,0);
+        const result=await sign('manager',[],{pen:true});assert.deepEqual(result.auto_sent_user_ids,[users.staff.id]);assert.deepEqual(result.registered_receipt_departments,[]);
+        assert.equal(inspect().receipts.length,0);assert.equal(inspect().notifications.length,1);
+    });
+    await test('matching secretary stamp records receipt and preserves already-routed deputy access',async()=>{
         const result=await sign('manager',[department],{unchanged:true});
-        assert.deepEqual(result.auto_sent_user_ids,[users.staff.id]);
+        assert.deepEqual(result.auto_sent_user_ids,[]);
         assert.deepEqual(result.registered_receipt_departments,[department]);
         const data=inspect(); assert.equal(data.access.find(row=>row.User_Id===users.manager.id).Is_Signed,'true');
         assert.equal(data.access.find(row=>row.User_Id===users.staff.id).Status,'Unread');
@@ -120,15 +127,29 @@ async function run() {
         const repeated=await sign('manager',[department]);assert.deepEqual(repeated.registered_receipt_departments,[department]);
         const data=inspect(); assert.equal(data.access.find(row=>row.User_Id===users.staff.id).Is_Signed,'true'); assert.equal(data.notifications.length,1);
     });
-    await test('legacy wildcard works for any actual stamp, not pen-only saves',async()=>{
+    await test('pen-only signatures use assigned wildcard routes without fabricating receipts or duplicate notifications',async()=>{
         await save([route('','manager','admin')]);
         assert.deepEqual((await sign()).auto_sent_user_ids,[]);
-        assert.deepEqual((await sign('manager',[other])).auto_sent_user_ids,[users.admin.id]);
+        assert.deepEqual((await sign('manager',[],{pen:true,unchanged:true})).auto_sent_user_ids,[],'unchanged PDF cannot trigger a new pen delivery');
+        const before=inspect();
+        const result=await sign('manager',[],{pen:true});assert.deepEqual(result.auto_sent_user_ids,[users.admin.id]);assert.deepEqual(result.registered_receipt_departments,[]);
+        assert.deepEqual(inspect().receipts,before.receipts);
+        assert.deepEqual((await sign('manager',[],{pen:true})).auto_sent_user_ids,[]);
+        assert.deepEqual((await sign('manager',[other])).auto_sent_user_ids,[]);
+        assert.equal(inspect().notifications.length,before.notifications.length+1);
     });
     await test('multiple matching scopes deduplicate deputies',async()=>{
         await save([route(department),route(other)]);
         assert.deepEqual((await sign('manager',[department,other])).auto_sent_user_ids,[]);
         assert.equal(inspect().notifications.length,2);
+    });
+    await test('pen-only signing reaches every assigned department and deduplicates repeated deputies',async()=>{
+        fixture('reset-deputy-access');
+        await save([route(department),route(other,'manager','admin'),route('กลุ่มบริหารงบประมาณ')]);
+        const before=inspect();const result=await sign('manager',[],{pen:true});
+        assert.deepEqual([...result.auto_sent_user_ids].sort((a,b)=>a-b),[users.admin.id,users.staff.id].sort((a,b)=>a-b));
+        assert.deepEqual(inspect().receipts,before.receipts);assert.equal(inspect().notifications.length,before.notifications.length+2);
+        assert.deepEqual((await sign('manager',[],{pen:true})).auto_sent_user_ids,[]);
     });
     await test('removing all routes stops future sends and migration never restores old pairs',async()=>{
         await save([]); fixture('migrate'); assert.deepEqual((await read()).routes,[]);

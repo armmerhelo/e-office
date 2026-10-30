@@ -25,6 +25,8 @@ if ($action==='seed') {
         'signed_files'=>$pdo->query('SELECT * FROM eoffice_signed_files WHERE Doc_Id=1 ORDER BY file_name')->fetchAll(),
         'receipts'=>$pdo->query('SELECT * FROM eoffice_document_receipts WHERE Doc_Id=1 ORDER BY received_at,revision')->fetchAll(),
         'notifications'=>array_map(fn($v)=>json_decode($v,true),$pdo->query('SELECT payload FROM eoffice_outbox ORDER BY id')->fetchAll(PDO::FETCH_COLUMN))],JSON_THROW_ON_ERROR);
+} elseif ($action==='reset-deputy-access') {
+    app_pdo()->exec('DELETE FROM t_access_rights WHERE Doc_Id=1 AND User_Id IN (1,3)');
 } elseif ($action==='migrate') {
     app_sign_routes_migrate(app_pdo());
 } elseif ($action==='legacy-receipt-fk') {

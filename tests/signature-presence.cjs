@@ -8,7 +8,7 @@ const save = source.slice(source.indexOf('        async function saveToServer() 
 const pen = {tool:'pen', points:[{x:1,y:1},{x:2,y:2}]};
 
 (async () => {
-    for (const [name, actions, alpha, expected] of [
+    for (const [name, actions, alpha, expected, penAlpha = alpha] of [
         ['untouched PDF', [], 0, false],
         ['Undo all ink', [], 0, false],
         ['eraser only', [{tool:'eraser'}], 0, false],
@@ -18,10 +18,11 @@ const pen = {tool:'pen', points:[{x:1,y:1},{x:2,y:2}]};
         ['visible pen', [pen], 255, true],
         ['visible stamp', [{tool:'stamp'}], 255, true],
         ['invisible stamp', [{tool:'stamp'}], 0, false],
+        ['erased pen with surviving stamp', [pen,{tool:'eraser'},{tool:'stamp'}], 255, true, 0],
     ]) {
         const writes = [], messages = [];
         const context = vm.createContext({
-            document: {getElementById: () => ({width:1,height:1,getContext:()=>({getImageData:()=>({data:new Uint8ClampedArray([0,0,0,alpha])})})})},
+            document: {getElementById: () => ({width:1,height:1,getContext:()=>({getImageData:()=>({data:new Uint8ClampedArray([0,0,0,alpha])})})}),createElement:()=>({getContext:()=>({beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){},closePath(){},getImageData:()=>({data:new Uint8ClampedArray([0,0,0,penAlpha])})})})},
             history: {1:actions}, StampRenderQueue,
             FormData: class {constructor(){this.fields=new Map();}append(key,value){this.fields.set(key,value);}}, getCookie:()=>'',
             generatePDFBlob:async()=> 'pdf',
@@ -32,6 +33,7 @@ const pen = {tool:'pen', points:[{x:1,y:1},{x:2,y:2}]};
         await context.saveToServer();
         assert.equal(writes.length,expected?1:0,name);
         if (expected) assert.equal(writes[0][1].body.fields.get('confirm_signature'),'1',name);
+        if (expected) assert.equal(writes[0][1].body.fields.get('confirm_pen_signature'),actions.some(a=>a.tool==='pen')&&penAlpha>0?'1':undefined,name+' pen routing declaration');
         if (!expected) assert.ok(messages.some(message=>message.includes('กรุณาลงนาม')),name);
     }
     console.log('PASS signing presence: untouched PDF, Undo, eraser, stationary pen and blank layers cannot complete signing; visible pen/stamp can save');

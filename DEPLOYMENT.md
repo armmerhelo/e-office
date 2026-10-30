@@ -28,6 +28,11 @@ All exposed database, mail, AI and push credentials from the previous source mus
 
 ## Migration and rollout
 
+### Secretary Auto send after a pen signature
+
+- The signing client declares `confirm_pen_signature=1` only for surviving pen ink (pen/eraser replay, excluding stamps). A successful changed-PDF save routes to all deputies currently assigned to that secretary on the server, including legacy wildcard routes; multiple routes to one deputy are deduplicated. Ordinary users without secretary assignments do not auto-send.
+- Stamp-only saves retain their explicit department/receipt-confirmation policy. Pen forwarding never creates a stamp receipt. Failed, stale or unchanged PDF saves cannot trigger new pen deliveries; existing deputy read/sign state and notification deduplication are preserved. The routing gate is taken before document/user locks for both pen and receipt sends. Publish the updated signing client and API together; older clients without the new declaration retain their former pen-only behavior.
+
 ### Inbox delivery cutoff (31 October 2026, Bangkok)
 
 - Received documents delivered before **2026-10-31 00:00 Asia/Bangkok** complete on read under the old rule. Deliveries at/after that instant require a successful signature/stamp save. The completed category is “ดำเนินการแล้ว”; legacy reads are labeled “อ่านแล้วตามเกณฑ์เดิม”, never falsely marked signed.

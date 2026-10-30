@@ -113,9 +113,9 @@
                 <div class="actions" style="margin:16px 0"><button id="reload-sign-routes" type="button" class="btn">โหลดข้อมูลใหม่</button><button id="add-sign-route" class="btn" type="button" disabled>+ เพิ่มคู่เลขา / รองฝ่าย</button></div>
                 <div id="sign-routing-message" class="message" role="status" hidden></div>
                 <form id="form_sign_routes">
-                    <div class="table-scroll"><table class="sign-route-table"><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
+                    <div class="table-scroll"><table class="sign-route-table"><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ลงนาม/ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
                     <p id="sign-route-empty" class="muted" hidden>ยังไม่มี Auto send กดเพิ่มคู่เลขา / รองฝ่ายเพื่อเริ่มตั้งค่า</p>
-                    <p class="muted" style="margin:14px 0">คู่เดิมใช้ “ทุกฝ่าย (คู่เดิม)” ให้เลือกฝ่ายให้ตรงกับตราประทับเพื่อส่งเฉพาะฝ่ายนั้น การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
+                    <p class="muted" style="margin:14px 0">ประทับตรา: ส่งตามฝ่ายที่ยืนยันรับเอกสาร • เซ็นด้วยปากกา: ส่งให้รองทุกฝ่ายที่ตั้งค่าไว้กับเลขาคนนั้น เมื่อบันทึกสำเร็จ การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
                 </form>
             </div>
             <footer class="dialog-foot actions"><button class="btn" type="button" data-sign-routes-close>ปิด</button><button id="save-sign-routes" class="btn primary" type="submit" form="form_sign_routes" disabled>บันทึก Auto send</button></footer>

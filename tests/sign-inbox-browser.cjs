@@ -44,7 +44,15 @@ async function request(route,body,auth=''){
   await evaluate("setTool('stamp');{const canvas=document.querySelector('.drawing-canvas'),rect=canvas.getBoundingClientRect();canvas.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2}));}");
  const saved=await evaluate("(async()=>{let saved=null;const original=window.fetch;window.fetch=async(...args)=>{const response=await original(...args);if(String(args[0]).includes('upload_pdf'))saved=await response.clone().json();return response;};await saveToServer();return saved;})()");
  assert.equal(saved?.status,'success','real stamp-only save must succeed');
- assert.equal((await request('/api/get_data_received.php',{Year:'2569',Doc_Id:doc},cookie)).body[0].is_signed,true);
+  assert.equal((await request('/api/get_data_received.php',{Year:'2569',Doc_Id:doc},cookie)).body[0].is_signed,true);
+  const penSaved=await evaluate(`(async()=>{
+    setTool('pen');const canvas=document.querySelector('.drawing-canvas'),rect=canvas.getBoundingClientRect();
+    const draw=()=>{canvas.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2}));canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:rect.left+rect.width/2+20,clientY:rect.top+rect.height/2+15}));canvas.dispatchEvent(new MouseEvent('mousemove',{bubbles:true,clientX:rect.left+rect.width/2+40,clientY:rect.top+rect.height/2}));canvas.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));};
+    draw();let result=null,declared=null;const original=window.fetch;
+    window.fetch=async(url,options)=>{if(String(url).includes('upload_pdf'))declared=options.body.get('confirm_pen_signature');const response=await original(url,options);if(String(url).includes('upload_pdf'))result=await response.clone().json();return response;};
+    try{await saveToServer();return {result,declared};}finally{window.fetch=original;}
+  })()`);
+  assert.equal(penSaved.declared,'1');assert.equal(penSaved.result?.status,'success','real pen save must declare pen forwarding');
  await evaluate('history.back()');await until("location.pathname==='/index.php'&&"+ready);
  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','Back preserves pending category');
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'saved stamp leaves pending inbox');

@@ -30,15 +30,16 @@ async function request(route,{as='manager',data,body,status=200,worker=0,raw=fal
     const text=await response.text();assert.equal(response.status,status,route+': '+text);return JSON.parse(text);
 }
 const view=(worker=0)=>request('/api/view_file.php?Doc_Id=1&File_Path=routing.pdf&Type=signed',{worker,raw:true});
-function upload(bytes,revision,department){
+function upload(bytes,revision,department,pen=false){
     // Upload fixtures represent an explicit signing action, not an editor no-op.
     const body=new FormData();body.append('file',new Blob([bytes],{type:'application/pdf'}),'routing.pdf');body.append('Doc_Id','1');body.append('year','2569');body.append('revision',revision);
     body.append('confirm_signature','1');
+    if(pen)body.append('confirm_pen_signature','1');
     if(department){body.append('receipt_departments',JSON.stringify([department]));body.append('confirm_receipt','1');}return body;
 }
-async function signed({worker=0,department,status=200,version,suffix='signed'}={}){
+async function signed({worker=0,department,status=200,version,suffix='signed',pen=false}={}){
     const snapshot=version||await view(worker);const bytes=Buffer.concat([snapshot.bytes,Buffer.from(`\n% ${suffix}\n`)]);
-    const result=await request('/e-sign/upload_pdf.php',{body:upload(bytes,snapshot.revision,department),worker,status});return {result,bytes};
+    const result=await request('/e-sign/upload_pdf.php',{body:upload(bytes,snapshot.revision,department,pen),worker,status});return {result,bytes};
 }
 async function routes(department='กลุ่มบริหารวิชาการ'){
     const current=await request('/management/get_sign_routes_api.php',{as:'admin'});
@@ -75,6 +76,11 @@ async function run(){
         assert.equal(data.signed_files[0].revision,final.revision);
         assert.equal(crypto.createHash('sha256').update(final.bytes).digest('hex'),data.signed_files[0].revision);
     });
+    await test('pen-only signing also waits for the routing gate before document and user locks',async()=>{
+        const snapshot=await view();const release=await hold('admin-before-receipt','ADMIN_GATE_HELD');
+        const pending=signed({pen:true,version:snapshot});await waitFor('gate-waits');await release();
+        const result=await pending;assert.deepEqual(result.result.registered_receipt_departments,[]);
+    });
     await test('real HTTP post-install SQL failure restores PDF and leaves receipt/outbox history unchanged',async()=>{
         const snapshot=await view(),before=JSON.parse(cli('inspect','tests/sign-routing-fixture.php'));
         cli('fail-next-signed-row');
@@ -82,6 +88,13 @@ async function run(){
         const after=await view();assert.deepEqual(after.bytes,snapshot.bytes);assert.equal(after.revision,snapshot.revision);
         assert.deepEqual(JSON.parse(cli('inspect','tests/sign-routing-fixture.php')),before);
         const success=await signed({department,version:snapshot,suffix:'retry-after-restore'});assert.deepEqual((await view()).bytes,success.bytes);
+    });
+    await test('failed pen-only save restores the PDF and cannot grant or notify a deputy',async()=>{
+        const snapshot=await view(),before=JSON.parse(cli('inspect','tests/sign-routing-fixture.php'));
+        cli('fail-next-signed-row');
+        try{await signed({pen:true,version:snapshot,status:500,suffix:'failed-pen'});}finally{cli('clear-failure');}
+        assert.deepEqual((await view()).bytes,snapshot.bytes);
+        assert.deepEqual(JSON.parse(cli('inspect','tests/sign-routing-fixture.php')),before);
     });
     await test('an actual InnoDB deadlock after PDF installation restores bytes and returns a retryable conflict',async()=>{
         const snapshot=await view(),before=JSON.parse(cli('inspect','tests/sign-routing-fixture.php'));
