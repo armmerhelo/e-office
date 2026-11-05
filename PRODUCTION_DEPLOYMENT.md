@@ -1,5 +1,15 @@
 # Production deployment — E-Office
 
+## SIYA NEWS — 5 พฤศจิกายน 2026
+
+- เผยแพร่ **20 runtime paths** จาก `e9a9e30dc5d09b5fad01650e0e9279df5810a837` เวลา **2026-11-05 09:01:53 +07:00** หลังตรวจซอร์ส production เทียบ parent และ dependencies 8 paths สำรองซอร์สและฐานข้อมูลครบ **42 ตาราง** พร้อมตรวจ SHA-256 และจำนวนแถว ติดตั้งแบบ atomic replacement ภายใต้ maintenance gate ชั่วคราว คืน `.htaccess` และ invalidate opcache แล้ว
+- เพิ่มเฉพาะตาราง `eoffice_siya_news`, `eoffice_siya_news_images`, `eoffice_siya_news_revisions` แบบ additive และตรวจพื้นที่เก็บภาพส่วนตัวนอก web root ว่าเขียนได้ ไม่แก้ private configuration หรือให้สิทธิ์ SIYA NEWS แก่บุคลากรเดิมอัตโนมัติ Admin กำหนดผู้ส่ง ผู้ตรวจคำ และผู้จัดทำวารสารในหน้าจัดการสมาชิกได้
+- เปิด workflow ร่าง → ส่งตรวจ → ส่งกลับแก้ไข/ผ่านตรวจ พร้อมภาพต้นฉบับ คำบรรยาย เครดิต ประวัติ และ ZIP เฉพาะข่าวผ่านตรวจ การแก้ข่าวหรือภาพหลังผ่านตรวจต้องตรวจใหม่ รวม UI มือถือ การดูภาพเต็ม และการกู้คืนคำขอ/คิวอัปโหลดที่ไม่ทราบผล โดยไม่เผยแพร่ข่าวสาธารณะ
+- **SIYA NEWS Drive bridge ยังปิดอยู่** ไม่เผยแพร่ Apps Script ไป Google และไม่ลบภาพออกจาก Server ต้องตั้งค่าและตรวจ bridge จริงก่อนเปิด worker การ deploy นี้ไม่ใช่หลักฐานว่าการย้ายภาพไป Drive ทำงานจริงแล้ว
+- Production HTTP smoke ผ่าน **12 กลุ่ม** ด้วยบัญชีสังเคราะห์แยกบทบาท ตรวจ guest/ผู้ไม่มีสิทธิ์ เจ้าของข่าว การล็อกผู้ส่งระหว่างตรวจ stale version การส่งกลับ/ส่งใหม่/อนุมัติ approved snapshot ภาพส่วนตัวและ no-store ZIP ตรงภาพต้นฉบับ การถอนสิทธิ์อ่าน/ดาวน์โหลดเมื่อแก้หลังตรวจ และการอนุมัติใหม่ ไม่ส่งอีเมล Push หรือไฟล์ไป Drive
+- Chromium production ตรวจ producer UI บน **1440/390/320px** ไม่มี horizontal overflow เปิดภาพเต็มได้ ไม่มี uncaught JavaScript exception และตรวจหน้าอัปเดตพร้อม full source commit หลังเผยแพร่ feed ลบข้อมูลทดสอบทั้งหมดแล้ว: บัญชีสังเคราะห์ **0**, ข่าว/ภาพสังเคราะห์ **0** ผู้ใช้/เอกสารกลับเป็น **71 / 14,724** และ hash สิทธิ์กับระดับผู้ใช้เดิมตรง baseline
+- ตรวจ checksum ตรงครบ **20 runtime paths**, ไม่มี temporary deployment helpers หรือ staged uploads เผยแพร่และตรวจประวัติที่ `index.php?view=updates` และ `data/system-updates.json` แล้ว Release ID **`deploy-20261105T020153000Z`** รักษาประวัติเดิมครบ
+
 ## เพิ่ม padding ปุ่มหมวดหนังสือ — 30 ตุลาคม 2026
 
 - เผยแพร่เฉพาะ `assets/style_main.css` จาก `450cb2b3fcb09d727cb3146e3f31ecea07288635` เวลา **2026-10-30 15:02:46 +07:00** ตรวจ diff/ซอร์สเดิม สำรองไฟล์ก่อน atomic replacement ภายใต้ maintenance gate คืน `.htaccess` เรียบร้อย ไม่เปลี่ยน schema ข้อมูล หรือกติกาเอกสาร
