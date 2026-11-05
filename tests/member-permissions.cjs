@@ -72,7 +72,7 @@ async function run() {
     });
     await test('Admin gets the complete permission catalog', async()=>{
         const me=await request('/api/me.php');
-        assert.deepEqual(new Set(me.user.permissions),new Set(['members','departments','external_numbers','email','room_booking','maintenance']));
+        assert.deepEqual(new Set(me.user.permissions),new Set(['members','departments','external_numbers','email','room_booking','maintenance','news_submit','news_editor','news_producer']));
     });
     await test('multiple grants immediately affect the existing session', async()=>{
         await grant('manager',['members','departments','members']);
@@ -83,6 +83,12 @@ async function run() {
         assert.equal(list.data.find(u=>u.User_Id===users.admin.id).can_edit,false);
         assert.equal(list.data.find(u=>u.User_Id===users.manager.id).can_edit,true);
         assert.equal(list.data.length,2);
+    });
+    await test('SIYA NEWS grants are independently assignable and immediately visible',async()=>{
+        await grant('basic',['news_submit','news_editor','news_producer']);
+        assert.deepEqual((await request('/api/me.php',{as:'basic'})).user.permissions,['news_submit','news_editor','news_producer']);
+        await grant('basic',[]);
+        assert.deepEqual((await request('/api/me.php',{as:'basic'})).user.permissions,[]);
     });
     await test('delegated group management supports save/list/delete',async()=>{
         await request('/management/save_department_api.php',{as:'manager',body:form({Department_Name:'Members QA',Department_Detail:'Test'})});

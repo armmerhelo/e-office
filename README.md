@@ -1,6 +1,6 @@
 # E-Office
 
-ระบบหนังสือราชการ: รับ/ส่งเอกสารและไฟล์แนบ ลงนาม PDF จัดการสมาชิก/กลุ่มงาน จองห้องประชุม จองเลขคำสั่ง แจ้งซ่อม และแจ้งเตือนผ่านอีเมล/Push
+ระบบหนังสือราชการ: รับ/ส่งเอกสารและไฟล์แนบ ลงนาม PDF จัดการสมาชิก/กลุ่มงาน จองห้องประชุม จองเลขคำสั่ง แจ้งซ่อม รวบรวมข่าว SIYA NEWS และแจ้งเตือนผ่านอีเมล/Push
 
 ## Runtime
 
@@ -57,6 +57,7 @@ npm.cmd run serve:test
 - [AUDIT_LOGS.md](AUDIT_LOGS.md): การเก็บ Log และหน้าประวัติการใช้งานสำหรับ Admin (รัน migration ก่อนใช้งาน)
 
 - [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md): การให้สิทธิ์รายบุคคลและการจัดการสมาชิกโดย Admin สูงสุด
+- [SIYA_NEWS.md](SIYA_NEWS.md): ขั้นตอนข่าว สิทธิ์ การอัปโหลดภาพ และการย้ายภาพไป Google Drive หลังครบ 30 วัน
 
 - [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker
@@ -70,7 +71,7 @@ npm.cmd run serve:test
 
 ### การนำทางและร่างฟอร์ม
 
-หน้าหลักใช้ persistent shell: ทั้งแท็บเอกสารและ 11 โมดูลเปลี่ยนเฉพาะพื้นที่เนื้อหาใน document เดิม โดยไม่ฝัง iframe และไม่ reload หน้าเมื่อกดเมนู ใช้ URL `index.php?view=...` พร้อม Back/Forward; ลิงก์หน้าโมดูลเดิมจะนำเข้าสู่ shell นี้
+หน้าหลักใช้ persistent shell: ทั้งแท็บเอกสารและ 12 โมดูลเปลี่ยนเฉพาะพื้นที่เนื้อหาใน document เดิม โดยไม่ฝัง iframe และไม่ reload หน้าเมื่อกดเมนู ใช้ URL `index.php?view=...` พร้อม Back/Forward; ลิงก์หน้าโมดูลเดิมจะนำเข้าสู่ shell นี้
 
 เมื่อเปิดโมดูลจะซ่อนกรอบงานเอกสารทั้งส่วน รวมแถบประเภทหนังสือ สถานะอ่าน ค้นหา และรายงาน แล้วคืน controls ตามแท็บเมื่อกลับหน้างานเอกสาร
 

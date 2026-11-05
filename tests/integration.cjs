@@ -12,7 +12,7 @@ if(!env.DB_DATABASE.endsWith('_test'))throw Error('Test database must end with _
 function cli(file){if(remote){if(file==='scripts/migrate.php')return '';const action=file==='tests/seed.php'?'seed':'worker';const r=cp.spawnSync('python',['scripts/staging-hosting.py','test-helper',action],{encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}const r=cp.spawnSync(php,[file],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return r.stdout;}
 function inspect(action,value){const r=remote?cp.spawnSync('python',['scripts/staging-hosting.py','test-helper',action,String(value)],{encoding:'utf8'}):cp.spawnSync(php,['tests/inspect.php',action,String(value)],{env,encoding:'utf8'});if(r.status!==0)throw Error(r.stdout+r.stderr);return JSON.parse(r.stdout);}
 cli('scripts/migrate.php');const seed=JSON.parse(cli('tests/seed.php'));env.EOFFICE_TEST_AI_RECIPIENTS=JSON.stringify([seed.users.recipient,999999]);
-const servers=remote?[]:[0,1,2].map(i=>cp.spawn(php,['-S',`localhost:${port+i}`,'scripts/router.php'],{env:{...env,APP_URL:`http://localhost:${port+i}`},stdio:['ignore','ignore','pipe']}));let serverErrors='';servers.forEach(server=>server.stderr.on('data',s=>serverErrors+=s));
+const servers=remote?[]:[0,1,2].map(i=>cp.spawn(php,['-S',`localhost:${port+i}`,'scripts/router.php'],{env:{...env,APP_URL:`http://localhost:${port+i}`},stdio:['ignore','ignore','pipe']}));let serverErrors='';servers.forEach(server=>server.stderr.on('data',s=>serverErrors+=s));let siyaNewsCleanupId=0;
 const pdf=Buffer.from(seed.pdf,'base64');let passed=0;const stamp=Date.now();
 async function request(route,{cookie='',data,form,method=data||form?'POST':'GET',status=200,headers={},worker=0}={}){
  if(route==='/management/update_user_api.php'&&form&&!form.has('member_version')){
@@ -198,9 +198,49 @@ async function run(){
     if(!remote)inspect('inbox_after_cutoff',doc);
     await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
     await request('/api/update_read_status.php',{cookie:outsider,data:{doc_id:doc}});
-    await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
-  });
-  console.log(`Integration: ${passed} passed`);
+     await inboxSignature(outsider,false,true);await inboxSignature(outsider,true,false);
+   });
+   if(!remote)await test('SIYA NEWS permissions gate submissions, proofing, approved access and private image delivery',async()=>{
+     async function grantNews(userId,permissions){
+        const snapshot=(await request('/management/get_user_departments_api.php?User_Id='+userId,{cookie:admin})).body;
+        await request('/management/save_user_permissions_api.php',{cookie:admin,data:{user_id:userId,permissions,permission_version:snapshot.permission_version}});
+      }
+      const qaIds=[seed.users.owner,seed.users.outsider,seed.users.recipient],originals={};
+      for(const userId of qaIds)originals[userId]=(await request('/management/get_user_departments_api.php?User_Id='+userId,{cookie:admin})).body.permissions;
+      try{
+        owner=await login('owner');await grantNews(seed.users.owner,[]);await grantNews(seed.users.outsider,[]);await grantNews(seed.users.recipient,[]);
+        await request('/api/siya-news.php?action=list&scope=mine',{cookie:owner,status:403});await request('/api/siya-news.php?action=list&scope=mine',{status:401});
+        await grantNews(seed.users.owner,['news_submit']);await grantNews(seed.users.outsider,['news_editor']);await grantNews(seed.users.recipient,['news_producer']);
+        const title='QA SIYA NEWS '+stamp;
+        let news=(await request('/api/siya-news.php',{cookie:owner,data:{action:'create',title,event_date:'2026-11-04',location:'หอประชุม',department:'QA',body:'รายละเอียดข่าวสำหรับทดสอบสิทธิ์และการตรวจคำ'}})).body;
+        assert.equal(news.version,1);const newsId=news.id;siyaNewsCleanupId=newsId;
+        const imageForm=new FormData();imageForm.set('action','upload');imageForm.set('id',String(newsId));imageForm.set('version',String(news.version));imageForm.append('image',new Blob([Buffer.from(seed.png,'base64')],{type:'image/png'}),'ภาพ QA.png');
+        news=(await request('/api/siya-news.php',{cookie:owner,form:imageForm})).body;assert.match(news.image_id,/^[a-f0-9]{32}$/);assert.equal(news.version,2);
+        await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:recipient,status:403});
+        news=(await request('/api/siya-news.php',{cookie:owner,data:{action:'submit',id:newsId,version:news.version}})).body;assert.equal(news.status_value,'review');
+        const queue=(await request('/api/siya-news.php?action=list&scope=review&q='+encodeURIComponent(title),{cookie:outsider})).body;assert.equal(queue.data.length,1);
+        await request('/api/siya-news.php',{cookie:owner,data:{action:'save',id:newsId,version:news.version,title,body:'stale author edit',event_date:'2026-11-04',location:'หอประชุม',department:'QA'},status:[403,409]});
+        news=(await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:outsider})).body.data;assert.equal(news.status,'review');
+        news=(await request('/api/siya-news.php',{cookie:outsider,data:{action:'return',id:newsId,version:news.version,review_note:'กรุณาแก้รายละเอียดข่าว'}})).body;assert.equal(news.status_value,'changes_requested');
+        const returned=(await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:owner})).body.data;assert.equal(returned.review_note,'กรุณาแก้รายละเอียดข่าว');
+        news=(await request('/api/siya-news.php',{cookie:owner,data:{action:'save',id:newsId,version:returned.version,title,body:'แก้ไขตามข้อเสนอแนะ',event_date:'2026-11-04',location:'หอประชุม',department:'QA'}})).body;assert.equal(news.status_value,'changes_requested');
+        news=(await request('/api/siya-news.php',{cookie:owner,data:{action:'submit',id:newsId,version:news.version}})).body;assert.equal(news.status_value,'review');
+        news=(await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:outsider})).body.data;assert.equal(news.status,'review');
+        await request('/api/siya-news.php',{cookie:outsider,data:{action:'approve',id:newsId,version:news.version+1,review_note:''},status:409});
+        news=(await request('/api/siya-news.php',{cookie:outsider,data:{action:'approve',id:newsId,version:news.version,review_note:'ตรวจคำแล้ว'}})).body;assert.equal(news.status_value,'approved');
+        const ready=(await request('/api/siya-news.php?action=list&scope=ready&q='+encodeURIComponent(title),{cookie:recipient})).body;assert.equal(ready.data.length,1);
+        const detail=(await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:recipient})).body.data;assert.equal(detail.images.length,1);assert.equal(detail.history,undefined);
+        const imageResponse=await fetch(`${base}/api/siya-news-image.php?id=${detail.images[0].id}`,{headers:{Cookie:recipient}});assert.equal(imageResponse.status,200);assert.equal(imageResponse.headers.get('Cache-Control'),'private, no-store, max-age=0');assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()),Buffer.from(seed.png,'base64'));
+        const zip=await fetch(`${base}/api/siya-news-export.php?id=${newsId}`,{headers:{Cookie:recipient}});if(zip.status===200){const bytes=Buffer.from(await zip.arrayBuffer());assert.equal(bytes.subarray(0,2).toString(),'PK');}else assert.equal(zip.status,503,'ZIP is either available or reports the missing server extension');
+        await request('/api/siya-news.php',{cookie:recipient,data:{action:'used',id:newsId}});
+        news=(await request('/api/siya-news.php',{cookie:owner,data:{action:'save',id:newsId,version:news.version,title,body:'แก้ไขหลังผ่านตรวจ ต้องตรวจซ้ำ',event_date:'2026-11-04',location:'หอประชุม',department:'QA'}})).body;assert.equal(news.status_value,'review');
+        await request('/api/siya-news.php?action=detail&id='+newsId,{cookie:recipient,status:403});
+      }finally{for(const userId of qaIds)await grantNews(userId,originals[userId]);}
+   });
+   console.log(`Integration: ${passed} passed`);
  console.log(JSON.stringify({doc,fileName,users:seed.users,storage:remote?'private storage on staging host':env.EOFFICE_STORAGE}));
 }
-run().catch(e=>{console.error(e);console.error(serverErrors);process.exitCode=1;}).finally(()=>servers.forEach(server=>server.kill()));
+run().catch(e=>{console.error(e);console.error(serverErrors);process.exitCode=1;}).finally(()=>{
+ if(!remote){const cleanup=cp.spawnSync(php,['tests/siya-news-cleanup.php',String(siyaNewsCleanupId)],{env,encoding:'utf8'});if(cleanup.status!==0)console.error('SIYA NEWS test cleanup failed',cleanup.stderr);}
+ servers.forEach(server=>server.kill());
+});

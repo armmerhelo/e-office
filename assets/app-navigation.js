@@ -12,7 +12,8 @@
         'email_send/doc_send_email.html':'send_email','email_send/ai_settings.html':'ai_settings',
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
         'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
-        'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates'
+        'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates',
+        'siya_news/index.html':'siya_news'
     };
     const entry=Object.keys(entryViews).find(path=>new URL(path,appRoot).pathname===location.pathname);
     if(entry && typeof location.replace==='function') {
@@ -31,6 +32,7 @@
         {label:'รายการจองห้องของฉัน', path:'room_booking/edit_room_booking.html', login:true, group:'อื่น ๆ', icon:'edit'},
         {label:'แจ้งซ่อม', path:'maintenance_requests/index.html', login:true, group:'อื่น ๆ', icon:'⚒'},
         {label:'แจ้งซ่อม (ฝ่ายงาน)', path:'maintenance_requests/admin.html', permission:'maintenance', group:'อื่น ๆ', icon:'report'},
+        {label:'SIYA NEWS', path:'siya_news/index.html', permissionAny:['news_submit','news_editor','news_producer'], group:'อื่น ๆ', icon:'news'},
         {label:'ส่งอีเมลคำสั่ง', path:'email_send/doc_send_email.html', permission:'email', group:'อื่น ๆ', icon:'✉'},
         {label:'ตั้งค่า AI และอีเมล', path:'email_send/ai_settings.html', admin:true, group:'อื่น ๆ', icon:'⚙'},
         {label:'ประวัติการใช้งาน', path:'management/audit_logs.html', admin:true, group:'อื่น ๆ', icon:'report'}
@@ -57,7 +59,8 @@
         '⚒':'M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55.164 1.163.133 1.694-.066.22-.082.415-.208.583-.376l2.441-2.441a.5.5 0 00-.353-.854h-1.738a1 1 0 01-.707-.293l-.586-.586a1 1 0 00-.707-.293h-2.211a1 1 0 00-.707.293l-.586.586a1 1 0 01-.707.293h-1.738a.5.5 0 00-.353.854l2.44 2.441a2.25 2.25 0 01.583.376z',
         'logout':'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
         'login':'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
-        '⚙':'M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2'
+        '⚙':'M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2',
+        'news':'M4 5h16v14H4zM8 9h8M8 13h8M8 17h5'
     };
     const appendIcon = (node,key) => {
         const icon = document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -91,6 +94,7 @@
         appendIcon(link,item.icon);
         link.append(make('span', '', item.label));
         if (item.permission) link.dataset.permission = item.permission;
+        if (item.permissionAny) link.dataset.permissionAny = item.permissionAny.join(',');
         if (item.login) link.dataset.requiresLogin = 'true';
         if (item.admin) link.dataset.requiresAdmin = 'true';
         if (new URL(link.href).pathname === location.pathname) {link.setAttribute('aria-current','page');link.classList.add('is-current');}
@@ -168,6 +172,7 @@
         for (const link of list.querySelectorAll('a')) link.hidden = Boolean(
             (link.dataset.requiresLogin && !user) ||
             (link.dataset.permission && !user?.permissions?.includes(link.dataset.permission)) ||
+            (link.dataset.permissionAny && !link.dataset.permissionAny.split(',').some(permission=>user?.permissions?.includes(permission))) ||
             (link.dataset.requiresAdmin && user?.status !== 'Admin'));
         for (const group of groups) group.heading.hidden = group.links.every(link=>link.hidden);
         logout.hidden=!user;login.hidden=!!user;userName.textContent=user?.name || '';

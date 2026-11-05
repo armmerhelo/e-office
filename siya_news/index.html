@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIYA NEWS — โรงเรียนศรียานุสรณ์</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="style.css?v=20261104-eoffice-theme">
+    <link rel="stylesheet" href="ux.css?v=20261104-upload-resolution">
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261104-eoffice-theme">
+</head>
+<body class="eoffice-module-page">
+<div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/siya_news/index.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
+    <script src="app.js?v=20261105-recovery-list"></script>
+    <main class="news-page" id="siya-news-app">
+        <header class="news-brand">
+            <div class="news-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h4v4H8zM15 8h2M15 12h2M8 16h9"/></svg></div>
+            <div><h1>SIYA NEWS</h1><p>รวบรวมข่าว ตรวจคำ และดาวน์โหลดข้อมูลสำหรับจัดทำวารสาร</p></div>
+            <div class="news-private"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>ใช้งานภายใน</div>
+        </header>
+        <div class="news-notice" role="note">ข่าวภายในสำหรับจัดทำวารสาร · ดาวน์โหลดได้เมื่อผ่านตรวจ · ไม่เผยแพร่สาธารณะ</div>
+        <div id="news-message" class="news-message" role="status" hidden></div>
+        <div class="news-workspace">
+            <section class="news-list-panel" aria-labelledby="list-title">
+                <div class="panel-heading"><h2 id="list-title">รายการข่าว</h2><button class="news-button primary eo-btn eo-btn--primary" id="create-news" type="button" hidden>＋ สร้างข่าว</button></div>
+                <div class="news-tabs" role="tablist" aria-label="หมวดข่าว" id="news-tabs"></div>
+                <label class="search-label" for="news-search">ค้นหาข่าว</label><input id="news-search" class="news-input" type="search" maxlength="100" placeholder="หัวข้อ กลุ่มงาน หรือเนื้อหา">
+                <div id="news-list" class="news-list" role="tabpanel" aria-live="polite"><p class="empty-state">กำลังโหลดรายการข่าว…</p></div>
+                <button type="button" class="news-button eo-btn" id="news-load-more" hidden>โหลดข่าวเพิ่มเติม</button>
+            </section>
+            <section class="news-detail-panel" aria-label="รายละเอียดข่าว" id="news-detail" tabindex="-1"><div class="empty-detail"><div class="empty-detail__icon" aria-hidden="true">✎</div><h2>เลือกข่าวเพื่อเริ่มทำงาน</h2><p>ข่าวที่คุณมีสิทธิ์จะปรากฏในรายการทางซ้าย</p></div></section>
+        </div>
+        <dialog id="news-image-viewer" class="news-image-viewer" aria-labelledby="news-viewer-title" aria-describedby="news-viewer-caption">
+            <header class="news-viewer-header"><h2 id="news-viewer-title">ภาพเต็ม</h2><button type="button" id="close-news-viewer" class="eo-btn">ปิดภาพ <span aria-hidden="true">×</span></button></header>
+            <div class="news-viewer-body"><p id="news-viewer-status" role="status"></p><img id="news-full-image" alt="" hidden></div>
+            <p id="news-viewer-caption" class="news-viewer-caption"></p>
+        </dialog>
+        <footer class="news-footer">SIYA NEWS · ระบบรวบรวมข่าวภายใน E-Office</footer>
+    </main>
+</div></div>
+</body>
+</html>

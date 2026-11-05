@@ -317,9 +317,9 @@ Workflow ทั้งสองเวอร์ชัน:
 
 ### API และข้อมูล
 
-Member CRUD, status/permissions APIs, department APIs, `config/permissions.php` และ version helpers ที่ใช้อยู่ตรงกับ production
+Member CRUD, status/permissions APIs, department APIs และ version helpers ยังคงกติกาเดิม ส่วน `config/permissions.php` ใน local เพิ่ม SIYA NEWS 3 บทบาท ซึ่งยังไม่ถือว่าเผยแพร่บน production จนกว่าจะ deploy และตรวจยืนยัน
 
-จึงยังเป็นกติกาเดิม: สิทธิ์ดูแลงาน 6 ด้าน, เปลี่ยนสิทธิ์/ระดับโดย Admin, ป้องกัน last Admin และใช้ version token ป้องกัน snapshot ล้าสมัย
+กติกาการเปลี่ยนสิทธิ์/ระดับโดย Admin การป้องกัน last Admin และ version token ป้องกัน snapshot ล้าสมัยยังเหมือนเดิม
 
 ### Client ที่เปลี่ยน
 

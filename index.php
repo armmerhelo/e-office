@@ -251,6 +251,12 @@ window.addEventListener('load', function() {
               แจ้งซ่อม (ฝ่ายงาน)
             </a>
           </li>
+          <li>
+            <a href="siya_news/index.html" id="menu-siya-news" onclick="showView('siya_news','','1'); return false;" class="menu-item eoffice-app-navigation__link" style="display:none">
+              <svg class="eoffice-app-navigation__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>SIYA NEWS</span>
+            </a>
+          </li>
         <li id="group_send_email">
           <a href="email_send/doc_send_email.html" id="send_email" onclick="showView('send_email','','1'); return false;" class="menu-item">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>

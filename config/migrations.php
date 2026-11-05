@@ -16,6 +16,8 @@ function app_migrate(PDO $pdo): void {
     if(!$pdo->query("SHOW INDEX FROM eoffice_outbox WHERE Key_name='idx_eoffice_outbox_status'")->fetch())$pdo->exec('ALTER TABLE eoffice_outbox ADD INDEX idx_eoffice_outbox_status (status,id)');
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_access_history (id BIGINT AUTO_INCREMENT PRIMARY KEY, Doc_Id INT NOT NULL, User_Id INT NOT NULL, snapshot JSON NOT NULL, archived_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_permissions (User_Id INT NOT NULL, permission VARCHAR(50) NOT NULL, PRIMARY KEY(User_Id,permission), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
+    require_once __DIR__.'/siya-news-schema.php';
+    app_siya_news_migrate($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_migrations (name VARCHAR(100) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     require_once __DIR__.'/sign-routing.php';
     app_sign_routes_migrate($pdo);

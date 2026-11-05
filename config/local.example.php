@@ -21,6 +21,10 @@ return [
     'EOFFICE_DRIVE_ARCHIVE_SECRET' => '', // 64 random lowercase hex, same Script Property
     'EOFFICE_DRIVE_EVICT_ENABLED' => 'false', // enable after remote recovery validation
     'EOFFICE_DRIVE_EVICT_GRACE_DAYS' => '14', // minimum 7
+    'EOFFICE_SIYA_NEWS_DRIVE_ENABLED' => 'false',
+    'EOFFICE_SIYA_NEWS_DRIVE_URL' => '', // authenticated merged Apps Script /exec
+    'EOFFICE_SIYA_NEWS_DRIVE_SECRET' => '', // 64 random lowercase hex; keep private
+    'EOFFICE_SIYA_NEWS_STORAGE' => '', // optional absolute private path outside the web root
     'EOFFICE_MOCK_SERVICES' => 'true',
     'EOFFICE_REMOTE_FILES' => 'false',
 ];

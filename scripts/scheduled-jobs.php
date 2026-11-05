@@ -4,6 +4,7 @@ if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 ini_set('zend.exception_ignore_args','1');
 require __DIR__.'/../config/order-emails.php';
 require __DIR__.'/../config/drive-archive-worker.php';
+require __DIR__.'/../config/siya-news-worker.php';
 $failed=false;
 try{echo app_order_worker()." order jobs processed\n";}catch(Throwable $e){fwrite(STDERR,'Order scheduler failed ('.get_class($e).")\n");$failed=true;}
 if(app_drive_archive_enabled()){
@@ -14,5 +15,9 @@ if(app_drive_archive_enabled()){
             echo json_encode(['drive_daily'=>app_drive_archive_backup()],JSON_THROW_ON_ERROR).PHP_EOL;
         }catch(Throwable $e){fwrite(STDERR,'Drive daily backup failed ('.get_class($e).")\n");$failed=true;}
     }
+}
+if(app_siya_news_drive_enabled()){
+    try{echo json_encode(['siya_news_drive'=>app_siya_news_archive_images()],JSON_THROW_ON_ERROR).PHP_EOL;}
+    catch(Throwable $e){fwrite(STDERR,'SIYA NEWS Drive worker failed ('.get_class($e).")\n");$failed=true;}
 }
 if($failed)exit(1);

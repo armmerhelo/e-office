@@ -28,4 +28,11 @@ function walk(dir) {
         }
     }
 }
-walk('.');console.log(JSON.stringify({phpCount,jsCount,inlineCount,failures},null,2));if(failures.length)process.exitCode=1;
+walk('.');
+try {
+    const gasRoot=path.join('integrations','google-drive');
+    const gas=['UnifiedDrive.gs','EOfficeArchive.gs','SiyaNewsDrive.gs'].map(file=>fs.readFileSync(path.join(gasRoot,file),'utf8')).join('\n\n');
+    new vm.Script(gas,{filename:'EOfficeDrive-Combined.gs'});
+    if((gas.match(/function\s+doPost\s*\(/g)||[]).length!==1||(gas.match(/function\s+doGet\s*\(/g)||[]).length!==1)throw Error('Apps Script entrypoint collision');
+}catch(error){failures.push({file:'integrations/google-drive (combined Apps Script)',error:error.message});}
+console.log(JSON.stringify({phpCount,jsCount,inlineCount,failures},null,2));if(failures.length)process.exitCode=1;

@@ -1,5 +1,5 @@
-/** Existing maintenance API plus the authenticated encrypted archive route.
- * Add EOfficeArchive.gs to the SAME Apps Script project.
+/** Existing maintenance API plus authenticated archive and SIYA NEWS routes.
+ * Add EOfficeArchive.gs and SiyaNewsDrive.gs to the SAME Apps Script project.
  * Script Property EOFFICE_LEGACY_ROOT_ID = the previous CUSTOM_ROOT_FOLDER_ID.
  * Archive root must be a separate PRIVATE sibling outside the legacy tree.
  */
@@ -20,8 +20,9 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
     if (!data || typeof data !== 'object') throw legacyDriveError('คำขอไม่ถูกต้อง');
     if (data.route !== undefined) {
-      if (data.route !== 'eoffice-archive-v1' || typeof eofficeArchiveHandle !== 'function') return sendJsonResponse({status:'error', code:'invalid_route'});
-      return eofficeArchiveHandle(e);
+      if (data.route === 'eoffice-archive-v1' && typeof eofficeArchiveHandle === 'function') return eofficeArchiveHandle(e);
+      if (data.route === 'eoffice-news-v1' && typeof eofficeSiyaNewsHandle === 'function') return eofficeSiyaNewsHandle(e);
+      return sendJsonResponse({status:'error', code:'invalid_route'});
     }
     switch (data.action) {
       case 'create': return handleCreate(data);

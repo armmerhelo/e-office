@@ -92,10 +92,16 @@ async function run() {
         await until("!!document.querySelector('.eoffice-module-host:not([hidden])') && !document.querySelector('.eoffice-module-status')");
         assert.equal(await evaluate("document.getElementById('module-viewport').hasAttribute('aria-busy')"),false);
     });
-    for(const view of ['members','groups','book','my_public','send_email','ai_settings','room_booking','room_booking2','edit_room_booking','maintenance','maintenance_admin'])
+    for(const view of ['members','groups','book','my_public','send_email','ai_settings','room_booking','room_booking2','edit_room_booking','maintenance','maintenance_admin','siya_news'])
         await check(view+' mounts with persistent document/sidebar and no iframe',async()=>{
             await moduleView(view);
             if(view==='book')assert.ok(await evaluate(`getComputedStyle(${root}.getElementById('bookingForm').parentElement).paddingTop.replace('px','')>=24`),'module reset must not suppress Tailwind card spacing');
+            if(view==='siya_news'){
+                await until(`${root}.getElementById('news-tabs').children.length===4`);
+                await evaluate(`${root}.getElementById('create-news').click()`);
+                assert.equal(await evaluate(`${root}.querySelectorAll('#news-content-form').length`),1);
+                assert.equal(await evaluate(`${root}.querySelectorAll('form form').length`),0,'news forms must not be nested');
+            }
             if(process.env.EOFFICE_QA_SCREENSHOTS==='1' && ['book','room_booking'].includes(view)) {
                 await sleep(300);const image=await send('Page.captureScreenshot',{format:'png'});
                 fs.writeFileSync(path.join(folder,`eoffice-spa-${view}.png`),Buffer.from(image.data,'base64'));

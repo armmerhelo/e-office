@@ -1,5 +1,6 @@
 
 function eofficeCan(permission) {
+    if (permission === 'siya_news') return ['news_submit','news_editor','news_producer'].some(role=>window.eofficeUser?.permissions?.includes(role));
     return !!window.eofficeUser?.permissions?.includes(permission);
 }
 
@@ -8,7 +9,8 @@ function applyPermissionMenus() {
         members: ['menu-members', 'group_menu_members'],
         departments: ['menu-groups', 'group_menu_groups'],
         email: ['send_email', 'group_send_email'],
-        maintenance: ['menu-maintenance-admin', 'group_maintenance_admin']
+        maintenance: ['menu-maintenance-admin', 'group_maintenance_admin'],
+        siya_news: ['menu-siya-news']
     })) {
         for (const id of ids) {
             const node = document.getElementById(id);
@@ -78,7 +80,7 @@ async function refreshPermissionMenus() {
 }
 
 function restrictedViewPermission(view) {
-    return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance'}[view];
+    return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance', siya_news:'siya_news'}[view];
 }
 
 const MODULE_ROUTES = Object.freeze({
@@ -94,7 +96,8 @@ const MODULE_ROUTES = Object.freeze({
     maintenance_admin: 'maintenance_requests/admin.html',
     ai_settings: 'email_send/ai_settings.html',
     audit_logs: 'management/audit_logs.html',
-    updates: 'updates/index.html'
+    updates: 'updates/index.html',
+    siya_news: 'siya_news/index.html'
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
