@@ -51,20 +51,33 @@ function app_siya_news_snapshot(PDO $pdo,array $news,int $actorId): void {
     $q=$pdo->prepare('SELECT id,original_name,extension,mime_type,bytes,caption,credit,sort_order FROM eoffice_siya_news_images WHERE news_id=? AND is_removed=0 ORDER BY sort_order,id');
     $q->execute([(int)$news['id']]);
     $snapshot=['title'=>$news['title'],'event_date'=>$news['event_date'],'location'=>$news['location'],'department'=>$news['department'],
-        'body'=>$news['body'],'status'=>$news['status'],'review_note'=>$news['review_note'],'images'=>$q->fetchAll()];
+        'body'=>$news['body'],'status'=>$news['status'],'review_note'=>$news['review_note'],'deleted_at'=>$news['deleted_at']??null,'deleted_by'=>$news['deleted_by']??null,'deleted_from_status'=>$news['deleted_from_status']??null,'images'=>$q->fetchAll()];
     $snapshot['image_ids']=array_column($snapshot['images'],'id');
     $pdo->prepare('INSERT INTO eoffice_siya_news_revisions(news_id,version,actor_id,snapshot) VALUES(?,?,?,?)')
         ->execute([(int)$news['id'],(int)$news['version'],$actorId,json_encode($snapshot,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)]);
 }
-function app_siya_news_item(PDO $pdo,int $id,array $user,bool $withHistory=false): array {
+function app_siya_news_can_trash(array $news,array $user): bool {
+    $status=$news['status']==='deleted'?($news['deleted_from_status']??''):$news['status'];
+    if(!in_array($status,['draft','review','approved','changes_requested'],true))return false;
+    if($user['User_Status']==='Admin')return true;
+    return ($status==='draft'&&(int)$news['owner_id']===(int)$user['User_Id']&&app_can($user,'news_submit'))
+        ||(in_array($status,['review','approved'],true)&&app_can($user,'news_editor'));
+}
+function app_siya_news_item(PDO $pdo,int $id,array $user,bool $withHistory=false,bool $allowDeleted=false): array {
     $q=$pdo->prepare('SELECT n.*,COALESCE(o.User_Name,CONCAT("สมาชิก #",n.owner_id)) AS owner_name,r.User_Name AS reviewer_name FROM eoffice_siya_news n LEFT JOIN t_user o ON o.User_Id=n.owner_id LEFT JOIN t_user r ON r.User_Id=n.reviewer_id WHERE n.id=?');
     $q->execute([$id]);$news=$q->fetch();
     if(!$news)app_fail('ไม่พบข่าว',404);
+    $deleted=$news['status']==='deleted';$trashAccess=$deleted&&$allowDeleted&&app_siya_news_can_trash($news,$user);
+    if($deleted&&!$trashAccess)app_fail('ข่าวนี้อยู่ในถังขยะ กรุณากู้คืนก่อนใช้งาน',403);
     $isOwner=(int)$news['owner_id']===(int)$user['User_Id'];$editor=app_can($user,'news_editor');$producer=app_can($user,'news_producer');$submitter=app_can($user,'news_submit')&&$isOwner;
-    $editorAccess=$editor&&in_array($news['status'],['review','approved'],true);
+    $editorAccess=($editor&&in_array($news['status'],['review','approved'],true))||$trashAccess;
     if(!$submitter&&!$editorAccess&&!($producer&&$news['status']==='approved'))app_fail('คุณไม่มีสิทธิ์เข้าถึงข่าวนี้',403);
     $news['is_owner']=$isOwner;
-    if(!$submitter&&!$editorAccess){
+    $news['can_delete']=!$deleted&&app_siya_news_can_trash($news,$user);
+    $news['can_restore']=$trashAccess;
+    if($deleted){
+        $q=$pdo->prepare('SELECT COUNT(*) FROM eoffice_siya_news_images WHERE news_id=? AND is_removed=0');$q->execute([$id]);$news['image_count']=(int)$q->fetchColumn();$news['images']=[];
+    }elseif(!$submitter&&!$editorAccess){
         $q=$pdo->prepare('SELECT snapshot FROM eoffice_siya_news_revisions WHERE news_id=? AND version=?');$q->execute([$id,(int)$news['approved_version']]);
         $approved=$q->fetchColumn();$approved=is_string($approved)?json_decode($approved,true,32,JSON_THROW_ON_ERROR):null;
         if(!is_array($approved)||!is_array($approved['images']??null))app_fail('ไม่พบข้อมูลข่าวเวอร์ชันที่ผ่านตรวจแล้ว',503);

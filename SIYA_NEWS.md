@@ -14,6 +14,14 @@ Admin keeps the existing all-access behavior. There is no general internal viewe
 
 Workflow: `draft → review → approved`; reviewers correct the submitted copy directly. Legacy `changes_requested` records and the return API remain supported for compatibility. A content or image change after approval clears approval and puts the item back into review. Saves use a version number to reject stale forms. Each change and review transition retains a restricted snapshot; producers receive only the approved news and its approved image set. The ZIP contains `ข่าว.txt`, original files under `images/`, and `รายการภาพ.csv` with captions and credits.
 
+### Trash and restore
+
+- **ย้ายไปถังขยะ** is a reversible soft deletion, not a permanent file/database delete. Submitters can trash/restore only their own drafts; reviewers can trash/restore submitted or approved news; Admin can handle any existing news state. Producers have no trash access.
+- The **ถังขยะ** tab contains only news the current account can restore. Deleted news is excluded from normal lists. Trash detail is read-only; image bytes, ZIP, edits, uploads, spelling checks and approval are blocked until restoration. Stored images and revision history are retained under the existing storage/retention policy.
+- Drafts restore as drafts. Previously submitted or approved news restores to `review`, with approval/usage metadata cleared; producers cannot read or export until reapproved. Legacy returned items can be handled by Admin and restore to their returned state.
+- Both actions require confirmation, the captured authenticated owner and a current version. Deleting does not autosave local changes: the confirmation explains that only previously saved content is recoverable. Failed/ambiguous requests preserve the form and use the existing receipt-recovery flow rather than automatically resending.
+- Run the additive migration (`php scripts/migrate.php`) **before publishing** the new API/UI together. It adds nullable `deleted_at`, `deleted_by`, `deleted_from_status` to `eoffice_siya_news`; no existing news is deleted or reclassified. Trash and restore each create a revision and audit event. There is no permanent-delete or automatic trash-purge endpoint.
+
 ### Workspace UX
 
 - Visual styling follows the E-Office indigo/slate palette, Prompt typography, white module cards and neutral form controls. Static and dynamically rendered actions use the shared `assets/ui-buttons.css` / `eo-btn` components; news status colors remain semantic rather than branding accents.

@@ -22,6 +22,9 @@ function app_siya_news_migrate(PDO $pdo): void {
         KEY news_status_updated(status,updated_at,id),
         KEY news_owner_updated(owner_id,updated_at,id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    foreach(['deleted_at'=>'DATETIME NULL','deleted_by'=>'INT NULL','deleted_from_status'=>'VARCHAR(24) NULL'] as $column=>$definition){
+        if(!$pdo->query("SHOW COLUMNS FROM eoffice_siya_news LIKE '$column'")->fetch())$pdo->exec("ALTER TABLE eoffice_siya_news ADD COLUMN $column $definition");
+    }
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_siya_news_revisions (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
         news_id BIGINT UNSIGNED NOT NULL,

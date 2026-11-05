@@ -33,6 +33,8 @@ function app_audit_catalog(): array {
         'siya_news.image'=>['siya_news','จัดการภาพข่าว','news'],
         'siya_news.export'=>['siya_news','ดาวน์โหลดชุดข่าว','news'],
         'siya_news.used'=>['siya_news','บันทึกการนำข่าวไปใช้','news'],
+        'siya_news.trash'=>['siya_news','ย้ายข่าวไปถังขยะ','news'],
+        'siya_news.restore'=>['siya_news','กู้คืนข่าวจากถังขยะ','news'],
         'number.create'=>['numbers','จองเลขคำสั่ง','number'],
         'number.update'=>['numbers','แก้ไขรายการจองเลขคำสั่ง','number'],
         'number.delete'=>['numbers','ลบรายการจองเลขคำสั่ง','number'],
