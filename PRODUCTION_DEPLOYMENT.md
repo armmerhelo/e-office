@@ -1,5 +1,14 @@
 # Production deployment — E-Office
 
+## ถังขยะและกู้คืนข่าว SIYA NEWS — 5 พฤศจิกายน 2026
+
+- เผยแพร่ **8 runtime paths** จาก `1f3b3b8c2e285c9dc1c3461d15dbba3bc9c050f4` เวลา **2026-11-05 11:06:23 +07:00** หลังตรวจ production เทียบ parent และ dependencies 10 paths สำรองซอร์สและฐานข้อมูลครบ **45 ตาราง** พร้อมตรวจ SHA-256 และจำนวนแถว ติดตั้งแบบ atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache แล้ว ไม่เปลี่ยน private configuration หรือเปิด Drive bridge
+- เพิ่มคอลัมน์ nullable `deleted_at`, `deleted_by`, `deleted_from_status` ใน `eoffice_siya_news` แบบ additive รัน migration ซ้ำได้ ตรวจ hash ข่าว ภาพ และ revisions ก่อน/หลัง migration ตรงกันทั้งหมด ไม่มีการลบหรือเปลี่ยนสถานะข่าวเดิม
+- เพิ่มย้ายไปถังขยะ/กู้คืนพร้อมยืนยันและ audit/revision ผู้ส่งจัดการได้เฉพาะร่างของตน ผู้ตรวจจัดการข่าว review/approved และ Admin จัดการได้ทั้งหมด ข่าวในถังขยะหายจากรายการปกติ อ่านได้เฉพาะผู้มีสิทธิ์กู้คืน และเปิดภาพ/ZIP/แก้ไข/ผ่านตรวจไม่ได้ เก็บภาพและประวัติไว้ตามนโยบายเดิม กู้คืนข่าวที่เคยผ่านตรวจเป็น review พร้อมล้าง approval/usage metadata จนกว่าจะผ่านตรวจใหม่ ไม่มี permanent delete หรือ automatic trash purge
+- Production HTTP smoke ผ่าน **11 กลุ่ม** ด้วยบัญชีสังเคราะห์ 6 บทบาท ครอบคลุม guest/ผู้ไม่มีสิทธิ์/producer/ผู้ส่งคนอื่น/editor/Admin account binding stale version ข่าวร่างส่วนตัว การแยกถังขยะ การบล็อกภาพทุกบทบาท การคงภาพต้นฉบับหลัง restore การกู้คืน review/approved และการถอน/คืนสิทธิ์ producer หลัง reapproval ไม่เรียก AI, Drive, อีเมล หรือ Push
+- Chromium production ตรวจยืนยัน/ยกเลิกลบและกู้คืน เจ้าของร่าง ผู้ตรวจ และ producer บน **1440/390/320px** ไม่มี horizontal overflow หรือ uncaught JavaScript exception ข่าวในถังขยะไม่แสดง image previews ผู้จัดทำวารสารไม่มีปุ่มถังขยะ/ลบ/กู้คืน ผู้ตรวจ restore แล้วอนุมัติใหม่ได้ ตรวจหน้าอัปเดตและ exact source commit หลังเผยแพร่ feed แล้ว
+- ลบบัญชี ข่าว และภาพสังเคราะห์ของรอบนี้ครบ ผู้ใช้/เอกสารกลับเป็น **72 / 14,724** และ hash สิทธิ์/ระดับผู้ใช้เดิมตรง baseline ของรอบนี้ ไม่ลบข่าวหรือภาพของผู้ใช้จริง ตรวจ checksum ตรงครบ **8 runtime paths** ไม่มี deployment helpers/staged uploads ตกค้าง Release ID **`deploy-20261105T040623000Z`** เผยแพร่ feed และตรวจ `index.php?view=updates` เรียบร้อย
+
 ## ตัวช่วยตรวจคำผิดและพื้นที่ทำงาน SIYA NEWS — 5 พฤศจิกายน 2026
 
 - เผยแพร่ **7 runtime paths** จาก `3329845a06af3116163738fd5f8409cca9027246` เวลา **2026-11-05 10:20:38 +07:00** หลังตรวจ production เทียบ parent และ dependencies 10 paths สำรองซอร์สและฐานข้อมูลครบ **45 ตาราง** พร้อมตรวจ SHA-256 และจำนวนแถว ติดตั้งแบบ atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache เรียบร้อย ไม่เปลี่ยน schema หรือ private configuration และคง SIYA NEWS Drive bridge ปิดอยู่
