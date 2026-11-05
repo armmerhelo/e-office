@@ -9,7 +9,7 @@ function app_permission_catalog(): array {
         'room_booking' => ['label'=>'ดูแลการจองห้อง', 'description'=>'พิจารณาอนุมัติและจัดการรายการจองห้อง'],
         'maintenance' => ['label'=>'ดูแลงานแจ้งซ่อม', 'description'=>'พิจารณา มอบหมาย และบันทึกผลการซ่อม'],
         'news_submit' => ['label'=>'SIYA NEWS — ส่งข่าว', 'description'=>'สร้างข่าว อัปโหลดภาพ และแก้ไขข่าวที่ตนส่ง'],
-        'news_editor' => ['label'=>'SIYA NEWS — บรรณาธิการ/ผู้ตรวจคำ', 'description'=>'ตรวจและแก้ไขข่าว ส่งกลับแก้ไข หรือยืนยันผ่านตรวจ'],
+        'news_editor' => ['label'=>'SIYA NEWS — บรรณาธิการ/ผู้ตรวจคำ', 'description'=>'ตรวจ แก้ไขและบันทึกข่าวโดยตรง หรือยืนยันผ่านตรวจ'],
         'news_producer' => ['label'=>'SIYA NEWS — ผู้จัดทำวารสาร', 'description'=>'เข้าถึงข่าวที่ผ่านตรวจและดาวน์โหลดข้อความกับภาพต้นฉบับ'],
     ];
 }

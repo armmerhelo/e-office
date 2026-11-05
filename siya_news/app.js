@@ -97,14 +97,14 @@
         <div class="news-field"><label for="news-event-date">วันที่จัดกิจกรรม</label><input class="news-input" id="news-event-date" type="date" value="${esc(news.event_date||'')}" ${editable?'':'disabled'}></div>
         <div class="news-field"><label for="news-department">กลุ่มงาน / ผู้รับผิดชอบ</label><input class="news-input" id="news-department" maxlength="255" value="${esc(news.department)}" ${editable?'':'disabled'}></div>
         <div class="news-field full"><label for="news-location">สถานที่</label><input class="news-input" id="news-location" maxlength="255" value="${esc(news.location)}" ${editable?'':'disabled'}></div>
-         <div class="news-field full"><label for="news-body">รายละเอียดข่าว</label><textarea class="news-textarea" id="news-body" maxlength="30000" placeholder="เขียนรายละเอียด ใครทำอะไร ที่ไหน เมื่อไร และผลที่เกิดขึ้น" ${editable?'':'disabled'}>${esc(news.body)}</textarea><p class="news-hint">${isReview?'ผู้ตรวจสามารถแก้เนื้อหาได้ ปุ่มผ่านตรวจจะบันทึกเนื้อหาและภาพล่าสุดก่อนอนุมัติ':'บันทึกเป็นร่างก่อนได้ เมื่อส่งตรวจแล้วผู้ส่งจะแก้ไขไม่ได้จนกว่าจะได้รับข่าวกลับ'}</p></div>
-          </div>${editable?'<div class="detail-actions"><button class="news-button" type="button" id="save-news-content">บันทึกเนื้อหาและภาพ</button><span class="news-hint">ไม่อนุมัติข่าว · หมายเหตุจะบันทึกเมื่อผ่านตรวจหรือส่งกลับแก้ไข</span></div>':''}${feedback('content')}</form>
+          <div class="news-field full"><label for="news-body">รายละเอียดข่าว</label><textarea class="news-textarea" id="news-body" maxlength="30000" placeholder="เขียนรายละเอียด ใครทำอะไร ที่ไหน เมื่อไร และผลที่เกิดขึ้น" ${editable?'':'disabled'}>${esc(news.body)}</textarea><p class="news-hint">${isReview?'ผู้ตรวจสามารถแก้เนื้อหาได้ ปุ่มผ่านตรวจจะบันทึกเนื้อหาและภาพล่าสุดก่อนอนุมัติ':'บันทึกเป็นร่างก่อนได้ เมื่อส่งตรวจแล้วผู้ตรวจจะเป็นผู้แก้ไขเนื้อหาและตรวจความถูกต้อง'}</p></div>
+          </div>${editable?'<section class="news-proofread" aria-labelledby="news-proofread-title"><h3 id="news-proofread-title">ตัวช่วยตรวจคำผิด</h3><p class="news-hint" id="news-proofread-hint">ส่งเฉพาะหัวข้อและรายละเอียดข่าวไปยังบริการ AI ภายนอกเพื่อช่วยตรวจคำผิด · คำแนะนำอาจคลาดเคลื่อน ควรตรวจชื่อเฉพาะและข้อเท็จจริงเอง · ไม่บันทึกหรือผ่านตรวจอัตโนมัติ</p><button class="news-button eo-btn" type="button" id="check-news-spelling" aria-describedby="news-proofread-hint">ช่วยตรวจคำผิด</button><div id="news-proofread-results" role="status" aria-live="polite"></div></section><div class="detail-actions"><button class="news-button" type="button" id="save-news-content">บันทึกเนื้อหาและภาพ</button><span class="news-hint">ไม่อนุมัติข่าว · หมายเหตุจะบันทึกเมื่อผ่านตรวจ</span></div>':''}${feedback('content')}</form>
         <section class="news-section" id="news-images-section"><div class="news-section-heading"><h3>ภาพประกอบ <span class="news-hint">(${news.images.length}/10)</span></h3>${editable?'<button type="button" class="news-button" id="add-news-images">＋ เพิ่มภาพ</button>':''}</div>
         ${editable?'<input class="news-hidden" id="news-image-files" type="file" accept="image/jpeg,image/png,image/webp" multiple><p class="news-hint">JPEG, PNG หรือ WebP · ไม่เกิน 20 MB ต่อภาพ · ต้นฉบับจะเก็บบน Server 30 วันก่อนย้ายไป Google Drive</p>':''}
         ${news.images.length?`<form id="news-image-meta-form">${imageMarkup(news,editable)}</form>`:imageMarkup(news,editable)}<div id="news-upload-progress" role="status" aria-live="polite"></div>${feedback('images')}</section>
         <form id="news-review-form" class="news-review-section" ${editable||canSubmit||isReview?'':'hidden'}>
-        ${isReview?`<div class="news-field"><h3>ผลการตรวจ</h3><label for="news-review-note">หมายเหตุ / ข้อเสนอแนะจากผู้ตรวจ</label><textarea class="news-textarea" id="news-review-note" maxlength="5000" aria-describedby="news-review-hint news-review-note-error" placeholder="กรอกข้อเสนอแนะหากต้องการส่งกลับแก้ไข">${esc(news.review_note||'')}</textarea><p id="news-review-note-error" class="news-field-error" role="alert" hidden>กรุณาระบุข้อเสนอแนะก่อนส่งกลับ</p><p id="news-review-hint" class="news-hint">ตรวจเนื้อหาและภาพด้านบนให้ครบก่อนผ่านตรวจ · ต้องระบุข้อเสนอแนะเมื่อส่งกลับแก้ไข</p></div>`:''}
-        <div class="detail-actions news-action-bar"><span id="news-save-state" role="status">${state.editing?'ยังไม่มีการแก้ไข':''}</span>${editable?`<button class="news-button ${canSubmit||isReview?'':'primary'}" type="button" id="save-news">${news.status==='approved'?'บันทึกและส่งตรวจใหม่':'บันทึกการแก้ไขทั้งหมด'}</button>`:''}${canSubmit?`<button class="news-button success" type="button" id="submit-news">บันทึกและส่งตรวจคำ</button>`:''}${isReview?`<button class="news-button return" type="button" id="return-news">บันทึกและส่งกลับแก้ไข</button><button class="news-button success" type="button" id="approve-news">บันทึกและผ่านตรวจ</button>`:''}</div></form>
+         ${isReview?`<div class="news-field"><h3>ผลการตรวจ</h3><label for="news-review-note">หมายเหตุผู้ตรวจ (ถ้ามี)</label><textarea class="news-textarea" id="news-review-note" maxlength="5000" aria-describedby="news-review-hint" placeholder="บันทึกหมายเหตุประกอบการผ่านตรวจ">${esc(news.review_note||'')}</textarea><p id="news-review-hint" class="news-hint">ผู้ตรวจแก้เนื้อหาและภาพได้โดยตรง เลือกบันทึกไว้ก่อน หรือบันทึกและผ่านตรวจเมื่อเรียบร้อย</p></div>`:''}
+         <div class="detail-actions news-action-bar"><span id="news-save-state" role="status">${state.editing?'ยังไม่มีการแก้ไข':''}</span>${editable?`<button class="news-button ${canSubmit||isReview?'':'primary'}" type="button" id="save-news">${news.status==='approved'?'บันทึกและส่งตรวจใหม่':'บันทึกการแก้ไขทั้งหมด'}</button>`:''}${canSubmit?`<button class="news-button success" type="button" id="submit-news">บันทึกและส่งตรวจคำ</button>`:''}${isReview?`<button class="news-button success" type="button" id="approve-news">บันทึกและผ่านตรวจ</button>`:''}</div></form>
         <div id="news-detail-message" class="news-message" role="status" data-news-feedback hidden></div>${historyMarkup(news.history)}`;
         $('news-detail').innerHTML=html;
         $('news-detail').querySelectorAll('.news-button').forEach(button=>{button.classList.add('eo-btn');if(button.matches('.primary,.success'))button.classList.add('eo-btn--primary');if(button.classList.contains('danger'))button.classList.add('eo-btn--danger-text');});
@@ -113,6 +113,47 @@
         lockControls();
     }
     function valuesFromForm(){return {title:$('news-title').value,event_date:$('news-event-date').value,department:$('news-department').value,location:$('news-location').value,body:$('news-body').value};}
+    function bindProofread(news){
+        const button=$('check-news-spelling'),box=$('news-proofread-results');if(!button)return;
+        const owner=window.eofficeUser?.id;
+        const source=()=>({title:$('news-title').value,body:$('news-body').value});let checked=null,items=[],applying=false,hadSuggestions=false;
+        for(const id of ['news-title','news-body'])$(id).addEventListener('input',()=>{if(applying||!checked)return;checked=null;items=[];box.textContent='ข้อความเปลี่ยนแล้ว กรุณาตรวจคำอีกครั้ง';});
+        function render(){
+            box.innerHTML=items.length?`<p class="news-hint">เหลือ ${items.length} คำแนะนำ · เลือกแก้ทีละจุด แล้วบันทึกข่าวตามปกติ</p><ul class="news-proofread-list">${items.map((item,index)=>`<li><div><span class="news-hint">${item.field==='title'?'หัวข้อข่าว':'รายละเอียดข่าว'}</span><p><del>${esc(item.original)}</del> → <strong>${esc(item.replacement)}</strong></p><p class="news-hint">${esc(item.reason)}</p></div><button type="button" class="news-button eo-btn" data-proofread-index="${index}">ใช้คำแก้${checked[item.field].split(item.original).length>2?' (จุดแรก)':''}</button></li>`).join('')}</ul>`:`<p class="news-hint">${hadSuggestions?'ไม่มีคำแนะนำเดิมเหลือแล้ว หากมีคำซ้ำหรือคำแนะนำทับซ้อน ให้ตรวจคำอีกครั้ง':'ตัวช่วยไม่พบคำผิดที่แนะนำให้แก้ ไม่ใช่การรับรองว่าข้อความถูกต้องทั้งหมด'}</p>`;
+            box.querySelectorAll('[data-proofread-index]').forEach(apply=>apply.addEventListener('click',()=>{
+                if(state.busy||!checked)return;
+                if(String(owner)!==String(window.eofficeUser?.id)){checked=null;items=[];box.textContent='บัญชีเปลี่ยนแล้ว กรุณาโหลดหน้าใหม่ก่อนตรวจคำ';return;}
+                if(JSON.stringify(source())!==JSON.stringify(checked)){checked=null;box.textContent='ข้อความเปลี่ยนแล้ว กรุณาตรวจคำอีกครั้ง';return;}
+                const item=items[Number(apply.dataset.proofreadIndex)],input=$(item.field==='title'?'news-title':'news-body');
+                const start=item.start;if(input.value.slice(start,start+item.original.length)!==item.original)return;
+                const next=input.value.slice(0,start)+item.replacement+input.value.slice(start+item.original.length);
+                if([...next].length>(item.field==='title'?255:30000)){message('คำแก้ทำให้ข้อความยาวเกินกำหนด กรุณาปรับข้อความเอง',true,'content');return;}input.value=next;
+                applying=true;input.dispatchEvent(new Event('input',{bubbles:true}));applying=false;checked=source();
+                const end=start+item.original.length,shift=item.replacement.length-item.original.length;
+                items=items.filter(row=>row!==item&&(row.field!==item.field||row.start+row.original.length<=start||row.start>=end));
+                items.forEach(row=>{if(row.field===item.field&&row.start>=end)row.start+=shift;});
+                render();input.focus();input.setSelectionRange(start,start+item.replacement.length);
+            }));
+        }
+        button.addEventListener('click',()=>{
+            if(state.busy||!confirm('ส่งหัวข้อและรายละเอียดข่าวปัจจุบันไปยังบริการ AI ภายนอกเพื่อช่วยตรวจคำผิดหรือไม่? ระบบจะไม่แก้ไขหรือบันทึกข่าวเอง'))return;
+            runAction(async()=>{
+                const snapshot=source();checked=null;items=[];box.textContent='กำลังช่วยตรวจคำผิด…';
+                try{
+                    if(!Number.isInteger(Number(owner))||Number(owner)<1||String(owner)!==String(window.eofficeUser?.id))throw Error('กรุณาเข้าสู่ระบบใหม่ก่อนตรวจคำ');
+                    const data=await request('../api/siya-news-proofread.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:news.id||null,...snapshot,consent:true,_expected_owner:owner})});
+                    if(!box.isConnected)return;
+                    if(JSON.stringify(source())!==JSON.stringify(snapshot)){box.textContent='ข้อความเปลี่ยนแล้ว กรุณาตรวจคำอีกครั้ง';return;}
+                    if(String(owner)!==String(window.eofficeUser?.id))throw Error('บัญชีเปลี่ยนแล้ว กรุณาโหลดหน้าใหม่ก่อนตรวจคำ');
+                    if(!Array.isArray(data.suggestions)||data.suggestions.length>60||data.suggestions.some(item=>!item||!['title','body'].includes(item.field)||!['original','replacement','reason'].every(key=>typeof item[key]==='string'&&item[key].trim().length>0&&[...item[key]].length<=500)||item.original===item.replacement||!snapshot[item.field].includes(item.original)))throw Error('ผลตรวจคำไม่สมบูรณ์ กรุณาลองใหม่');
+                    const normalized=data.suggestions.map(item=>({...item,replacement:item.replacement.replace(/\r\n?/g,'\n'),start:snapshot[item.field].indexOf(item.original)}));
+                    if(normalized.some(item=>item.original===item.replacement||(item.field==='title'&&item.replacement.includes('\n'))))throw Error('ผลตรวจคำไม่สมบูรณ์ กรุณาลองใหม่');
+                    checked=snapshot;items=normalized;hadSuggestions=items.length>0;render();
+                    if(data.mock)box.insertAdjacentHTML('afterbegin','<p class="news-hint">โหมดทดสอบ: ผลสังเคราะห์ ไม่ได้ส่งข้อความไปบริการภายนอก</p>');
+                }catch(error){if(box.isConnected)box.textContent=error.message;}
+            },'content');
+        });
+    }
     async function saveContent(showMessage=true){const news=state.selected;const values=state.editing?valuesFromForm():null;const images=imagesChanged()?imageValues():null;const note=$('news-review-note')?.value;
         // Validate every pending field before the first write of a multi-step save.
         if(values)for(const [key,max] of Object.entries({title:255,location:255,department:255,body:30000}))if([...values[key]].length>max)throw Error('ข้อความยาวเกินกำหนด: '+key);
@@ -122,7 +163,7 @@
         if(!news.id||contentChanged()){const result=await post({action:news.id?'save':'create',...(values||{}),...(news.id?{id:news.id,version:news.version}:{})});news.id=result.id||news.id;news.version=result.version;news.status=result.status_value||news.status;Object.assign(news,values);}
         if(images){const result=await post({action:'images_update',id:news.id,version:news.version,images});news.version=result.version;news.status=result.status_value||news.status;news.images=news.images.map(image=>({...image,...images.find(item=>item.id===image.id)})).sort((a,b)=>a.sort_order-b.sort_order);}
         // Keep the current form intact until every write succeeds, including review notes.
-        if(note!==undefined)news.pendingReviewNote=note;if(showMessage){await loadDetail(news.id,news.status!=='approved'&&state.editing);await loadList();message('บันทึกเนื้อหาและภาพแล้ว'+(note?' · หมายเหตุจะบันทึกเมื่อผ่านตรวจหรือส่งกลับแก้ไข':''));}return news;
+        if(note!==undefined)news.pendingReviewNote=note;if(showMessage){await loadDetail(news.id,news.status!=='approved'&&state.editing);await loadList();message('บันทึกเนื้อหาและภาพแล้ว'+(note?' · หมายเหตุจะบันทึกเมื่อผ่านตรวจ':''));}return news;
     }
     function renderUploadProgress(){
         const box=$('news-upload-progress'),batch=state.uploadBatch;
@@ -182,7 +223,7 @@
         await loadList();renderUploadProgress();
         message(batch.items.some(item=>item.status==='uncertain')?'ส่งภาพที่เหลือแล้ว แต่ยังมีภาพที่ต้องตรวจสอบผลในรายการ':batch.items.some(item=>['confirmed','cancelled'].includes(item.status))?'ส่งภาพที่เหลือแล้ว · คิวนี้มีรายการยืนยันพบภาพหรือยกเลิกไว้':'อัปโหลดภาพครบแล้ว');
     }
-    async function bindDetail(news,editable,canSubmit,isReview,producer){$('save-news')?.addEventListener('click',()=>runAction(()=>saveContent()));
+    async function bindDetail(news,editable,canSubmit,isReview,producer){bindProofread(news);$('save-news')?.addEventListener('click',()=>runAction(()=>saveContent()));
         $('refresh-news-list')?.addEventListener('click',()=>runAction(async()=>{if(!await loadList())return;root.classList.remove('show-detail');message('โหลดรายการล่าสุดแล้ว กรุณาเลือกข่าวเพื่อตรวจผลการบันทึกก่อนส่งซ้ำ',false,'toolbar');}));
         $('save-news-content')?.addEventListener('click',()=>runAction(()=>saveContent(),'content'));
         $('news-detail').querySelectorAll('.news-image-preview').forEach((preview,index)=>{const image=news.images[index],button=document.createElement('button');button.type='button';button.className='news-image-preview news-open-image';button.setAttribute('aria-label','ดูภาพเต็ม: '+image.original_name);button.setAttribute('aria-haspopup','dialog');button.append(...preview.childNodes);const hint=document.createElement('span');hint.className='news-open-image__hint';hint.textContent='ดูภาพเต็ม';button.append(hint);preview.replaceWith(button);button.addEventListener('click',()=>openImage(image,button));});
@@ -190,21 +231,15 @@
         $('cancel-edit')?.addEventListener('click',()=>{if(!mayLeave())return;runAction(()=>loadDetail(news.id,false));});
         $('news-back')?.addEventListener('click',()=>{if(!mayLeave())return;markClean();state.detailRequest++;clearDetail();$('create-news').hidden?$('news-search').focus():$('create-news').focus();});
         $('add-news-images')?.addEventListener('click',()=>$('news-image-files').click());
-        const clearNoteError=()=>{const field=$('news-review-note');field?.removeAttribute('aria-invalid');if($('news-review-note-error'))$('news-review-note-error').hidden=true;};
-        $('news-review-note')?.addEventListener('input',()=>{if($('news-review-note').value.trim())clearNoteError();});
         const transition=action=>{
             if(state.busy)return;
             if(hasPendingUpload()){message('ยังมีภาพค้างหรือยังยืนยันผลไม่ได้ กรุณาส่งต่อ ยืนยันพบภาพ หรือยกเลิกจากคิวให้ครบก่อนเปลี่ยนสถานะข่าว',true,'images');return;}
             const field=$('news-review-note'),note=field?.value.trim()||'';
             const content=state.editing?valuesFromForm():state.selected;
             if(['submit','approve'].includes(action)&&(!content.title.trim()||!content.body.trim())){message('กรุณากรอกหัวข้อและเนื้อหาข่าวก่อนส่งตรวจหรือผ่านตรวจ',true,'content');return;}
-            // Validate while the field is still enabled, before any save or lock.
-            if(action==='return'&&!note){field.setAttribute('aria-invalid','true');$('news-review-note-error').hidden=false;field.focus({preventScroll:true});return;}
-            clearNoteError();
-            return runAction(async()=>{const latest=await saveContent(false);await post({action,id:latest.id,version:latest.version,review_note:note});if(action==='return'&&!(has('news_submit')&&latest.is_owner)){markClean();clearDetail();}else await loadDetail(latest.id,false);await loadList();message(action==='approve'?'บันทึกและผ่านตรวจคำแล้ว พร้อมให้ผู้จัดทำวารสารนำไปใช้':action==='return'?'บันทึกและส่งข่าวกลับให้ผู้ส่งแก้ไขแล้ว':'บันทึกและส่งข่าวให้บรรณาธิการตรวจคำแล้ว');});
+            return runAction(async()=>{const latest=await saveContent(false);await post({action,id:latest.id,version:latest.version,review_note:note});await loadDetail(latest.id,false);await loadList();message(action==='approve'?'บันทึกและผ่านตรวจคำแล้ว พร้อมให้ผู้จัดทำวารสารนำไปใช้':'บันทึกและส่งข่าวให้บรรณาธิการตรวจคำแล้ว');});
         };
         $('submit-news')?.addEventListener('click',()=>transition('submit'));
-        $('return-news')?.addEventListener('click',()=>transition('return'));
         $('approve-news')?.addEventListener('click',()=>transition('approve'));
         $('news-content-form')?.addEventListener('submit',event=>{event.preventDefault();if(editable)runAction(()=>saveContent(),'content');});
         $('news-review-form')?.addEventListener('submit',event=>event.preventDefault());

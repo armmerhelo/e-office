@@ -31,11 +31,97 @@ async function run(){
  await until("typeof window.EOFFICE_MOCK_SERVICES==='boolean'");assert.equal(await evaluate('window.EOFFICE_MOCK_SERVICES'),true);
  assert.equal(await evaluate(`fetch('/api/auth_login.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(${JSON.stringify({username:process.env.EOFFICE_QA_EMAIL,password:process.env.EOFFICE_QA_PASSWORD})})}).then(r=>r.status)`),200);
  await send('Page.navigate',{url:base+'/index.php?view=siya_news'});
- await until(`${el('news-tabs')}?.children.length>0`);
+  await until(`${el('news-tabs')}?.children.length>0`);
+  await check('compact header keeps policy visible without a separate banner',async()=>{
+   for(const width of [1440,940,680,390,320]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<=680});
+    const layout=await evaluate(`(()=>{const header=${root}.querySelector('.news-brand');return {height:header.getBoundingClientRect().height,overflow:document.documentElement.scrollWidth>innerWidth,notice:!!${root}.querySelector('.news-notice'),text:header.textContent};})()`);
+    assert.ok(layout.height<=110,JSON.stringify({width,...layout}));assert.equal(layout.overflow,false);assert.equal(layout.notice,false);
+    assert.match(layout.text,/ดาวน์โหลดเมื่อผ่านตรวจ/);assert.match(layout.text,/ไม่เผยแพร่สาธารณะ/);assert.match(layout.text,/ใช้งานภายใน/);
+   }
+   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+  });
  // Confirm prompts are controlled in-page so cancellation is exercised, not auto-accepted.
  await evaluate('window.__qaConfirm=true;window.confirm=()=>window.__qaConfirm');
- const title='UX browser regression '+Date.now();let newsId;
- await check('draft changes survive cancelled navigation',async()=>{
+  const title='UX browser regression '+Date.now();let newsId;
+  await check('proofread suggests without saving, applies explicitly and invalidates stale results',async()=>{
+   await click('create-news');await fill('news-title','ขออนุญาติ');await fill('news-body','ข้อความทดสอบคำผิด');
+   await evaluate(`(()=>{window.__proofreadFetch=window.fetch;window.__proofreadWrites=0;window.fetch=(url,options)=>{if(String(url).includes('siya-news-proofread.php'))return Promise.resolve(new Response(JSON.stringify({status:'success',suggestions:[{field:'title',original:'อนุญาติ',replacement:'อนุญาต',reason:'คำสะกดที่ถูกต้อง'}]}),{headers:{'Content-Type':'application/json'}}));if(options?.method==='POST')window.__proofreadWrites++;return window.__proofreadFetch(url,options);};})()`);
+   await click('check-news-spelling');await until(`${el('news-proofread-results')}.querySelector('[data-proofread-index]')&&!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+   assert.equal(await evaluate(`${el('news-title')}.value`),'ขออนุญาติ');assert.equal(await evaluate('window.__proofreadWrites'),0);
+   await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);assert.equal(await evaluate(`${el('news-title')}.value`),'ขออนุญาต');
+   await fill('news-title','ขออนุญาติ');await click('check-news-spelling');await until(`${el('news-proofread-results')}.querySelector('[data-proofread-index]')&&!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+   await fill('news-body','แก้เนื้อหาแล้ว');assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length`),0);
+    await evaluate('window.fetch=window.__proofreadFetch');
+    await fill('news-title','พัฒนา อนุญาติ');
+    await evaluate(`window.fetch=(url,options)=>String(url).includes('siya-news-proofread.php')?Promise.resolve(new Response(JSON.stringify({status:'success',suggestions:[{field:'title',original:'พัฒนา',replacement:'การพัฒนา',reason:'ทดสอบคำแก้ที่มีคำเดิม'},{field:'title',original:'อนุญาติ',replacement:'อนุญาต',reason:'สะกดผิด'}]}),{headers:{'Content-Type':'application/json'}})):window.__proofreadFetch(url,options)`);
+    await click('check-news-spelling');await until(`${el('news-proofread-results')}.querySelector('[data-proofread-index]')&&!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+    await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+    assert.equal(await evaluate(`${el('news-title')}.value`),'การพัฒนา อนุญาติ');
+    assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length`),1);
+    await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+    assert.equal(await evaluate(`${el('news-title')}.value`),'การพัฒนา อนุญาต');
+    assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length`),0);
+    await evaluate('window.fetch=window.__proofreadFetch');
+    const backend=await evaluate(`fetch('/api/siya-news-proofread.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'ขออนุญาติ',body:'ข่าวสังเคราะห์',consent:true,_expected_owner:window.eofficeUser.id})}).then(r=>r.json())`);
+   assert.equal(backend.status,'success');assert.equal(backend.mock,true);assert.equal(backend.suggestions[0].replacement,'อนุญาต');
+    const cooldown=await evaluate(`fetch('/api/siya-news-proofread.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'ทดสอบ',body:'ข่าวสังเคราะห์',consent:true,_expected_owner:window.eofficeUser.id})}).then(r=>r.status)`);assert.equal(cooldown,429);
+   await click('news-tab-mine');
+  });
+  await check('proofread overlap, repeated text, Unicode offsets, XSS, invalid output, failure and cancelled consent',async()=>{
+   await click('create-news');await fill('news-title','😀 อนุญาติ อนุญาติ');await fill('news-body','อนุญาติ');
+   await evaluate(`(()=>{window.__proofreadEdgeFetch=window.fetch;window.__proofreadCalls=0;window.fetch=(url,options)=>{if(!String(url).includes('siya-news-proofread.php'))return window.__proofreadEdgeFetch(url,options);window.__proofreadCalls++;window.__proofreadPayload=JSON.parse(options.body);return Promise.resolve(new Response(JSON.stringify(window.__proofreadReply),{status:window.__proofreadStatus||200,headers:{'Content-Type':'application/json'}}));};})()`);
+   const reply=async(suggestions,status=200)=>evaluate(`window.__proofreadReply=${JSON.stringify(status===200?{status:'success',suggestions}:{status:'error',message:'QA proofread offline'})};window.__proofreadStatus=${status}`);
+   const suggestion=(field,original,replacement,reason='ทดสอบ')=>({field,original,replacement,reason});
+   await reply([suggestion('title','อนุญาติ','อนุญาต','<img src=x onerror="window.__proofreadXSS=1">'),suggestion('title','อนุญาติ อนุญาติ','คำแนะนำทับซ้อน'),suggestion('body','อนุญาติ','อนุญาต')]);
+   await evaluate('window.__qaConfirm=false');await click('check-news-spelling');assert.equal(await evaluate('window.__proofreadCalls'),0);await evaluate('window.__qaConfirm=true');
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length===3`);
+   assert.equal(await evaluate('window.__proofreadPayload._expected_owner'),await evaluate('window.eofficeUser.id'));
+   assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('img').length`),0);
+   assert.doesNotMatch(await evaluate(`${el('news-detail')}.textContent`),/gemini/i);
+   await send('Emulation.setDeviceMetricsOverride',{width:320,height:844,deviceScaleFactor:1,mobile:true});assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+   const proofreadingCapture=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});fs.writeFileSync(path.join(profile,'mobile-proofread.png'),Buffer.from(proofreadingCapture.data,'base64'));
+   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+   await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+   assert.equal(await evaluate(`${el('news-title')}.value`),'😀 อนุญาต อนุญาติ');assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length`),1);
+   await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+   assert.equal(await evaluate(`${el('news-body')}.value`),'อนุญาต');assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/คำซ้ำหรือคำแนะนำทับซ้อน/);
+   for(const invalid of [[suggestion('title','อนุญาติ','อนุญาติ')],[suggestion('title','อนุญาติ','หัวข้อ\r\nหลายบรรทัด')],[suggestion('title','อนุญาติ','x'.repeat(501))],[suggestion('secret','อนุญาติ','แก้')],Array.from({length:61},()=>suggestion('title','อนุญาติ','อนุญาต'))]){
+    await reply(invalid);await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+    assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/ไม่สมบูรณ์/);assert.equal(await evaluate(`${el('news-title')}.value`),'😀 อนุญาต อนุญาติ');
+   }
+   await reply([],503);await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/QA proofread offline/);assert.equal(await evaluate(`${el('news-title')}.disabled`),false);
+   await reply([]);await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/ตัวช่วยไม่พบ/);
+   await fill('news-title','ก'.repeat(254)+'ข');await reply([suggestion('title','ข','เพิ่ม')]);
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-proofread-results')}.querySelector('[data-proofread-index]')`);
+   await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);assert.equal(await evaluate(`${el('news-title')}.value`),'ก'.repeat(254)+'ข');assert.match(await evaluate(`${el('news-message-content')}.textContent`),/ยาวเกินกำหนด/);
+   await fill('news-body','คำแรก คำถัดไป');await reply([suggestion('body','คำแรก','แก้\r\nสองบรรทัด'),suggestion('body','คำถัดไป','แก้ถัดไป')]);
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length===2`);
+   await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+   assert.equal(await evaluate(`${el('news-body')}.value`),'แก้\nสองบรรทัด แก้ถัดไป');
+   await fill('news-body','อนุญาติ');await reply([suggestion('body','อนุญาติ','อนุญาต')]);
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length===1`);
+   await evaluate('window.__proofreadOwner=window.eofficeUser.id;window.eofficeUser.id=Number(window.__proofreadOwner)+1000000');
+   try{
+    await evaluate(`${el('news-proofread-results')}.querySelector('[data-proofread-index]').click()`);
+    assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/บัญชีเปลี่ยน/);assert.equal(await evaluate(`${el('news-body')}.value`),'อนุญาติ');
+   }finally{await evaluate('window.eofficeUser.id=window.__proofreadOwner');}
+   await evaluate(`window.fetch=(url,options)=>String(url).includes('siya-news-proofread.php')?Promise.reject(new TypeError('QA proofread network failure')):window.__proofreadEdgeFetch(url,options)`);
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/QA proofread network failure/);assert.equal(await evaluate(`${el('save-news-content')}.disabled`),false);
+   await reply([suggestion('body','อนุญาติ','อนุญาต')]);
+   await evaluate(`window.fetch=(url,options)=>String(url).includes('siya-news-proofread.php')?new Promise(resolve=>window.__proofreadResolve=()=>resolve(new Response(JSON.stringify(window.__proofreadReply),{headers:{'Content-Type':'application/json'}}))):window.__proofreadEdgeFetch(url,options)`);
+   await click('check-news-spelling');await until('!!window.__proofreadResolve');assert.equal(await evaluate(`${el('news-body')}.disabled`),true);
+   await evaluate('window.__proofreadOwner=window.eofficeUser.id;window.eofficeUser.id=Number(window.__proofreadOwner)+1000000;window.__proofreadResolve()');
+   try{await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/บัญชีเปลี่ยน/);assert.equal(await evaluate(`${el('news-proofread-results')}.querySelectorAll('[data-proofread-index]').length`),0);}finally{await evaluate('window.eofficeUser.id=window.__proofreadOwner');}
+   await evaluate(`window.__proofreadTimer=window.setTimeout;window.setTimeout=(fn,delay,...args)=>window.__proofreadTimer(fn,delay===120000?40:delay,...args);window.fetch=(url,options)=>String(url).includes('siya-news-proofread.php')?new Promise(()=>{}):window.__proofreadEdgeFetch(url,options)`);
+   await click('check-news-spelling');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/หมดเวลา/);assert.equal(await evaluate(`${el('news-body')}.disabled`),false);
+   await evaluate('window.setTimeout=window.__proofreadTimer');
+   await evaluate(`window.__proofreadResolve=null;window.fetch=(url,options)=>String(url).includes('siya-news-proofread.php')?new Promise(resolve=>window.__proofreadResolve=()=>resolve(new Response(JSON.stringify(window.__proofreadReply),{headers:{'Content-Type':'application/json'}}))):window.__proofreadEdgeFetch(url,options)`);
+   await click('check-news-spelling');await until('!!window.__proofreadResolve');await fill('news-body','ข้อความใหม่ต้องไม่ถูกแทนที่');await evaluate('window.__proofreadResolve()');
+   await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);assert.match(await evaluate(`${el('news-proofread-results')}.textContent`),/ข้อความเปลี่ยนแล้ว/);assert.equal(await evaluate(`${el('news-body')}.value`),'ข้อความใหม่ต้องไม่ถูกแทนที่');
+   await evaluate('window.fetch=window.__proofreadEdgeFetch');await click('news-tab-mine');
+  });
+  await check('draft changes survive cancelled navigation',async()=>{
   await click('create-news');await fill('news-title',title);await fill('news-body','ข้อความก่อนตรวจ');
   await evaluate('window.__qaConfirm=false');await click('news-tab-mine');
   assert.equal(await evaluate(`${el('news-title')}.value`),title);
@@ -47,26 +133,19 @@ async function run(){
   newsId=await evaluate(`${el('news-detail')}.querySelector('.eyebrow').textContent.match(/#([0-9]+)/)[1]`);
   assert.equal(await evaluate(`${el('news-detail')}.querySelector('.status-badge').dataset.status`),'review');
  });
- await check('return requires a note before any write and focuses the enabled field',async()=>{
-  await fill('news-review-note','   ');
-  await evaluate(`(()=>{const original=window.fetch;window.__qaValidationFetch=original;window.__qaValidationWrites=0;window.fetch=(url,options)=>{if(String(url).includes('siya-news.php')&&options?.method==='POST')window.__qaValidationWrites++;return original(url,options);};})()`);
-  await click('return-news');
-  assert.equal(await evaluate(`${root}.activeElement.id`),'news-review-note');
-  assert.equal(await evaluate(`${el('news-review-note')}.disabled`),false);
-  assert.equal(await evaluate(`${el('news-review-note')}.getAttribute('aria-invalid')`),'true');
-  assert.equal(await evaluate(`${el('news-review-note-error')}.hidden`),false);
-  assert.equal(await evaluate('window.__qaValidationWrites'),0);
-  await fill('news-review-note','ข้อเสนอแนะที่กรอกแล้ว');
-  assert.equal(await evaluate(`${el('news-review-note-error')}.hidden`),true);
-  assert.equal(await evaluate(`${el('news-review-note')}.hasAttribute('aria-invalid')`),false);
-  await evaluate('window.fetch=window.__qaValidationFetch');
- });
+  await check('reviewer saves corrections directly without returning to author',async()=>{
+   assert.equal(await evaluate(`!!${el('return-news')}`),false);
+   await click('edit-news');await fill('news-body','ผู้ตรวจแก้เนื้อหาโดยตรง');await click('save-news-content');
+   await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+   const news=await evaluate(`fetch('/api/siya-news.php?action=detail&id='+${JSON.stringify(newsId)}).then(r=>r.json()).then(r=>r.data)`);
+   assert.equal(news.body,'ผู้ตรวจแก้เนื้อหาโดยตรง');assert.equal(news.status,'review');
+  });
  await check('approval saves the latest visible content and review note',async()=>{
-   await click('edit-news');await fill('news-body','ข้อความที่ผู้ตรวจแก้และต้องผ่านตรวจ');await fill('news-review-note','ตรวจแล้วจาก browser regression');
+    if(await evaluate(`!!${el('edit-news')}`))await click('edit-news');await fill('news-body','ข้อความที่ผู้ตรวจแก้และต้องผ่านตรวจ');await fill('news-review-note','ตรวจแล้วจาก browser regression');
   assert.equal(await evaluate(`${el('news-review-form')}.querySelectorAll('.eo-btn--primary').length`),1);
   assert.equal(await evaluate(`${el('news-review-form')}.querySelector('.eo-btn--primary').id`),'approve-news');
   assert.equal(await evaluate(`Boolean(${el('news-images-section')}.compareDocumentPosition(${el('news-review-form')})&Node.DOCUMENT_POSITION_FOLLOWING)`),true);
-  assert.equal(await evaluate(`getComputedStyle(${el('return-news')}).backgroundColor`),'rgb(255, 251, 235)');
+   assert.equal(await evaluate(`!!${el('return-news')}`),false);
   assert.equal(await evaluate(`getComputedStyle(${el('save-news')}).backgroundColor`),'rgb(255, 255, 255)');
   await click('approve-news');await until(`${el('news-message')}.textContent.includes('ผ่านตรวจคำแล้ว')&&!${el('siya-news-app')}.hasAttribute('aria-busy')`);
   const news=await evaluate(`fetch('/api/siya-news.php?action=detail&id='+${JSON.stringify(newsId)}).then(r=>r.json()).then(r=>r.data)`);
@@ -354,18 +433,17 @@ async function run(){
     assert.equal(await evaluate(`fetch('/'+${JSON.stringify(news.images[0].url)}).then(r=>r.status)`),403);
     assert.equal(await evaluate(`fetch('/api/siya-news.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save',id:${JSON.stringify(newsId)},version:${news.version},title:'denied',body:'denied'})}).then(r=>r.status)`),403);
    });
-   await check('editing approved metadata revokes producer access until return, resubmit and reapproval',async()=>{
+    await check('editing approved metadata revokes producer access until direct reviewer correction and reapproval',async()=>{
     await login('submit');await selectNews();await click('edit-news');
     await evaluate(`(()=>{const input=${el('news-detail')}.querySelector('[data-caption]');input.value='แก้ไขภาพหลังผ่านตรวจ';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await click('save-news-content');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-detail')}.querySelector('.status-badge').dataset.status==='review'`);
     const news=(await detail()).body.data;await login('producer');assert.equal((await detail()).status,403);
     assert.equal(await evaluate(`fetch('/'+${JSON.stringify(news.images[0].url)}).then(r=>r.status)`),403);
     assert.equal(await evaluate(`fetch('/api/siya-news-export.php?id='+${JSON.stringify(newsId)}).then(r=>r.status)`),404);
-    await login('editor');await selectNews();await fill('news-review-note','ส่งกลับเพื่อแก้ไขตามกระบวนการทดสอบ');await click('return-news');
-    await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-message')}.textContent.includes('ส่งข่าวกลับให้ผู้ส่งแก้ไขแล้ว')`);
-    assert.equal((await detail()).status,403,'editor loses read access to returned story');
-    await login('submit');await selectNews();assert.equal((await detail()).body.data.status,'changes_requested');await click('submit-news');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-detail')}.querySelector('.status-badge').dataset.status==='review'`);
-    await login('editor');await selectNews();await click('approve-news');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-detail')}.querySelector('.status-badge').dataset.status==='approved'`);
+     await login('editor');await selectNews();assert.equal(await evaluate(`!!${el('return-news')}`),false);
+     await click('edit-news');await fill('news-body','ผู้ตรวจแก้เนื้อหาหลังผู้ส่งแก้ภาพ');await click('save-news-content');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')`);
+     assert.equal((await detail()).body.data.body,'ผู้ตรวจแก้เนื้อหาหลังผู้ส่งแก้ภาพ');assert.equal((await detail()).body.data.status,'review');
+     await click('approve-news');await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&${el('news-detail')}.querySelector('.status-badge').dataset.status==='approved'`);
     await login('producer');assert.equal((await detail()).status,200);
    });
    await check('unassigned role cannot read stories, images or export',async()=>{
