@@ -18,6 +18,8 @@ function app_migrate(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_permissions (User_Id INT NOT NULL, permission VARCHAR(50) NOT NULL, PRIMARY KEY(User_Id,permission), FOREIGN KEY(User_Id) REFERENCES t_user(User_Id) ON DELETE CASCADE) ENGINE=InnoDB");
     require_once __DIR__.'/siya-news-schema.php';
     app_siya_news_migrate($pdo);
+    require_once __DIR__.'/siya-news-studio-schema.php';
+    app_siya_news_studio_migrate($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_migrations (name VARCHAR(100) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     require_once __DIR__.'/sign-routing.php';
     app_sign_routes_migrate($pdo);

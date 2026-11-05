@@ -13,7 +13,7 @@
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
         'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
         'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates',
-        'siya_news/index.html':'siya_news'
+        'siya_news/index.html':'siya_news', 'siya_news/studio.html':'siya_news_studio'
     };
     const entry=Object.keys(entryViews).find(path=>new URL(path,appRoot).pathname===location.pathname);
     if(entry && typeof location.replace==='function') {
@@ -33,6 +33,7 @@
         {label:'แจ้งซ่อม', path:'maintenance_requests/index.html', login:true, group:'อื่น ๆ', icon:'⚒'},
         {label:'แจ้งซ่อม (ฝ่ายงาน)', path:'maintenance_requests/admin.html', permission:'maintenance', group:'อื่น ๆ', icon:'report'},
         {label:'SIYA NEWS', path:'siya_news/index.html', permissionAny:['news_submit','news_editor','news_producer'], group:'อื่น ๆ', icon:'news'},
+        {label:'SIYA NEWS — จัดหน้าวารสาร', path:'siya_news/studio.html', permission:'news_producer', group:'อื่น ๆ', icon:'studio'},
         {label:'ส่งอีเมลคำสั่ง', path:'email_send/doc_send_email.html', permission:'email', group:'อื่น ๆ', icon:'✉'},
         {label:'ตั้งค่า AI และอีเมล', path:'email_send/ai_settings.html', admin:true, group:'อื่น ๆ', icon:'⚙'},
         {label:'ประวัติการใช้งาน', path:'management/audit_logs.html', admin:true, group:'อื่น ๆ', icon:'report'}
@@ -60,7 +61,8 @@
         'logout':'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
         'login':'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
         '⚙':'M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2',
-        'news':'M4 5h16v14H4zM8 9h8M8 13h8M8 17h5'
+        'news':'M4 5h16v14H4zM8 9h8M8 13h8M8 17h5',
+        'studio':'M4 4h16v16H4zM4 9h16M9 9v11M14 4v5'
     };
     const appendIcon = (node,key) => {
         const icon = document.createElementNS('http://www.w3.org/2000/svg','svg');

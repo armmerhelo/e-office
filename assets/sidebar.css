@@ -67,6 +67,15 @@
 #sidebar .eoffice-app-navigation__footer { white-space: normal; }
 #sidebar .eoffice-app-navigation__footer p { margin: 0; padding: 0; font: inherit; }
 #sidebar .system-updates-badge { margin-left: auto; padding: 2px 8px; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: 11px; font-weight: 600; }
+body[data-studio-focus="true"] #mobile-header { height: 36px; padding: 4px 12px; }
+body[data-studio-focus="true"] #mobile-header h1 { font-size: 13px; line-height: 20px; }
+body[data-studio-focus="true"] #menu-toggle { min-width: 32px; min-height: 28px; }
+body[data-studio-focus="true"] #app-layout { min-height: calc(100dvh - 36px); }
+body[data-studio-focus="true"] #main_div { padding: 0; }
+@media (min-width: 64rem) {
+    body[data-studio-focus="true"] #mobile-header { display: flex !important; }
+    body[data-studio-focus="true"]:not(.studio-menu-expanded) #sidebar { display: none; }
+}
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar { width: 6px; height: 6px; }
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar-track { background: transparent; }
 :is(#sidebar, .eoffice-app-navigation)::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }

@@ -10,7 +10,7 @@
         room_booking:'room_booking/index.html', room_booking2:'room_booking/new_room.html',
         edit_room_booking:'room_booking/edit_room_booking.html', maintenance:'maintenance_requests/index.html',
         maintenance_admin:'maintenance_requests/admin.html', updates:'updates/index.html', audit_logs:'management/audit_logs.html',
-        siya_news:'siya_news/index.html'
+        siya_news:'siya_news/index.html', siya_news_studio:'siya_news/studio.html'
     });
     const cache = new Map(), libraries = new Map();
     const roleIndependent=new Set(['room_booking','room_booking2','maintenance']);
@@ -248,6 +248,7 @@
             if(item.src) {
                 const src=new URL(item.getAttribute('src'),url);
                 if(src.pathname.endsWith('/app-navigation.js'))continue;
+                if(item.hasAttribute('data-eoffice-global')) {await library(src.href);continue;}
                 if(src.origin!==url.origin) {
                     if(src.hostname==='cdn.tailwindcss.com')continue;
                     await library(src.href);continue;
@@ -311,6 +312,7 @@
     }
     const allowed=view=>window.eofficeUser && !window.eofficeFormOwner?.hasConflict() && window.eofficeSessionState?.status==='authenticated' && (['ai_settings','audit_logs'].includes(view)?window.eofficeUser.status==='Admin':
         view==='siya_news' ? ['news_submit','news_editor','news_producer'].some(permission=>window.eofficeUser.permissions?.includes(permission)) :
+        view==='siya_news_studio' ? window.eofficeUser.permissions?.includes('news_producer') :
         !({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]) ||
         window.eofficeUser.permissions?.includes({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]));
     const approve=()=>window.eofficeApproveDocumentLeaving?.(false,true)!==false;
@@ -397,6 +399,11 @@
                 if(request!==sequence)return false;
                 if(ctx.permissionStale||staleAccess(ctx))return this.open(view,{page:'load'});
                 if(!allowed(view)){window.showView(window.eofficeUser?'received':'public','load');return false;}
+                document.body.dataset.studioFocus=String(view==='siya_news_studio');
+                document.body.classList.remove('studio-menu-expanded');
+                document.getElementById('sidebar').inert=view==='siya_news_studio'||!window.matchMedia('(min-width: 64rem)').matches;
+                document.getElementById('menu-toggle').setAttribute('aria-expanded','false');
+                document.getElementById('menu-toggle').setAttribute('aria-label','เปิดเมนู');
                 stopLoading();status.remove();active=ctx;ctx.node.hidden=false;ctx.activate(true);document.title=ctx.body.querySelector('h1')?.textContent.trim()||'E-Office';
                 return true;
             } catch(error) {
@@ -407,6 +414,8 @@
         },
         leave() {
             if(!host.hidden && !approve())return false;
+            document.body.dataset.studioFocus='false';document.body.classList.remove('studio-menu-expanded');
+            document.getElementById('sidebar').inert=!window.matchMedia('(min-width: 64rem)').matches;
             sequence++;if(active)deactivate(active);active=null;stopLoading();status.remove();host.hidden=true;document.body.style.overflow='auto';
             document.getElementById('main_div').dataset.contentMode='document';
             const area=document.getElementById('main-content-area');

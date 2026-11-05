@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIYA NEWS Studio — โรงเรียนศรียานุสรณ์</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="studio.css?v=20261105-freeform">
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261104-eoffice-theme">
+</head>
+<body class="eoffice-module-page">
+<div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/siya_news/studio.html">
+    <script src="../assets/app-navigation.js?v=20261014-spa"></script>
+    <script src="../assets/vendor/konva.min.js?v=10.9.1" data-eoffice-global></script>
+    <script src="../assets/vendor/jspdf.umd.min.js?v=2.5.2" data-eoffice-global></script>
+    <script src="studio.js?v=20261105-freeform"></script>
+    <main class="studio-page" id="studio-app" aria-busy="false">
+        <header class="st-top">
+            <a class="st-back" id="st-back" href="index.html">← SIYA NEWS</a>
+            <span class="st-brand">SIYA NEWS <b>Studio</b></span>
+            <label class="st-sr" for="layoutSelect">ชุดจัดหน้า</label>
+            <select class="st-select" id="layoutSelect" aria-label="ชุดจัดหน้า"></select>
+            <button class="st-btn st-icon" id="newLayout" type="button" title="สร้างชุดจัดหน้าใหม่" aria-label="สร้างชุดจัดหน้าใหม่">＋</button>
+            <label class="st-sr" for="docName">ชื่องาน</label>
+            <input class="st-title-input" id="docName" maxlength="120" autocomplete="off" aria-label="ชื่องานออกแบบ">
+            <div class="st-mid">
+                <button class="st-btn st-icon" id="undoBtn" type="button" title="ย้อนกลับ (Ctrl+Z)" aria-label="ย้อนกลับ">↶</button>
+                <button class="st-btn st-icon" id="redoBtn" type="button" title="ทำซ้ำ (Ctrl+Y)" aria-label="ทำซ้ำ">↷</button>
+                <span class="st-save" id="saveState" role="status">พร้อมใช้งาน</span>
+                <button class="st-btn st-small" id="reloadBtn" type="button" hidden>โหลดล่าสุด</button>
+            </div>
+            <div class="st-right">
+                <button class="st-btn st-small" id="historyBtn" type="button">ประวัติ</button>
+                <button class="st-btn st-small" id="checkBtn" type="button">ตรวจความพร้อม</button>
+                <button class="st-btn st-small" id="exportPngBtn" type="button">PNG</button>
+                <button class="st-btn st-primary st-small" id="exportPdfBtn" type="button">PDF</button>
+            </div>
+        </header>
+        <div id="studio-message" class="st-message" role="status" hidden></div>
+        <div class="st-app">
+            <nav class="st-rail" id="toolrail" aria-label="เครื่องมือออกแบบ">
+                <button class="st-rail-item is-active" type="button" data-tab="news"><span aria-hidden="true">▤</span>ข่าว</button>
+                <button class="st-rail-item" type="button" data-tab="texts"><span aria-hidden="true">T</span>ข้อความ</button>
+                <button class="st-rail-item" type="button" data-tab="shapes"><span aria-hidden="true">◩</span>รูปทรง</button>
+                <button class="st-rail-item" type="button" data-tab="templates"><span aria-hidden="true">▦</span>เทมเพลต</button>
+                <button class="st-rail-item" type="button" data-tab="layers"><span aria-hidden="true">☷</span>เลเยอร์</button>
+                <button class="st-rail-item" type="button" data-tab="pages"><span aria-hidden="true">▭</span>หน้า</button>
+            </nav>
+            <aside class="st-side" id="side" aria-label="เครื่องมือ">
+                <div class="st-side-head"><strong>เครื่องมือ</strong><button class="st-btn st-small" id="sideClose" type="button">ปิด</button></div>
+                <section class="st-panel is-active" id="tab-news">
+                    <h2 class="st-panel-title">ข่าวที่ผ่านตรวจ</h2>
+                    <p class="st-sub">คลิกเพื่อแทรกข้อความและภาพ หรือเลือกเฉพาะภาพลงหน้ากระดาษ</p>
+                    <label class="st-label" for="newsSearch">ค้นหา</label>
+                    <input class="st-input" id="newsSearch" type="search" maxlength="100" placeholder="หัวข้อ กลุ่มงาน หรือเนื้อหา">
+                    <div id="newsPool" class="st-news-pool" aria-live="polite"></div>
+                    <p class="st-sub st-pool-note">แสดงข่าวที่ผ่านตรวจล่าสุดสูงสุด 100 รายการ และภาพที่งานนี้อ้างอิงอยู่</p>
+                </section>
+                <section class="st-panel" id="tab-texts">
+                    <h2 class="st-panel-title">เพิ่มข้อความ</h2>
+                    <button class="st-text-option st-h1" type="button" data-text="heading">เพิ่มหัวเรื่อง</button>
+                    <button class="st-text-option st-h2" type="button" data-text="sub">เพิ่มหัวข้อย่อย</button>
+                    <button class="st-text-option st-body-text" type="button" data-text="body">เพิ่มข้อความทั่วไป</button>
+                    <p class="st-sub">ดับเบิลคลิกข้อความบนหน้ากระดาษเพื่อแก้ไขเร็ว หรือปรับฟอนต์/สี/ขนาดจากแผงด้านขวา</p>
+                </section>
+                <section class="st-panel" id="tab-shapes">
+                    <h2 class="st-panel-title">รูปทรงและองค์ประกอบ</h2>
+                    <div class="st-shape-grid">
+                        <button class="st-shape" type="button" data-shape="rect" title="สี่เหลี่ยม">■</button>
+                        <button class="st-shape" type="button" data-shape="round" title="สี่เหลี่ยมมุมมน">▢</button>
+                        <button class="st-shape" type="button" data-shape="circle" title="วงกลม">●</button>
+                        <button class="st-shape" type="button" data-shape="triangle" title="สามเหลี่ยม">▲</button>
+                        <button class="st-shape" type="button" data-shape="star" title="ดาว">★</button>
+                        <button class="st-shape" type="button" data-shape="line" title="เส้น">╱</button>
+                    </div>
+                    <label class="st-label">สีที่ใช้บ่อย</label>
+                    <div class="st-shape-grid st-swatches" id="swatches"></div>
+                    <p class="st-sub">คลิกวัตถุเพื่อลาก ย่อ ขยาย หมุน และจัดลำดับเลเยอร์</p>
+                </section>
+                <section class="st-panel" id="tab-templates">
+                    <h2 class="st-panel-title">เริ่มต้นจากเทมเพลต</h2>
+                    <button class="st-template" type="button" data-template="cover"><span class="st-template__preview st-preview-cover">SIYA<br>NEWS</span><strong>หน้าปกวารสาร</strong><small>หัวข้อเด่น + พื้นหลังสี</small></button>
+                    <button class="st-template" type="button" data-template="feature"><span class="st-template__preview st-preview-feature">ข่าว<br>เด่น</span><strong>ข่าวเด่น</strong><small>พื้นที่ภาพและหัวข้อข่าว</small></button>
+                    <button class="st-template" type="button" data-template="activity"><span class="st-template__preview st-preview-activity">กิจกรรม</span><strong>กิจกรรมโรงเรียน</strong><small>รูปทรงและข้อความสีสัน</small></button>
+                    <button class="st-btn st-wide" id="blankBtn" type="button">＋ เริ่มหน้าว่าง</button>
+                    <p class="st-sub">เทมเพลตจะแทนที่องค์ประกอบบนหน้าปัจจุบัน แต่ไม่ลบข่าวหรือภาพต้นฉบับ</p>
+                </section>
+                <section class="st-panel" id="tab-layers">
+                    <h2 class="st-panel-title">เลเยอร์</h2>
+                    <p class="st-sub">เลเยอร์บนสุดจะอยู่เหนือวัตถุด้านล่าง</p>
+                    <div id="layerList"></div>
+                </section>
+                <section class="st-panel" id="tab-pages">
+                    <h2 class="st-panel-title">หน้า</h2>
+                    <label class="st-label" for="formatSelect">ขนาดหน้า</label>
+                    <select class="st-input" id="formatSelect"></select>
+                    <div class="st-page-actions">
+                        <button class="st-btn" id="duplicatePageBtn" type="button">ทำสำเนาหน้า</button>
+                        <button class="st-btn st-warn" id="deletePageBtn" type="button">ลบหน้านี้</button>
+                        <button class="st-btn st-primary" id="addPageBtn" type="button">＋ เพิ่มหน้า</button>
+                        <button class="st-btn st-warn" id="deleteLayoutBtn" type="button">ลบชุดจัดหน้านี้</button>
+                    </div>
+                    <label class="st-label" for="bgColor">สีพื้นหลังหน้า</label>
+                    <div class="st-color-row"><input id="bgColor" type="color" value="#ffffff"><input class="st-input" id="bgColorHex" type="text" value="#ffffff" maxlength="9"></div>
+                    <p class="st-sub">เปลี่ยนขนาดหน้าจะไม่ย้ายตำแหน่งองค์ประกอบเดิม ควรตรวจหน้าใหม่ก่อนพิมพ์</p>
+                </section>
+            </aside>
+            <section class="st-workspace" aria-label="พื้นที่ออกแบบ">
+                <div class="st-workbar">
+                    <span class="st-meta" id="workFormat">A4 แนวตั้ง · 794 × 1123 px</span>
+                    <div class="st-workbar-right">
+                        <button class="st-btn st-small" id="inspectorToggle" type="button" aria-expanded="false" aria-controls="inspector">ปรับแต่ง</button>
+                        <button class="st-btn st-small" id="fitBtn" type="button">พอดีจอ</button>
+                        <input id="zoomRange" type="range" min="15" max="150" step="5" value="55" aria-label="ซูม">
+                        <span id="zoomValue" class="st-meta">55%</span>
+                    </div>
+                </div>
+                <div class="st-canvas-scroll" id="canvasScroll">
+                    <div class="st-canvas-center">
+                        <div class="st-page-label" id="pageLabel">หน้า 1</div>
+                        <div class="st-page-wrap" id="pageWrap"><div id="stageContainer"></div></div>
+                    </div>
+                </div>
+                <div class="st-pages" id="pagesStrip" aria-label="หน้ากระดาษ"></div>
+                <div id="toast" class="st-toast" role="status" aria-live="polite"></div>
+            </section>
+            <aside class="st-inspector" id="inspector" aria-label="ปรับแต่งองค์ประกอบ">
+                <div class="st-inspector-head"><h3>ปรับแต่ง</h3><button class="st-btn st-small" id="inspectorClose" type="button">ปิด</button></div>
+                <div id="noSelection" class="st-muted-card"><span aria-hidden="true">✦</span>เลือกวัตถุบนพื้นที่ออกแบบเพื่อปรับแต่ง<br><small>หรือแตะพื้นที่ว่างเพื่อตั้งค่าหน้ากระดาษ</small></div>
+                <div id="propPanel" class="st-props" hidden>
+                    <div class="st-field"><label for="pName">ชื่อเลเยอร์</label><input id="pName" type="text" maxlength="80"></div>
+                    <div class="st-field" id="pTextWrap"><label for="pText">ข้อความ</label><textarea id="pText" maxlength="10000"></textarea></div>
+                    <div class="st-field st-image-note" id="pImageWrap" hidden>ภาพจากข่าวที่ผ่านตรวจ · ใช้ภาพเดิมของข่าวเท่านั้น</div>
+                    <div class="st-field"><button class="st-btn st-small st-wide" id="lockBtn" type="button" aria-pressed="false">ล็อกวัตถุ</button></div>
+                    <div id="objectEditing">
+                    <div class="st-field-row"><div class="st-field"><label for="pX">ตำแหน่ง X</label><input id="pX" type="number" step="1"></div><div class="st-field"><label for="pY">ตำแหน่ง Y</label><input id="pY" type="number" step="1"></div></div>
+                    <div class="st-field-row"><div class="st-field"><label for="pW">กว้าง</label><input id="pW" type="number" min="1"></div><div class="st-field"><label for="pH">สูง</label><input id="pH" type="number" min="1"></div></div>
+                    <div class="st-field-row"><div class="st-field"><label for="pRotation">หมุน (°)</label><input id="pRotation" type="number" step="1"></div><div class="st-field"><label for="pOpacity">โปร่งใส (%)</label><input id="pOpacity" type="number" min="0" max="100"></div></div>
+                    <div class="st-field" id="pFillWrap"><label for="pFill">สี</label><div class="st-color-row"><input id="pFill" type="color" value="#4f46e5"><input id="pFillHex" type="text" maxlength="9" placeholder="#4f46e5"></div></div>
+                    <div id="pFontWrap"><div class="st-field"><label for="pFont">แบบอักษร</label><select id="pFont"><optgroup label="งานเอกสารทางการ"><option value="Sarabun">Sarabun — สารบรรณ</option></optgroup><optgroup label="ทั่วไป"><option value="Prompt">Prompt</option><option value="Noto Sans Thai">Noto Sans Thai</option><option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="sans-serif">Sans-serif</option></optgroup></select></div><div class="st-field-row"><div class="st-field"><label for="pFontSize">ขนาดตัวอักษร</label><input id="pFontSize" type="number" min="6" max="400"></div><div class="st-field"><label for="pFontWeight">น้ำหนัก</label><select id="pFontWeight"><option value="normal">ปกติ</option><option value="bold">ตัวหนา</option><option value="italic">ตัวเอียง</option><option value="italic bold">หนาเอียง</option></select></div></div><div class="st-field"><label for="pAlign">จัดแนว</label><select id="pAlign"><option value="left">ชิดซ้าย</option><option value="center">กึ่งกลาง</option><option value="right">ชิดขวา</option><option value="justify">เต็มบรรทัด</option></select></div></div>
+                    <div id="textExtra" class="st-field" hidden>
+                        <div class="st-field-row"><div class="st-field"><label for="pLineHeight">ระยะบรรทัด</label><input id="pLineHeight" type="number" min="0.8" max="3" step="0.05"></div><div class="st-field"><label for="pLetterSpacing">ระยะตัวอักษร (px)</label><input id="pLetterSpacing" type="number" min="-20" max="100" step="0.5"></div></div>
+                        <label class="st-check"><input id="pUnderline" type="checkbox"> ขีดเส้นใต้</label>
+                    </div>
+                    <div id="borderPanel" class="st-field" hidden>
+                        <h3>ขอบวัตถุ</h3>
+                        <div class="st-field-row"><div class="st-field"><label for="pStroke">สีขอบ</label><input id="pStroke" type="color" value="#1e293b"></div><div class="st-field"><label for="pStrokeWidth">ความหนา (px)</label><input id="pStrokeWidth" type="number" min="0" max="100" step="1"></div></div>
+                        <div class="st-field" id="cornerWrap"><label for="pCorner">มุมมน (px)</label><input id="pCorner" type="number" min="0" max="500"></div>
+                    </div>
+                    <div id="cropPanel" class="st-field" hidden>
+                        <h3>ครอปภาพ</h3>
+                        <div class="st-field"><label for="cropRatio">สัดส่วนกรอบ</label><select id="cropRatio"><option value="current">กรอบปัจจุบัน</option><option value="original">สัดส่วนภาพเดิม</option><option value="1">1:1</option><option value="1.3333333333">4:3</option><option value="1.7777777778">16:9</option><option value="0.75">3:4</option></select></div>
+                        <label class="st-check"><input id="cropMode" type="checkbox"> ลากภาพภายในกรอบ</label>
+                        <div class="st-field"><label for="cropZoom">ซูมภาพ</label><input id="cropZoom" type="range" min="1" max="5" step="0.05" value="1"></div>
+                        <div class="st-field"><label for="cropX">ตำแหน่งแนวนอน</label><input id="cropX" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+                        <div class="st-field"><label for="cropY">ตำแหน่งแนวตั้ง</label><input id="cropY" type="range" min="0" max="1" step="0.01" value="0.5"></div>
+                        <button class="st-btn st-small" id="cropReset" type="button">คืนภาพเต็ม</button>
+                    </div>
+                    <div class="st-field"><h3>จัดแนวกับหน้ากระดาษ</h3><div class="st-align-actions">
+                        <button class="st-btn st-small" type="button" data-place="left">ซ้าย</button><button class="st-btn st-small" type="button" data-place="center">กึ่งกลาง</button><button class="st-btn st-small" type="button" data-place="right">ขวา</button>
+                        <button class="st-btn st-small" type="button" data-place="top">บน</button><button class="st-btn st-small" type="button" data-place="middle">กลางแนวตั้ง</button><button class="st-btn st-small" type="button" data-place="bottom">ล่าง</button>
+                    </div></div>
+                    <hr>
+                    <div class="st-actions"><button class="st-btn st-small" id="frontBtn" type="button">↑ ขึ้นบน</button><button class="st-btn st-small" id="backBtn" type="button">↓ ลงล่าง</button><button class="st-btn st-small" id="duplicateBtn" type="button">ทำสำเนา</button><button class="st-btn st-small st-warn" id="deleteBtn" type="button">ลบ</button></div>
+                    </div>
+                </div>
+                <div id="pagePanel" class="st-props">
+                    <hr><h3>พื้นหลังหน้า</h3>
+                    <div class="st-field"><label for="bgColorSide">สีพื้นหลัง</label><div class="st-color-row"><input id="bgColorSide" type="color" value="#ffffff"><input id="bgColorSideHex" type="text" maxlength="9" value="#ffffff"></div></div>
+                    <div class="st-field"><label>ขนาดหน้า</label><div class="st-sub" id="pageSizeDisplay">794 × 1123 px</div></div>
+                    <div class="st-field"><label for="safeMargin">ระยะปลอดภัยจากขอบ (px)</label><input id="safeMargin" type="number" min="0" max="200" value="38"></div>
+                    <label class="st-check"><input id="showSafeMargin" type="checkbox"> แสดงเส้นระยะปลอดภัย</label>
+                    <label class="st-check"><input id="snapToggle" type="checkbox" checked> ดูดแนวขณะลาก (Snap)</label>
+                    <p class="st-sub">เส้นช่วยไม่ติดไปกับ PNG/PDF · ส่งออก 2× ของขนาดหน้า ไม่ขึ้นกับซูม</p>
+                    <p class="st-sub">ภาพและข้อความถูกวาดเป็นภาพในไฟล์ PNG/PDF · ไม่ได้ฝังข้อมูลลับหรือไฟล์ต้นฉบับ</p>
+                </div>
+            </aside>
+        </div>
+        <dialog id="historyDialog" class="st-dialog" aria-labelledby="historyTitle">
+            <header class="st-dialog-head"><h2 id="historyTitle">ประวัติเวอร์ชัน</h2><button class="st-btn" id="historyClose" type="button">ปิด</button></header>
+            <div id="historyList" class="st-history"></div>
+        </dialog>
+        <div class="st-fatal" id="fatal" hidden><b>โหลดตัวแก้ไขไม่สำเร็จ</b><p>ไม่สามารถโหลด Konva หรือ jsPDF จากไฟล์ในระบบได้ กรุณารีเฟรชหน้าใหม่ หรือแจ้งผู้ดูแล E-Office</p></div>
+    </main>
+</div></div>
+</body>
+</html>

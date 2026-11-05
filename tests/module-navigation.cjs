@@ -63,7 +63,8 @@ const routes = {
     maintenance_admin: ['menu-maintenance-admin', 'maintenance_requests/admin.html'],
     updates: ['menu-updates', 'updates/index.html'],
     audit_logs: ['menu-audit-logs', 'management/audit_logs.html'],
-    siya_news: ['menu-siya-news', 'siya_news/index.html']
+    siya_news: ['menu-siya-news', 'siya_news/index.html'],
+    siya_news_studio: ['menu-siya-news-studio', 'siya_news/studio.html']
 };
 
 const main = fs.readFileSync('assets/main.js', 'utf8');
@@ -158,10 +159,10 @@ const recordHistory = (url, push) => {
     context.window.location.href = String(url);
 };
 const context = {
-    window: {...routerWindowEvents,eofficeUser:{status:'Admin',permissions:['members','departments','email','maintenance','news_submit']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path}},
+    window: {...routerWindowEvents,eofficeUser:{status:'Admin',permissions:['members','departments','email','maintenance','news_submit','news_producer']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path}},
     document: {body:{style:{}},getElementById:el},
     MODULE_ROUTES: Object.freeze(Object.fromEntries([...Object.entries(routes).map(([key,[,path]]) => [key,path]), ['room_booking2','room_booking/new_room.html']])),
-    restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance',siya_news:'siya_news'})[view],
+    restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance',siya_news:'siya_news',siya_news_studio:'news_producer'})[view],
     eofficeCan:permission => permission==='siya_news'?Boolean(context.window.eofficeUser?.permissions.some(role=>['news_submit','news_editor','news_producer'].includes(role))):Boolean(context.window.eofficeUser?.permissions.includes(permission)),
     getCookie:() => context.window.eofficeUser ? 'session' : null,
     setSidebarOpen(){}, display_style:(id,display) => { el(id).style.display = display; },
@@ -193,12 +194,15 @@ for (const view of ['constructor','toString','__proto__','missing','received','s
 context.window.eofficeUser={permissions:[]};
 context.showView('members','load');
 assert.equal(context.loaded,'received');
+context.window.eofficeUser={permissions:['news_submit','news_editor']};
+context.showView('siya_news_studio','load');
+assert.equal(context.loaded,'received','Studio requires news_producer');
 context.window.eofficeUser=null;
 context.showView('room_booking','load');
 assert.equal(context.loaded,'public');
 console.log('PASS real router: module redirects, document tabs, invalid/prototype routes, denied permissions and guests');
 
-context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance','news_submit']};
+context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance','news_submit','news_producer']};
 const mounted=[];
 context.window.eofficeModuleRouter={open:(view,options)=>mounted.push({view,...options}),leave:()=>true};
 context.navigated=null;
@@ -220,7 +224,7 @@ for (const view of Object.keys(context.MODULE_ROUTES)) {
     assert.equal(sessionValues.get('eoffice-login-view'),view,'guest module target must survive canonicalization');
     // Guest startup displays public again after opening its login modal.
     context.showView('public','load');
-    context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance','news_submit']};
+    context.window.eofficeUser={status:'Admin',permissions:['members','departments','email','maintenance','news_submit','news_producer']};
     context.navigated=null;
     startup.runInContext(context);
     assert.equal(context.navigated,context.MODULE_ROUTES[view]);

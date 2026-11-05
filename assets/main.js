@@ -10,7 +10,8 @@ function applyPermissionMenus() {
         departments: ['menu-groups', 'group_menu_groups'],
         email: ['send_email', 'group_send_email'],
         maintenance: ['menu-maintenance-admin', 'group_maintenance_admin'],
-        siya_news: ['menu-siya-news']
+        siya_news: ['menu-siya-news'],
+        news_producer: ['menu-siya-news-studio', 'group_siya_news_studio']
     })) {
         for (const id of ids) {
             const node = document.getElementById(id);
@@ -80,7 +81,7 @@ async function refreshPermissionMenus() {
 }
 
 function restrictedViewPermission(view) {
-    return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance', siya_news:'siya_news'}[view];
+    return {members:'members', groups:'departments', send_email:'email', maintenance_admin:'maintenance', siya_news:'siya_news', siya_news_studio:'news_producer'}[view];
 }
 
 const MODULE_ROUTES = Object.freeze({
@@ -97,7 +98,8 @@ const MODULE_ROUTES = Object.freeze({
     ai_settings: 'email_send/ai_settings.html',
     audit_logs: 'management/audit_logs.html',
     updates: 'updates/index.html',
-    siya_news: 'siya_news/index.html'
+    siya_news: 'siya_news/index.html',
+    siya_news_studio: 'siya_news/studio.html'
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
@@ -398,6 +400,13 @@ window.onload = async () => {
 
 /** Toggles the visibility of the sidebar on mobile. */
 const toggleSidebar = () => {
+    if (sidebarDesktop.matches && document.body.dataset.studioFocus === 'true') {
+        const expanded = document.body.classList.toggle('studio-menu-expanded');
+        document.getElementById('sidebar').inert = !expanded;
+        document.getElementById('menu-toggle').setAttribute('aria-expanded', String(expanded));
+        document.getElementById('menu-toggle').setAttribute('aria-label', expanded ? 'ย่อเมนู' : 'เปิดเมนู');
+        return;
+    }
     setSidebarOpen(document.getElementById('sidebar').dataset.sidebarOpen !== 'true');
 };
 
@@ -412,7 +421,9 @@ function setSidebarOpen(open) {
     const wasOpen = sidebar.dataset.sidebarOpen === 'true';
     const isOpen = !sidebarDesktop.matches && open;
     sidebar.dataset.sidebarOpen = String(isOpen);
-    sidebar.inert = !sidebarDesktop.matches && !isOpen;
+    sidebar.inert = sidebarDesktop.matches
+        ? document.body.dataset.studioFocus === 'true' && !document.body.classList.contains('studio-menu-expanded')
+        : !isOpen;
     overlay.classList.toggle('hidden', !isOpen);
     document.getElementById('main_div').inert = isOpen;
     button.setAttribute('aria-expanded', String(isOpen));

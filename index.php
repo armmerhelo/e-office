@@ -257,6 +257,12 @@ window.addEventListener('load', function() {
               <span>SIYA NEWS</span>
             </a>
           </li>
+          <li id="group_siya_news_studio" style="display:none">
+            <a href="siya_news/studio.html" id="menu-siya-news-studio" onclick="showView('siya_news_studio','','1'); return false;" class="menu-item eoffice-app-navigation__link" style="display:none">
+              <svg class="eoffice-app-navigation__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4h16v16H4zM4 9h16M9 9v11M14 4v5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span>SIYA NEWS — จัดหน้าวารสาร</span>
+            </a>
+          </li>
         <li id="group_send_email">
           <a href="email_send/doc_send_email.html" id="send_email" onclick="showView('send_email','','1'); return false;" class="menu-item">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
