@@ -114,7 +114,7 @@ async function run() {
                 assert.equal(await evaluate(`${root}.getElementById('panel-guide').hidden`),false,'guide tab should reveal the format instructions');
                 await evaluate(`${root}.getElementById('tab-compose').click()`);
                 const injection=await evaluate(`(()=>{const s=${root},field=s.getElementById('department');field.value='<img src=x onerror=alert(1)>';field.dispatchEvent(new Event('input',{bubbles:true}));const preview=s.getElementById('preview-department');return {text:preview.textContent,children:preview.children.length};})()`);
-                assert.equal(injection.text,'<img src=x onerror=alert(1)>');assert.equal(injection.children,0,'memo preview must not interpret entered text as HTML');
+                assert.equal(injection.text,'<img src=x onerror=alert(๑)>');assert.equal(injection.children,0,'memo preview must not interpret entered text as HTML');
                 assert.equal(await evaluate(`${root}.getElementById('preview-number').classList.contains('paper-fallback')`),true,'empty form fields should remain visual hints, not print as content');
                 await evaluate('window.dispatchEvent(new Event("beforeprint"))');
                 assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),true,'print mode should remove the application shell');
@@ -127,10 +127,10 @@ async function run() {
                 await evaluate('window.dispatchEvent(new Event("beforeprint"))');
                 assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),false,'printing another cached module must not activate the memo print stylesheet');
                 await evaluate('window.dispatchEvent(new Event("afterprint"))');
+                await moduleView('memo');
                 await evaluate(`${root}.getElementById('memo-form').reset()`);
                 await until(`${root}.getElementById('emblem-preview').complete && ${root}.getElementById('emblem-preview').naturalWidth>0`);
                 assert.match(await evaluate(`${root}.getElementById('emblem-preview').currentSrc`),/\/memorandum\/assets\/garuda-reference\.png$/,'reset must keep the default Garuda URL inside the memo module');
-                await moduleView('memo');
                 await evaluate(`window.__qaNativePrint=window.print;window.__qaPrintCalls=0;window.print=()=>window.__qaPrintCalls++;${root}.getElementById('print-memo').click();window.showView('book')`);
                 await until("location.search==='?view=book' && !!document.querySelector('.eoffice-module-host:not([hidden])')");
                 await sleep(50);
@@ -144,7 +144,7 @@ async function run() {
                 await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
             }
             if(view==='siya_news'){
-                await until(`${root}.getElementById('news-tabs').children.length===4`);
+                await until(`${root}.getElementById('news-tabs').children.length===5`);
                 await evaluate(`${root}.getElementById('create-news').click()`);
                 assert.equal(await evaluate(`${root}.querySelectorAll('#news-content-form').length`),1);
                 assert.equal(await evaluate(`${root}.querySelectorAll('form form').length`),0,'news forms must not be nested');
@@ -528,7 +528,7 @@ async function run() {
     });
     await check('older failed personal-order refresh cannot overwrite the latest result',async()=>{
         await moduleView('my_public');
-        await evaluate(`window.__qaIdentityTransport=window.fetch;window.__qaIdentityReads=[];window.fetch=(url,opts)=>new URL(String(url),location.href).pathname==='/email_send/api_get_my_docs.php'?new Promise((resolve,reject)=>window.__qaIdentityReads.push({resolve,reject})):window.__qaIdentityTransport(url,opts);${root}.querySelector('.header-actions button').click();${root}.querySelector('.header-actions button').click();`);
+        await evaluate(`window.__qaIdentityTransport=window.fetch;window.__qaIdentityReads=[];window.fetch=(url,opts)=>new URL(String(url),location.href).pathname==='/email_send/api_get_my_docs.php'?new Promise((resolve,reject)=>window.__qaIdentityReads.push({resolve,reject})):window.__qaIdentityTransport(url,opts);${root}.getElementById('refreshOrders').click();${root}.getElementById('refreshOrders').click();`);
         await until('window.__qaIdentityReads.length===2');
         await evaluate(`window.__qaIdentityReads[1].resolve(new Response(JSON.stringify({status:'success',years:[],data:[{doc_id:99100,doc_year:'2569',external_number:100,doc_name:'QA latest order',files:[]}]}),{headers:{'Content-Type':'application/json'}}))`);
         await until(root+".getElementById('myDocTableBody').textContent.includes('QA latest order')");
