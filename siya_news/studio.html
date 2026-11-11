@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
-    <link rel="stylesheet" href="studio.css?v=20261105-freeform">
+    <link rel="stylesheet" href="studio.css?v=20261111-pool-accessibility">
     <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261104-eoffice-theme">
 </head>
 <body class="eoffice-module-page">
@@ -18,7 +18,7 @@
     <script src="../assets/app-navigation.js?v=20261014-spa"></script>
     <script src="../assets/vendor/konva.min.js?v=10.9.1" data-eoffice-global></script>
     <script src="../assets/vendor/jspdf.umd.min.js?v=2.5.2" data-eoffice-global></script>
-    <script src="studio.js?v=20261105-freeform"></script>
+    <script src="studio.js?v=20261111-pool-accessibility"></script>
     <main class="studio-page" id="studio-app" aria-busy="false">
         <header class="st-top">
             <a class="st-back" id="st-back" href="index.html">← SIYA NEWS</a>
@@ -58,7 +58,9 @@
                     <p class="st-sub">คลิกเพื่อแทรกข้อความและภาพ หรือเลือกเฉพาะภาพลงหน้ากระดาษ</p>
                     <label class="st-label" for="newsSearch">ค้นหา</label>
                     <input class="st-input" id="newsSearch" type="search" maxlength="100" placeholder="หัวข้อ กลุ่มงาน หรือเนื้อหา">
-                    <div id="newsPool" class="st-news-pool" aria-live="polite"></div>
+                    <button class="st-btn st-wide" id="newsPoolRefresh" type="button" aria-controls="newsPool" aria-label="รีเฟรชคลังข่าวที่ผ่านตรวจ">↻ รีเฟรชคลังข่าว</button>
+                    <p class="st-sub st-pool-status" id="newsPoolStatus" role="status" aria-live="polite"></p>
+                    <div id="newsPool" class="st-news-pool"></div>
                     <p class="st-sub st-pool-note">แสดงข่าวที่ผ่านตรวจล่าสุดสูงสุด 100 รายการ และภาพที่งานนี้อ้างอิงอยู่</p>
                 </section>
                 <section class="st-panel" id="tab-texts">

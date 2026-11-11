@@ -69,6 +69,18 @@ async function run(){
   for(const width of [1440,1024,760,390,320]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<760});assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'),'overflow '+width);}
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
  });
+ await check('news pool refresh recovers from errors and shows newly approved items',async()=>{
+  const before=await evaluate(`${qa('#newsPool .st-news')}.length`);assert.ok(before>0);
+  await evaluate(`(()=>{window.__poolFetch=window.fetch;window.fetch=(input,options)=>String(input).includes('action=pool')?Promise.reject(new TypeError('QA pool offline')):window.__poolFetch(input,options);})()`);
+  await click('#newsPoolRefresh');await until(`${el('newsPoolRefresh')}.disabled===false&&${el('newsPoolStatus')}.textContent.includes('QA pool offline')`);
+  assert.equal(await evaluate(`${qa('#newsPool .st-news')}.length`),before,'failed refresh preserves the previously loaded news');
+  await evaluate(`window.fetch=(input,options)=>String(input).includes('action=pool')?Promise.resolve(new Response(JSON.stringify({status:'success',data:[]}),{headers:{'Content-Type':'application/json'}})):window.__poolFetch(input,options)`);
+  await click('#newsPoolRefresh');await until(`${el('newsPoolRefresh')}.disabled===false&&${qa('#newsPool .st-news')}.length===0`);
+  assert.match(await evaluate(`${el('newsPool')}.textContent`),/ยังไม่มีข่าวที่ผ่านตรวจ.*รีเฟรชคลังข่าว/);
+  assert.match(await evaluate(`${el('newsPoolStatus')}.textContent`),/คลังข่าวว่าง/);
+  await evaluate('window.fetch=window.__poolFetch');await click('#newsPoolRefresh');await until(`${el('newsPoolRefresh')}.disabled===false&&${qa('#newsPool .st-news')}.length>0`);
+  assert.equal(await evaluate(`${el('newsPoolStatus')}.textContent.includes('ผ่านตรวจ')`),true);
+ });
  await check('compact bars preserve vertical canvas space on desktop and short screens',async()=>{
   for(const height of [900,600]){
    await send('Emulation.setDeviceMetricsOverride',{width:1440,height,deviceScaleFactor:1,mobile:false});
@@ -100,11 +112,14 @@ async function run(){
   const after=(await detail()).document.pages[0].elements;assert.ok(after.some(element=>element.type==='Image'&&element.newsId&&element.imageId));assert.ok(after.some(element=>element.type==='Text'&&element.text.length>0));
   await click('#undoBtn');await waitSaved();assert.ok((await detail()).document.pages[0].elements.length<after.length);
   await click('#redoBtn');await waitSaved();assert.equal((await detail()).document.pages[0].elements.length,after.length);
- });
+  });
  await check('inspector text/font edits are stored in the layout document',async()=>{
+  await click('[data-tab="layers"]');
   await evaluate(`${q('#pagesStrip .st-page-item')}.click()`);await until(`${qa('#layerList .st-layer')}.length>0`);
-  await evaluate(`(()=>{const row=[...${qa('#layerList .st-layer')}].find(item=>item.textContent.trim().startsWith('T'));if(!row)throw Error('No text layer');row.click();})()`);
+  await evaluate(`(()=>{const row=[...${qa('#layerList .st-layer')}].find(item=>item.textContent.trim().startsWith('T'));if(!row)throw Error('No text layer');const name=row.querySelector('.st-layer-name');if(!name||name.tagName!=='BUTTON'||name.tabIndex!==0||!name.getAttribute('aria-label'))throw Error('Layer name is not an accessible keyboard button');name.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));})()`);
+  await until(`${qa('#layerList .st-layer-name[aria-pressed="true"]')}.length===1`);
   await until(`!${el('pTextWrap')}.hidden`);
+  assert.equal(await evaluate(`${qa('#layerList .st-layer-name[aria-pressed="true"]')}.length`),1,'keyboard selection is exposed accessibly');
   await evaluate(`(()=>{const text=${el('pText')};text.value='ข้อความแก้ไขจาก inspector';text.dispatchEvent(new Event('input',{bubbles:true}));text.dispatchEvent(new Event('change',{bubbles:true}));const size=${el('pFontSize')};size.value='28';size.dispatchEvent(new Event('input',{bubbles:true}));size.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await waitSaved();
   const doc=await detail();assert.ok(doc.document.pages[0].elements.some(element=>element.type==='Text'&&element.text==='ข้อความแก้ไขจาก inspector'&&Number(element.fontSize)===28));
@@ -226,7 +241,7 @@ async function run(){
  });
  await check('layer visibility is stored in the saved document',async()=>{
   await evaluate(`${q('#pagesStrip .st-page-item')}.click()`);await until(`${qa('#layerList .st-layer')}.length>0`);
-  await evaluate(`(()=>{const row=[...${qa('#layerList .st-layer')}].find(item=>item.textContent.includes('วงกลม'));row.querySelector('button').click();})()`);await waitSaved();
+  await evaluate(`(()=>{const row=[...${qa('#layerList .st-layer')}].find(item=>item.textContent.includes('วงกลม'));row.querySelector('button[aria-label^="ซ่อน "]').click();})()`);await waitSaved();
   const doc=await detail();assert.ok(doc.document.pages.some(page=>page.elements.some(element=>element.visible===false)));
  });
  await check('readiness check and PNG export produce a canvas image',async()=>{
@@ -271,9 +286,14 @@ async function run(){
   assert.ok(await evaluate(`${q('#stageContainer canvas')}.width>0`));
  });
  await check('mobile canvas and inspector stay usable',async()=>{
+  await send('Emulation.setDeviceMetricsOverride',{width:1024,height:900,deviceScaleFactor:1,mobile:false});
+  await evaluate(`${el('safeMargin')}.focus()`);
+  await send('Emulation.setDeviceMetricsOverride',{width:1020,height:900,deviceScaleFactor:1,mobile:false});
+  await until(`${el('inspector')}.inert&&${el('inspectorToggle')}.matches(':focus')`);
+  await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   for(const width of [390,320]){await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});await until(`document.documentElement.scrollWidth<=innerWidth`);await until(`${q('#pageWrap')}.getBoundingClientRect().width<=innerWidth`);
-   await evaluate(`${q('[data-tab="news"]')}.click()`);await until(`${el('side')}.classList.contains('is-open')`);await evaluate(`${el('sideClose')}.click()`);await until(`!${el('side')}.classList.contains('is-open')`);
-   await evaluate(`${el('inspectorToggle')}.click()`);await until(`${el('inspector')}.classList.contains('is-open')`);await evaluate(`${el('inspectorClose')}.click()`);await until(`!${el('inspector')}.classList.contains('is-open')`);await pause(250);await send('Page.captureScreenshot',{format:'png'}).then(r=>fs.writeFileSync(path.join(profile,'studio-'+width+'.png'),Buffer.from(r.data,'base64')));}
+    await evaluate(`${q('[data-tab="news"]')}.click()`);await until(`${el('side')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('side')}.inert`),false);await evaluate(`${el('sideClose')}.click()`);await until(`!${el('side')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('side')}.inert`),true);assert.equal(await evaluate(`${q('[data-tab].is-active')}.matches(':focus')`),true);
+    await evaluate(`${el('inspectorToggle')}.click()`);await until(`${el('inspector')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('inspector')}.inert`),false);await evaluate(`${el('inspectorClose')}.click()`);await until(`!${el('inspector')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('inspector')}.inert`),true);assert.equal(await evaluate(`${el('inspectorToggle')}.matches(':focus')`),true);await pause(250);await send('Page.captureScreenshot',{format:'png'}).then(r=>fs.writeFileSync(path.join(profile,'studio-'+width+'.png'),Buffer.from(r.data,'base64')));}
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
  });
  assert.deepEqual(errors,[]);console.log('Screenshots: '+profile);console.log('Studio layout: #'+layoutId);

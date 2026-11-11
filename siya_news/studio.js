@@ -57,7 +57,7 @@
     const excerpt=(text,max)=>{const chars=[...String(text??'')];return chars.length>max?chars.slice(0,max-1).join('')+'…':chars.join('');};
     const state={
         layouts:[],layout:null,version:0,pages:[],active:0,zoom:.55,selected:null,
-        pool:[],poolMap:new Map(),dirty:false,saving:false,conflict:false,loading:false,exporting:false,
+        pool:[],poolMap:new Map(),poolError:'',poolLoading:false,poolRequest:null,dirty:false,saving:false,conflict:false,loading:false,exporting:false,
         ready:false,revision:0,saveTimer:null,owner:null,autoFit:true,creating:false,mutating:false,
         stage:null,bgLayer:null,contentLayer:null,uiLayer:null,transformer:null,bgRect:null,
         restoring:false,restoreToken:0,toastTimer:null,imageCache:new Map(),imageFailures:new Set(),
@@ -201,8 +201,35 @@
         return [...new Map([...latest.data,...referenced].map(row=>[Number(row.id),row])).values()];
     }
     async function refreshPool(){
-        setPool(await fetchPool());
-        renderPool();
+        const layout=state.layout,pages=state.pages;
+        if(state.poolRequest){
+            const pending=state.poolRequest;
+            if(pending.layout===layout&&pending.pages===pages)return pending.promise;
+            await pending.promise;
+            return refreshPool();
+        }
+        const button=$('newsPoolRefresh'),request={layout,pages,promise:null};
+        state.poolRequest=request;
+        state.poolLoading=true;
+        if(button){button.disabled=true;button.setAttribute('aria-busy','true');button.textContent='กำลังโหลดคลังข่าว…';}
+        request.promise=(async()=>{
+            try{
+                const rows=await fetchPool(pages);
+                // A layout may be switched while the two pool requests are in flight.
+                // Never let an older page's references replace the newly opened pool.
+                if(state.layout!==layout||state.pages!==pages)return false;
+                setPool(rows);state.poolError='';renderPool();return true;
+            }catch(error){
+                if(state.layout===layout&&state.pages===pages){state.poolError='รีเฟรชคลังข่าวไม่สำเร็จ: '+error.message;renderPool();}
+                return false;
+            }finally{
+                if(state.poolRequest===request){
+                    state.poolRequest=null;state.poolLoading=false;
+                    if(button){button.disabled=false;button.removeAttribute('aria-busy');button.textContent='↻ รีเฟรชคลังข่าว';}
+                }
+            }
+        })();
+        return request.promise;
     }
 
     function renderLayouts(){
@@ -583,7 +610,15 @@
         const box=$('newsPool');box.replaceChildren();
         const query=($('newsSearch').value||'').trim().toLowerCase();
         const rows=state.pool.filter(item=>!query||[item.title,item.department,item.body].join(' ').toLowerCase().includes(query));
-        if(!rows.length){box.append(Object.assign(document.createElement('p'),{className:'st-sub',textContent:state.pool.length?'ไม่พบข่าวตามคำค้น':'ยังไม่มีข่าวที่ผ่านตรวจ'}));return;}
+        const status=$('newsPoolStatus');
+        if(status){
+            status.classList.toggle('is-error',Boolean(state.poolError));
+            status.textContent=state.poolError||(
+                query?`พบ ${rows.length} จาก ${state.pool.length} ข่าวที่ผ่านตรวจ`:
+                state.pool.length?`คลังข่าวมี ${state.pool.length} ข่าวที่ผ่านตรวจ`:'คลังข่าวว่าง · ข่าวจะแสดงหลังบรรณาธิการอนุมัติ'
+            );
+        }
+        if(!rows.length){box.append(Object.assign(document.createElement('p'),{className:'st-sub',textContent:state.pool.length?'ไม่พบข่าวตามคำค้น':'ยังไม่มีข่าวที่ผ่านตรวจ · ใช้ปุ่มรีเฟรชคลังข่าวเพื่อตรวจรายการใหม่'}));return;}
         for(const item of rows){
             const card=document.createElement('article');card.className='st-news';
             const head=document.createElement('button');head.type='button';head.className='st-news-head';
@@ -614,12 +649,18 @@
         for(const node of nodes){
             const row=document.createElement('div');row.className='st-layer'+(node===state.selected?' is-active':'');
             const marker=document.createElement('span');marker.textContent=node.getClassName()==='Text'?'T':node.getClassName()==='Image'?'▧':'◆';
-            const name=document.createElement('span');name.className='st-layer-name';name.textContent=node.name()||(node.getClassName()==='Text'?node.text().slice(0,24):node.getClassName());
+            const layerName=node.name()||(node.getClassName()==='Text'?node.text().slice(0,24):node.getClassName());
+            const name=document.createElement('button');name.type='button';name.className='st-layer-name';name.textContent=layerName;name.setAttribute('aria-label','เลือกเลเยอร์ '+layerName);name.setAttribute('aria-pressed',String(node===state.selected));
+            const activateLayer=()=>{if(state.selected!==node)select(node);};
+            name.addEventListener('click',event=>{event.stopPropagation();activateLayer();});
+            name.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();activateLayer();}});
             const visible=document.createElement('button');visible.type='button';visible.title='ซ่อน/แสดง';visible.textContent=node.visible()?'◉':'◌';
+            visible.setAttribute('aria-label',(node.visible()?'ซ่อน ':'แสดง ')+layerName);
             visible.addEventListener('click',event=>{event.stopPropagation();node.visible(!node.visible());record();renderLayers();});
             const up=document.createElement('button');up.type='button';up.title='เลื่อนขึ้น';up.textContent='↑';up.addEventListener('click',event=>{event.stopPropagation();node.moveUp();record();renderLayers();});
             const down=document.createElement('button');down.type='button';down.title='เลื่อนลง';down.textContent='↓';down.addEventListener('click',event=>{event.stopPropagation();node.moveDown();record();renderLayers();});
             const lock=document.createElement('button');lock.type='button';lock.title=node.getAttr('locked')?'ปลดล็อกวัตถุ':'ล็อกวัตถุ';lock.textContent=node.getAttr('locked')?'🔒':'🔓';lock.setAttribute('aria-pressed',String(!!node.getAttr('locked')));
+            up.setAttribute('aria-label','เลื่อน '+layerName+' ขึ้น');down.setAttribute('aria-label','เลื่อน '+layerName+' ลง');lock.setAttribute('aria-label',(node.getAttr('locked')?'ปลดล็อก ':'ล็อก ')+layerName);
             lock.addEventListener('click',event=>{event.stopPropagation();select(node);toggleLock(node);});
             up.disabled=down.disabled=visible.disabled=!!node.getAttr('locked');
             row.append(marker,name,visible,up,down,lock);
@@ -740,7 +781,7 @@
             state.active=0;state.selected=null;state.dirty=false;state.conflict=false;state.owner=ownerId();state.imageFailures=new Set();state.autoFit=true;
             $('docName').value=state.layout.title;
             clearTimeout(state.saveTimer);
-            setPool(pool);renderPool();
+            setPool(pool);state.poolError='';renderPool();
             await paintPage();fitPage();renderLayouts();renderPages();renderSave();if(!state.imageFailures.size)showMessage('');
         }catch(error){showMessage(error.message,true);renderLayouts();}
         finally{state.loading=false;setBusy(false);if(state.layout)fitSettled();}
@@ -947,6 +988,7 @@
         $('blankBtn').addEventListener('click',()=>{if(editableNodes().length&&!confirm('ล้างองค์ประกอบทั้งหมดในหน้านี้หรือไม่?'))return;select(null);state.contentLayer.destroyChildren();const page=curr();if(page){page.bg='#ffffff';state.bgRect.fill(page.bg);state.bgLayer.batchDraw();}record();renderPages();updatePageLabel();});
         const swatches=$('swatches');for(const color of COLORS){const button=document.createElement('button');button.type='button';button.className='st-shape';button.style.background=color;button.title=color;button.addEventListener('click',()=>{if(state.selected?.getAttr('locked'))return;if(state.selected&&state.selected.getClassName()!=='Image'){setFill(state.selected,color);record();refreshProps();}else{setBackground(color);record();}});swatches.append(button);}
         $('newsSearch').addEventListener('input',renderPool);
+        $('newsPoolRefresh').addEventListener('click',()=>refreshPool());
         $('undoBtn').addEventListener('click',()=>undo(-1));$('redoBtn').addEventListener('click',()=>undo(1));
         $('zoomRange').addEventListener('input',event=>{state.autoFit=false;setZoom(Number(event.target.value)/100);});$('fitBtn').addEventListener('click',()=>{state.autoFit=true;fitPage();});
         $('formatSelect').addEventListener('change',event=>applyFormat(event.target.value));
@@ -957,9 +999,9 @@
         $('checkBtn').addEventListener('click',()=>checkReady());$('exportPngBtn').addEventListener('click',()=>exportPng());
         $('exportPdfBtn').addEventListener('click',()=>exportPdf());
         $('reloadBtn').addEventListener('click',recoverLayout);
-        $('sideClose').addEventListener('click',()=>$('side').classList.remove('is-open'));
-        $('inspectorToggle').addEventListener('click',()=>{const open=$('inspector').classList.toggle('is-open');$('inspectorToggle').setAttribute('aria-expanded',String(open));});
-        $('inspectorClose').addEventListener('click',()=>{$('inspector').classList.remove('is-open');$('inspectorToggle').setAttribute('aria-expanded','false');});
+        $('sideClose').addEventListener('click',()=>{$('side').classList.remove('is-open');syncDrawerA11y();focusActiveTab();});
+        $('inspectorToggle').addEventListener('click',()=>{const open=$('inspector').classList.toggle('is-open');$('inspectorToggle').setAttribute('aria-expanded',String(open));syncDrawerA11y();});
+        $('inspectorClose').addEventListener('click',()=>{$('inspector').classList.remove('is-open');$('inspectorToggle').setAttribute('aria-expanded','false');syncDrawerA11y();$('inspectorToggle').focus({preventScroll:true});});
         $('docName').addEventListener('input',markDirty);
         $('pName').addEventListener('input',()=>{if(state.selected&&!state.selected.getAttr('locked')){state.selected.name($('pName').value);renderLayers();markDirty();}});$('pName').addEventListener('change',()=>{if(state.selected&&!state.selected.getAttr('locked'))record();});
         updateAttr('pText',(node,value)=>{if(node.getClassName()==='Text')node.text(value);});
@@ -999,11 +1041,12 @@
             else if((event.key==='Delete'||event.key==='Backspace')&&state.selected){event.preventDefault();deleteSelected();}
             else if(state.selected&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();const step=event.shiftKey?10:1;state.selected.x(state.selected.x()+(event.key==='ArrowLeft'?-step:event.key==='ArrowRight'?step:0));state.selected.y(state.selected.y()+(event.key==='ArrowUp'?-step:event.key==='ArrowDown'?step:0));state.contentLayer.batchDraw();refreshPosition();record();}
         };
-        const resizeHandler=()=>{if(!state.stage)return;if(window.innerWidth>760)$('side').classList.remove('is-open');if(state.autoFit)fitPage();};
+        const resizeHandler=()=>{if(!state.stage)return;if(window.innerWidth>760)$('side').classList.remove('is-open');syncDrawerA11y();if(state.autoFit)fitPage();};
         const beforeUnloadHandler=event=>{if(state.dirty||state.saving||state.conflict||state.exporting||state.mutating){event.preventDefault();event.returnValue='';}};
         browserWindow.addEventListener('keydown',keyHandler);
         browserWindow.addEventListener('resize',resizeHandler);
         browserWindow.addEventListener('beforeunload',beforeUnloadHandler);
+        syncDrawerA11y();
         window.addEventListener('eoffice:module-dispose',()=>{
             browserWindow.removeEventListener('keydown',keyHandler);browserWindow.removeEventListener('resize',resizeHandler);browserWindow.removeEventListener('beforeunload',beforeUnloadHandler);
             browserWindow.document.querySelectorAll('[data-studio-overlay]').forEach(element=>element.remove());
@@ -1017,9 +1060,19 @@
         document.querySelectorAll('.st-panel').forEach(panel=>panel.classList.toggle('is-active',panel.id==='tab-'+tab));
         if(tab==='layers')renderLayers();
         if(tab==='pages')updatePageLabel();
-        if(window.innerWidth<=760)$('side').classList.add('is-open');
+        if(window.innerWidth<=760){$('side').classList.add('is-open');syncDrawerA11y();}
     }
-    function closeSideOnMobile(){if(window.innerWidth<=760)$('side').classList.remove('is-open');}
+    function closeSideOnMobile(){if(window.innerWidth<=760){$('side').classList.remove('is-open');syncDrawerA11y();focusActiveTab();}}
+    function focusActiveTab(){document.querySelector('[data-tab].is-active')?.focus({preventScroll:true});}
+    function syncDrawerA11y(){
+        const width=window.innerWidth,side=$('side'),inspector=$('inspector');
+        if(!side||!inspector)return;
+        const focused=root.getRootNode().activeElement||document.activeElement,hideSide=width<=760&&!side.classList.contains('is-open'),hideInspector=width<=1020&&!inspector.classList.contains('is-open');
+        const restoreTabFocus=hideSide&&side.contains(focused),restoreInspectorFocus=hideInspector&&inspector.contains(focused);
+        side.inert=hideSide;inspector.inert=hideInspector;
+        if(restoreTabFocus)focusActiveTab();
+        if(restoreInspectorFocus)$('inspectorToggle').focus({preventScroll:true});
+    }
 
     (async()=>{
         if(window.eofficeSessionState?.status==='pending')await new Promise(resolve=>window.addEventListener('eoffice:session-updated',function done(event){if(event.detail?.status!=='pending'){window.removeEventListener('eoffice:session-updated',done);resolve();}}));

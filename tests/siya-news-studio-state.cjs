@@ -317,18 +317,31 @@ async function run(){
   assert.equal(ctx.state.layout.id,2);assert.equal(ctx.state.layouts.length,1);assert.equal(ctx.state.layouts[0].id,2);
   assert.equal(ctx.root.inert,false);console.log('PASS delete locks navigation and applies its receipt only to the captured layout');
  }
- {
-  const calls=[];
-  const ctx=runtime(['fetchReferencedPool'],{request:async url=>{
+  {
+   const calls=[];
+   const ctx=runtime(['fetchReferencedPool'],{request:async url=>{
    const ids=url.split('ids=')[1].split(',').map(Number);calls.push(ids);
    assert.ok(ids.length<=60);return {data:ids.map(id=>({id}))};
   }});
   const rows=await ctx.fetchReferencedPool(Array.from({length:181},(_,i)=>i+1));
-  assert.equal(rows.length,181);assert.equal(calls.length,4);assert.equal(rows[180].id,181);
-  console.log('PASS references above 80 load in bounded batches without dropping IDs');
- }
- {
-  const gate=deferred();let painted=0,checked=false;
+   assert.equal(rows.length,181);assert.equal(calls.length,4);assert.equal(rows[180].id,181);
+   console.log('PASS references above 80 load in bounded batches without dropping IDs');
+  }
+  {
+   const gate=deferred(),oldLayout={id:1},oldPages=[{id:'old'}],button={disabled:false,attributes:{},setAttribute(key,value){this.attributes[key]=value;},removeAttribute(key){delete this.attributes[key];}};
+   let calls=0;
+   const ctx=runtime(['refreshPool'],{$:()=>button,fetchPool:async pages=>{calls++;if(pages===oldPages)await gate.promise;return [{id:pages[0].id==='old'?9:2}];},setPool:rows=>{ctx.state.pool=rows;},renderPool(){}});
+   ctx.state.layout=oldLayout;ctx.state.pages=oldPages;ctx.state.pool=[{id:9}];
+   const refreshing=ctx.refreshPool();assert.equal(ctx.state.poolLoading,true);assert.equal(button.disabled,true);
+   const duplicate=ctx.refreshPool();assert.equal(calls,1,'same-layout refreshes share a single request');
+   ctx.state.layout={id:2};ctx.state.pages=[{id:'new'}];const nextLayout=ctx.refreshPool();assert.equal(calls,1);
+   gate.resolve();assert.equal(await refreshing,false);assert.equal(await duplicate,false);assert.equal(await nextLayout,true);
+   assert.deepEqual(ctx.state.pool,[{id:2}]);assert.equal(calls,2,'a new layout triggers a fresh request after stale work settles');
+   assert.equal(ctx.state.poolLoading,false);assert.equal(button.disabled,false);
+   console.log('PASS duplicate news-pool refreshes share work and a new layout reloads after stale work settles');
+  }
+  {
+   const gate=deferred();let painted=0,checked=false;
   const ctx=runtime(['setBusy','openLayout','exportPdf'],{
    JsPDF:function(){},checkReady:async()=>{checked=true;await gate.promise;return false;},
    paintPage:async()=>{painted++;},request:async()=>{throw Error('must not navigate');},
