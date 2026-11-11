@@ -27,6 +27,8 @@ function applyPermissionMenus() {
     if (auditMenu) auditMenu.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
+    const memoMenu = document.getElementById('group_menu_memo');
+    if (memoMenu) memoMenu.style.display = window.eofficeUser ? 'block' : 'none';
     for (const [id,visible] of [['menu-logout',!!window.eofficeUser],['openModal',!window.eofficeUser]]) {
         const node=document.getElementById(id);if(node)node.style.display=visible?'flex':'none';
     }
@@ -98,6 +100,7 @@ const MODULE_ROUTES = Object.freeze({
     ai_settings: 'email_send/ai_settings.html',
     audit_logs: 'management/audit_logs.html',
     updates: 'updates/index.html',
+    memo: 'memorandum/index.html',
     siya_news: 'siya_news/index.html',
     siya_news_studio: 'siya_news/studio.html'
 });

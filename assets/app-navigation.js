@@ -13,7 +13,8 @@
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
         'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
         'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates',
-        'siya_news/index.html':'siya_news', 'siya_news/studio.html':'siya_news_studio'
+        'siya_news/index.html':'siya_news', 'siya_news/studio.html':'siya_news_studio',
+        'memorandum/index.html':'memo'
     };
     const entry=Object.keys(entryViews).find(path=>new URL(path,appRoot).pathname===location.pathname);
     if(entry && typeof location.replace==='function') {
@@ -27,6 +28,7 @@
         {label:'คำสั่งของฉัน', path:'email_send/my_dashboard.html', login:true, group:'ทะเบียนเอกสาร', icon:'▤'},
         {label:'หนังสือส่งถึง', path:'index.php?view=received', login:true, group:'ทะเบียนเอกสาร', icon:'inbox'},
         {label:'ทะเบียนหนังสือรับ', path:'index.php?view=send_table', login:true, group:'ทะเบียนเอกสาร', icon:'▥'},
+        {label:'สร้างบันทึกข้อความ', path:'memorandum/index.html', login:true, group:'ทะเบียนเอกสาร', icon:'memo'},
         {label:'จองห้องประชุม', path:'room_booking/index.html', login:true, group:'อื่น ๆ', icon:'▦'},
         {label:'ขอใช้สถานที่', path:'room_booking/new_room.html', login:true, group:'อื่น ๆ', icon:'+'},
         {label:'รายการจองห้องของฉัน', path:'room_booking/edit_room_booking.html', login:true, group:'อื่น ๆ', icon:'edit'},
@@ -62,7 +64,8 @@
         'login':'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
         '⚙':'M12 8a4 4 0 100 8 4 4 0 000-8m0-5v3m0 12v3M3 12h3m12 0h3M6 6l2 2m8 8 2 2M6 18l2-2m8-8 2-2',
         'news':'M4 5h16v14H4zM8 9h8M8 13h8M8 17h5',
-        'studio':'M4 4h16v16H4zM4 9h16M9 9v11M14 4v5'
+        'studio':'M4 4h16v16H4zM4 9h16M9 9v11M14 4v5',
+        'memo':'M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7'
     };
     const appendIcon = (node,key) => {
         const icon = document.createElementNS('http://www.w3.org/2000/svg','svg');

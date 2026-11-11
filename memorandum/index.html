@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="../assets/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สร้างบันทึกข้อความ — E-Office</title>
+    <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
+    <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
+    <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261104-eoffice-theme">
+    <link rel="stylesheet" href="memo.css?v=20261111-memo-reference-v33">
+</head>
+<body class="eoffice-module-page">
+<div class="eoffice-module-content"><div class="eoffice-module-view" data-page="/memorandum/index.html">
+    <script src="../assets/app-navigation.js?v=20261111-memo-route"></script>
+    <main class="memo-page" id="memo-page">
+        <header class="memo-heading">
+            <div>
+                <p class="memo-eyebrow">เครื่องมือจัดทำเอกสารราชการ</p>
+                <h1>สร้างบันทึกข้อความ</h1>
+                <p class="memo-intro">กรอกข้อมูลแล้วตรวจรูปแบบในตัวอย่างก่อนพิมพ์หรือบันทึกเป็น PDF</p>
+            </div>
+            <button class="eo-btn eo-btn--primary memo-print-button" id="print-memo" type="button">พิมพ์ / บันทึกเป็น PDF</button>
+        </header>
+
+        <div class="memo-tabs" role="tablist" aria-label="ส่วนของหน้าสร้างบันทึกข้อความ">
+            <button class="memo-tab is-active" id="tab-compose" type="button" role="tab" aria-selected="true" aria-controls="panel-compose" tabindex="0">สร้างบันทึก</button>
+            <button class="memo-tab" id="tab-guide" type="button" role="tab" aria-selected="false" aria-controls="panel-guide" tabindex="-1">แนวทางจัดหน้า</button>
+        </div>
+
+        <section class="memo-panel" id="panel-compose" role="tabpanel" aria-labelledby="tab-compose">
+            <div class="memo-workspace">
+                <form class="memo-form" id="memo-form" autocomplete="off">
+                    <div class="memo-form-heading">
+                        <div><h2>ข้อมูลในบันทึก</h2><p>ข้อมูลจะแสดงในกระดาษตัวอย่างทันที และไม่ถูกส่งขึ้นเซิร์ฟเวอร์</p></div>
+                        <div class="memo-form-actions"><button class="eo-btn eo-btn--secondary eo-btn--sm" id="fill-sample" type="button">ใส่ตัวอย่างตาม PDF</button><button class="eo-btn eo-btn--secondary eo-btn--sm" id="clear-memo" type="reset">ล้างข้อมูล</button></div>
+                    </div>
+
+                    <div class="memo-form-grid">
+                        <label class="memo-field memo-field--wide" for="department">
+                            <span>ส่วนราชการ</span>
+                            <input id="department" name="department" maxlength="180" placeholder="เช่น [ชื่อหน่วยงาน] [กลุ่ม/ฝ่าย]">
+                        </label>
+                        <label class="memo-field" for="memo-number">
+                            <span>ที่</span>
+                            <input id="memo-number" name="number" maxlength="80" placeholder="เช่น [รหัสหน่วยงาน]/[เลขลำดับ]">
+                        </label>
+                        <label class="memo-field" for="memo-date">
+                            <span>วันที่</span>
+                            <input id="memo-date" name="date" type="date">
+                        </label>
+                        <label class="memo-field memo-field--wide" for="subject">
+                            <span>เรื่อง</span>
+                            <input id="subject" name="subject" maxlength="240" placeholder="ระบุชื่อเรื่อง">
+                        </label>
+                        <label class="memo-field memo-field--wide" for="recipient">
+                            <span>เรียน</span>
+                            <input id="recipient" name="recipient" maxlength="180" placeholder="เช่น [ตำแหน่งผู้รับ] [ชื่อหน่วยงาน]">
+                        </label>
+                        <label class="memo-field memo-field--wide" for="body-text">
+                            <span>เนื้อหา</span>
+                            <textarea id="body-text" name="body" rows="8" maxlength="12000" placeholder="พิมพ์เนื้อหาแต่ละย่อหน้า เว้นบรรทัดว่าง 1 บรรทัดระหว่างย่อหน้า"></textarea>
+                            <small>ข้อความที่ขึ้นบรรทัดใหม่ในช่องจะต่อเป็นย่อหน้าเดียวกัน เว้นบรรทัดว่างหนึ่งบรรทัดเพื่อเริ่มย่อหน้าใหม่</small>
+                        </label>
+                        <label class="memo-field memo-field--wide" for="closing">
+                            <span>คำลงท้าย (ถ้ามี)</span>
+                            <input id="closing" name="closing" maxlength="300" placeholder="เช่น จึงเรียนมาเพื่อโปรดพิจารณา">
+                        </label>
+                        <label class="memo-field" for="signer">
+                            <span>ชื่อผู้ลงนาม</span>
+                            <input id="signer" name="signer" maxlength="120" placeholder="ชื่อ นามสกุล">
+                        </label>
+                        <label class="memo-field" for="position">
+                            <span>ตำแหน่ง</span>
+                            <input id="position" name="position" maxlength="160" placeholder="เช่น [ตำแหน่ง] [ชื่อหน่วยงาน]">
+                        </label>
+                        <label class="memo-field memo-field--wide" for="emblem-file">
+                            <span>ตราครุฑ</span>
+                            <input id="emblem-file" name="emblem" type="file" accept="image/png,image/jpeg,image/webp">
+                            <small id="emblem-help">มีตราครุฑจาก PDF ตัวอย่างให้แล้ว หากเลือกไฟล์ใหม่จะแทนที่เฉพาะในตัวอย่างนี้ โดยไม่อัปโหลด</small>
+                        </label>
+                        <label class="memo-field memo-field--wide" for="signature-file">
+                            <span>ภาพลายเซ็น (ถ้ามี)</span>
+                            <input id="signature-file" name="signature" type="file" accept="image/png,image/jpeg,image/webp">
+                            <small id="signature-help">เลือกภาพลายเซ็นที่ได้รับอนุญาต ไฟล์จะใช้ในตัวอย่างและพิมพ์เท่านั้น ไม่ถูกอัปโหลด</small>
+                        </label>
+                    </div>
+                    <p class="memo-privacy" role="note">เอกสารนี้จัดทำในเบราว์เซอร์ ข้อมูล ไฟล์ตราครุฑ และลายเซ็นจะไม่ถูกบันทึกลงระบบ หากปิดหรือโหลดหน้านี้ใหม่ต้องกรอกอีกครั้ง</p>
+                </form>
+
+                <section class="memo-preview" aria-labelledby="preview-title">
+                    <div class="memo-preview-heading"><div><h2 id="preview-title">ตัวอย่างเอกสาร</h2><p>กระดาษ A4 · ขอบกระดาษประมาณตาม PDF ที่แนบมา</p></div><span class="memo-preview-badge">ตัวอย่าง</span></div>
+                    <div class="memo-paper-wrap">
+                        <article class="memo-paper" id="memo-paper" aria-label="ตัวอย่างบันทึกข้อความ A4">
+                            <header class="paper-letterhead">
+                                <div class="memo-emblem-slot" id="emblem-slot"><img id="emblem-preview" src="assets/garuda-reference.png" alt="ตราครุฑจาก PDF ตัวอย่าง"></div>
+                                <h2 class="paper-title">บันทึกข้อความ</h2>
+                            </header>
+                            <p class="paper-line"><strong>ส่วนราชการ</strong> <span id="preview-department" class="paper-value">[ส่วนราชการ]</span></p>
+                            <div class="paper-meta-line"><p class="paper-underlined"><strong>ที่</strong> <span id="preview-number" class="paper-value paper-fallback">[เลขที่]</span></p><p class="paper-underlined"><strong>วันที่</strong> <span id="preview-date" class="paper-value paper-fallback">[วันที่]</span></p></div>
+                            <p class="paper-line paper-underlined"><strong>เรื่อง</strong> <span id="preview-subject" class="paper-value paper-fallback">[ชื่อเรื่อง]</span></p>
+                            <p class="paper-line paper-recipient"><span class="paper-recipient-label">เรียน</span> <span id="preview-recipient" class="paper-value">[ผู้รับ]</span></p>
+                            <div class="paper-body" id="preview-body"><p class="paper-placeholder">เนื้อหาบันทึกข้อความจะแสดงบริเวณนี้</p></div>
+                            <p class="paper-closing" id="preview-closing" hidden></p>
+                            <div class="paper-signature" id="preview-signature" aria-label="ส่วนลงนาม">
+                                <img id="signature-preview" class="paper-sign-image" alt="" hidden>
+                                <p class="paper-sign-name paper-fallback" id="preview-signer">(ชื่อผู้ลงนาม)</p>
+                                <p class="paper-fallback" id="preview-position">ตำแหน่ง</p>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section class="memo-panel" id="panel-guide" role="tabpanel" aria-labelledby="tab-guide" hidden>
+            <div class="guide-heading"><span class="guide-icon" aria-hidden="true">✓</span><div><h2>หลักการพิมพ์บันทึกข้อความ</h2><p>สรุปตามภาพแนวทางที่แนบมา โปรดตรวจสอบระเบียบของหน่วยงานก่อนใช้เอกสารจริง</p></div></div>
+            <ol class="guide-list">
+                <li><span class="guide-number">1</span><div><h3>ตราครุฑ</h3><p>ใช้ตราครุฑสีดำจาก PDF ตัวอย่าง สูงประมาณ 1.5 เซนติเมตร วางด้านซ้ายบนของหัวกระดาษ และเลือกไฟล์อื่นแทนได้</p></div></li>
+                <li><span class="guide-number">2</span><div><h3>ตั้งค่าหน้ากระดาษ</h3><p>A4 แนวตั้ง · ระยะพิมพ์อิงพิกัดจาก PDF จริง: ขอบบนประมาณ 1 ซม. ซ้ายและขวา 2.5 ซม. และล่าง 2 ซม.</p></div></li>
+                <li><span class="guide-number">3</span><div><h3>แบบอักษรและขนาด</h3><p>ใช้ TH Sarabun ขนาดเนื้อหาและหัวรายการประมาณ 16 pt · หัวข้อ “บันทึกข้อความ” ตัวหนาประมาณ 20 pt ตาม PDF จริง</p></div></li>
+                <li><span class="guide-number">4</span><div><h3>เลขไทย</h3><p>แนวทางแนะนำให้ใช้เลขไทยในเอกสารราชการ ตรวจเลขที่หนังสือและตัวเลขอื่นก่อนพิมพ์</p></div></li>
+                <li><span class="guide-number">5</span><div><h3>ย่อหน้า</h3><p>ย่อบรรทัดแรกของแต่ละย่อหน้าประมาณ 2.25 เซนติเมตรจากแนวข้อความ ตามพิกัดใน PDF ตัวอย่าง</p></div></li>
+                <li><span class="guide-number">6</span><div><h3>ระยะบรรทัดและย่อหน้า</h3><p>เว้นก่อนย่อหน้าประมาณ 6 pt และขึ้นบรรทัดใหม่หนึ่งครั้งระหว่างรายการ “ส่วนราชการ / ที่ / วันที่ / เรื่อง” กับข้อความ ถัดจากคำลงท้ายเว้นประมาณ 4 บรรทัดก่อนลงชื่อ</p></div></li>
+            </ol>
+            <div class="guide-note"><strong>ก่อนพิมพ์:</strong> ตราครุฑอ้างอิงจาก PDF ที่แนบมา ส่วนลายเซ็นให้เลือกไฟล์ที่ได้รับอนุญาตเอง ข้อมูลและไฟล์ที่เลือกใช้เฉพาะในเบราว์เซอร์ ตรวจตัวอย่างทุกหน้า แล้วเลือก “บันทึกเป็น PDF” ในหน้าต่างพิมพ์</div>
+        </section>
+    </main>
+    <script src="memo.js?v=20261111-memo-reference-v19"></script>
+</div></div>
+</body>
+</html>

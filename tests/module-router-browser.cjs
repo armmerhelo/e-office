@@ -92,10 +92,57 @@ async function run() {
         await until("!!document.querySelector('.eoffice-module-host:not([hidden])') && !document.querySelector('.eoffice-module-status')");
         assert.equal(await evaluate("document.getElementById('module-viewport').hasAttribute('aria-busy')"),false);
     });
-    for(const view of ['members','groups','book','my_public','send_email','ai_settings','room_booking','room_booking2','edit_room_booking','maintenance','maintenance_admin','siya_news'])
+    for(const view of ['members','groups','book','my_public','send_email','ai_settings','room_booking','room_booking2','edit_room_booking','maintenance','maintenance_admin','siya_news','memo'])
         await check(view+' mounts with persistent document/sidebar and no iframe',async()=>{
             await moduleView(view);
             if(view==='book')assert.ok(await evaluate(`getComputedStyle(${root}.getElementById('bookingForm').parentElement).paddingTop.replace('px','')>=24`),'module reset must not suppress Tailwind card spacing');
+            if(view==='memo'){
+                await until(`${root}.getElementById('memo-form') && ${root}.getElementById('panel-compose').checkVisibility()`);
+                assert.equal(await evaluate(`${root}.getElementById('signature-file').type`),'file','memo composer should accept a signature image from the current device');
+                assert.equal(await evaluate(`${root}.getElementById('emblem-preview').complete && ${root}.getElementById('emblem-preview').naturalWidth>0`),true,'memo default emblem extracted from the reference PDF should load');
+                assert.equal(await evaluate(`${root}.getElementById('memo-paper').ownerDocument.fonts.check('16pt MemoPSK')`),true,'memo preview should load the bundled reference Sarabun font');
+                const paperWidth=await evaluate(`${root}.getElementById('memo-paper').getBoundingClientRect().width`);
+                assert.ok(Math.abs(paperWidth-793.7)<1,`memo preview should retain an A4 width; got ${paperWidth}px`);
+                await evaluate(`${root}.getElementById('fill-sample').click()`);
+                const sample=await evaluate(`(()=>{const s=${root};return {department:s.getElementById('department').value,subject:s.getElementById('subject').value,date:s.getElementById('preview-date').textContent,recipient:s.getElementById('preview-recipient').textContent,body:s.getElementById('preview-body').innerText,signer:s.getElementById('preview-signer').textContent};})()`);
+                assert.match(sample.subject,/ข้อตกลงในการพัฒนางาน \(PA\)/);
+                assert.match(sample.date,/๑ ตุลาคม ๒๕๖๘/);
+                assert.match(sample.body,/๒๕๖๙/,'preview should format years with Thai numerals like the source PDF');
+                assert.match(sample.body,/\[ชื่อและนามสกุล\]/,'sample should use placeholders instead of embedding staff data');
+                assert.match(sample.signer,/\[ชื่อและนามสกุล\]/);
+                await evaluate(`${root}.getElementById('tab-guide').click()`);
+                assert.equal(await evaluate(`${root}.getElementById('panel-guide').hidden`),false,'guide tab should reveal the format instructions');
+                await evaluate(`${root}.getElementById('tab-compose').click()`);
+                const injection=await evaluate(`(()=>{const s=${root},field=s.getElementById('department');field.value='<img src=x onerror=alert(1)>';field.dispatchEvent(new Event('input',{bubbles:true}));const preview=s.getElementById('preview-department');return {text:preview.textContent,children:preview.children.length};})()`);
+                assert.equal(injection.text,'<img src=x onerror=alert(1)>');assert.equal(injection.children,0,'memo preview must not interpret entered text as HTML');
+                assert.equal(await evaluate(`${root}.getElementById('preview-number').classList.contains('paper-fallback')`),true,'empty form fields should remain visual hints, not print as content');
+                await evaluate('window.dispatchEvent(new Event("beforeprint"))');
+                assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),true,'print mode should remove the application shell');
+                await evaluate('window.dispatchEvent(new Event("afterprint"))');
+                assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),false,'print mode should clean up after printing');
+                await evaluate('window.dispatchEvent(new Event("beforeprint"))');
+                await moduleView('book');
+                assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),false,'leaving memo during print must restore the application shell');
+                await evaluate('window.dispatchEvent(new Event("afterprint"))');
+                await evaluate('window.dispatchEvent(new Event("beforeprint"))');
+                assert.equal(await evaluate('document.documentElement.classList.contains("memo-printing")'),false,'printing another cached module must not activate the memo print stylesheet');
+                await evaluate('window.dispatchEvent(new Event("afterprint"))');
+                await evaluate(`${root}.getElementById('memo-form').reset()`);
+                await until(`${root}.getElementById('emblem-preview').complete && ${root}.getElementById('emblem-preview').naturalWidth>0`);
+                assert.match(await evaluate(`${root}.getElementById('emblem-preview').currentSrc`),/\/memorandum\/assets\/garuda-reference\.png$/,'reset must keep the default Garuda URL inside the memo module');
+                await moduleView('memo');
+                await evaluate(`window.__qaNativePrint=window.print;window.__qaPrintCalls=0;window.print=()=>window.__qaPrintCalls++;${root}.getElementById('print-memo').click();window.showView('book')`);
+                await until("location.search==='?view=book' && !!document.querySelector('.eoffice-module-host:not([hidden])')");
+                await sleep(50);
+                assert.equal(await evaluate('window.__qaPrintCalls'),0,'delayed font readiness must not print after navigating away from the memo');
+                await evaluate('window.print=window.__qaNativePrint');
+                await moduleView('memo');
+                for(const width of [390,320]){
+                    await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:false});
+                    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'memo form and tabbed guide should not create mobile page overflow');
+                }
+                await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+            }
             if(view==='siya_news'){
                 await until(`${root}.getElementById('news-tabs').children.length===4`);
                 await evaluate(`${root}.getElementById('create-news').click()`);

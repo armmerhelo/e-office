@@ -10,7 +10,8 @@
         room_booking:'room_booking/index.html', room_booking2:'room_booking/new_room.html',
         edit_room_booking:'room_booking/edit_room_booking.html', maintenance:'maintenance_requests/index.html',
         maintenance_admin:'maintenance_requests/admin.html', updates:'updates/index.html', audit_logs:'management/audit_logs.html',
-        siya_news:'siya_news/index.html', siya_news_studio:'siya_news/studio.html'
+        siya_news:'siya_news/index.html', siya_news_studio:'siya_news/studio.html',
+        memo:'memorandum/index.html'
     });
     const cache = new Map(), libraries = new Map();
     const roleIndependent=new Set(['room_booking','room_booking2','maintenance']);
@@ -19,7 +20,7 @@
     let dataRevision=0;
     let popupOwner=null;
     let moduleUtilities;
-    let active = null, sequence = 0;
+    let active = null, sequence = 0, printOwner = null;
     const host = document.createElement('section');host.id='module-viewport';host.hidden=true;
     document.getElementById('main_div').append(host);
     const status = document.createElement('div');status.className='eoffice-module-status';status.setAttribute('role','status');
@@ -87,7 +88,7 @@
             assign:value=>navigateModule(value),replace:value=>navigateModule(value,true),
             reload:()=>window.location.reload(),toString:()=>url.href
         };
-        const boundWindow=new Set(['alert','confirm','prompt','open','matchMedia','getComputedStyle','requestAnimationFrame','cancelAnimationFrame','queueMicrotask','structuredClone','createImageBitmap','scrollTo','scrollBy','atob','btoa']);
+        const boundWindow=new Set(['alert','confirm','prompt','open','print','matchMedia','getComputedStyle','requestAnimationFrame','cancelAnimationFrame','queueMicrotask','structuredClone','createImageBitmap','scrollTo','scrollBy','atob','btoa']);
         const moduleWindow=new Proxy(values,{
             get(target,key) {
                 if (key===Symbol.unscopables) return undefined;
@@ -228,7 +229,7 @@
             if(ctx.pendingPopup){const args=ctx.pendingPopup;ctx.pendingPopup=null;popupOwner=ctx;window.Swal?.fire(...args);}
             if(!prepared&&(!revisit||(restoreScroll&&revisit)||ctx.dataDirty||ctx.lastDataRevision!==dataRevision))ctx.refresh();
         };
-        ctx.dispose=()=>{ctx.closeDialogs();ctx.disposed=true;ctx.active=false;events.dispatchEvent(new Event('eoffice:module-dispose'));abort.abort();timers.forEach(id=>window.clearTimeout(id));intervals.forEach(id=>window.clearInterval(id));ctx.observer?.disconnect();ctx.node?.remove();};
+        ctx.dispose=()=>{ctx.closeDialogs();ctx.disposed=true;ctx.active=false;if(printOwner===ctx)printOwner=null;events.dispatchEvent(new Event('eoffice:module-dispose'));abort.abort();timers.forEach(id=>window.clearTimeout(id));intervals.forEach(id=>window.clearInterval(id));ctx.observer?.disconnect();ctx.node?.remove();};
         return ctx;
     }
     async function create(view) {
@@ -335,6 +336,7 @@
         const reload=document.createElement('button');reload.type='button';reload.textContent='โหลดตามสิทธิ์ใหม่';reload.onclick=()=>window.eofficeModuleRouter.open(ctx.view,{page:'load'});status.append(' ',reload);host.append(status);
     };
     const deactivate=ctx=>{
+        if(printOwner===ctx){printOwner=null;ctx.events.dispatchEvent(new Event('afterprint'));}
         ctx.closeDialogs();
         ctx.scrollX=window.scrollX;ctx.scrollY=window.scrollY;ctx.scrollTop=document.getElementById('main_div').scrollTop;
         ctx.active=false;ctx.node.hidden=true;
@@ -424,8 +426,14 @@
             document.getElementById('document-modal').style.removeProperty('display');document.title='E-Office ศรียานุสรณ์';return true;
         }
     };
-    for(const type of ['focus','pageshow','eoffice:session-updated'])window.addEventListener(type,event=>{
-        for(const entry of cache.values())if(entry.ctx)entry.ctx.events.dispatchEvent(type==='eoffice:session-updated'?new CustomEvent(type,{detail:window.eofficeSessionState}):new Event(type));
+    for(const type of ['focus','pageshow','beforeprint','afterprint','eoffice:session-updated'])window.addEventListener(type,event=>{
+        if(type==='beforeprint'){
+            printOwner=active;
+            printOwner?.events.dispatchEvent(new Event(type));
+        } else if(type==='afterprint'){
+            const owner=printOwner;printOwner=null;
+            owner?.events.dispatchEvent(new Event(type));
+        } else for(const entry of cache.values())if(entry.ctx)entry.ctx.events.dispatchEvent(type==='eoffice:session-updated'?new CustomEvent(type,{detail:window.eofficeSessionState}):new Event(type));
         if(type==='eoffice:session-updated'&&window.eofficeSessionState?.status==='authenticated')for(const entry of cache.values())if(entry.ctx&&staleAccess(entry.ctx)) {
             entry.ctx.permissionStale=true;entry.ctx.closeDialogs();entry.ctx.node.inert=true;entry.ctx.node.hidden=true;
         }

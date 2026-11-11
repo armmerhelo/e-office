@@ -64,7 +64,8 @@ const routes = {
     updates: ['menu-updates', 'updates/index.html'],
     audit_logs: ['menu-audit-logs', 'management/audit_logs.html'],
     siya_news: ['menu-siya-news', 'siya_news/index.html'],
-    siya_news_studio: ['menu-siya-news-studio', 'siya_news/studio.html']
+    siya_news_studio: ['menu-siya-news-studio', 'siya_news/studio.html'],
+    memo: ['menu-memo', 'memorandum/index.html']
 };
 
 const main = fs.readFileSync('assets/main.js', 'utf8');
@@ -110,6 +111,51 @@ assert.match(main, /requestedViewFromUrl\(\)/, 'the main inbox should accept dir
 assert.match(fs.readFileSync('assets/app-navigation.js', 'utf8'), /eoffice:permissions-changed/);
 assert.doesNotMatch(fs.readFileSync('assets/member-management.js', 'utf8'), /window\.parent\.postMessage/);
 
+const memoHtml=fs.readFileSync('memorandum/index.html','utf8');
+const memoCss=fs.readFileSync('memorandum/memo.css','utf8');
+const memoJs=fs.readFileSync('memorandum/memo.js','utf8');
+const memoRouter=fs.readFileSync('assets/module-router.js','utf8');
+const appNavigation=fs.readFileSync('assets/app-navigation.js','utf8');
+assert.match(memoHtml,/role="tablist"[\s\S]*สร้างบันทึก[\s\S]*แนวทางจัดหน้า/,'memo module should expose compose and format guidance tabs');
+assert.match(memoHtml,/id="memo-form"/,'memo module should provide an editable form');
+assert.match(memoHtml,/id="fill-sample"/,'memo module should provide a sample matching the reference document');
+assert.match(memoHtml,/id="memo-paper"/,'memo module should preview the printable document');
+assert.match(memoHtml,/id="signature-file"/,'memo module should accept a user-supplied signature image');
+assert.match(memoHtml,/src="assets\/garuda-reference\.png"/,'memo module should use the Garuda emblem from the supplied PDF by default');
+assert.match(memoCss,/font-family:MemoPSK/,'memo preview should use the matching TH Sarabun PSK font face');
+assert.match(memoCss,/transform:translate\(-\.62pt,-\.415pt\) scale\(1\.009,\.994\)/,'memo emblem should match the measured reference PDF image bounds');
+assert.match(memoCss,/text-indent:10\.97mm/,'memo date value should preserve the reference template indent after its label');
+assert.match(memoCss,/border-bottom:1\.15pt dashed #222/,'memo underlines should print as thin dashes like the source PDF');
+assert.match(memoCss,/body\.eoffice-module-page::before\{display:none!important/,'print should not reserve the standalone module shell header');
+assert.match(memoJs,/0x0e50-0x30/,'memo preview should render Arabic digits as Thai numerals to match the reference PDF');
+assert.ok(fs.existsSync('memorandum/assets/fonts/TH-Sarabun-PSK.ttf'),'memo module should bundle the reference TH Sarabun PSK font');
+assert.ok(fs.existsSync('memorandum/assets/fonts/TH-Sarabun-PSK-Bold.ttf'),'memo module should bundle the matching bold font');
+assert.match(memoHtml,/paper-underlined/,'memo preview should underline number, date and subject fields like the source PDF');
+assert.match(memoCss,/@page\{size:A4 portrait;margin:1cm 2\.5cm 2cm 25\.04mm\}/,'memo print should use the A4 margins measured from the supplied PDF');
+assert.match(memoJs,/@page\{size:A4 portrait;margin:1cm 2\.5cm 2cm 25\.04mm\}/,'memo print-mode shell should use the same reference margins');
+assert.match(memoCss,/font-size:20pt/,'memo heading should match the supplied 20pt size');
+assert.match(memoCss,/\.paper-title\{position:absolute;top:29\.26mm/,'on-screen memo title should account for the page top margin in the A4 preview');
+assert.match(memoCss,/\.paper-line strong,\.paper-meta-line strong\{flex:none;font-size:16pt/,'memo metadata labels should match the supplied 16pt size');
+assert.match(memoCss,/font-size:16pt/,'memo body should use the supplied 16pt size');
+assert.match(memoCss,/transform:translate\(-\.73pt,\.83pt\)/,'memo signer block should align with the reference signature area without embedding its contents');
+assert.match(memoCss,/letter-spacing:\.385pt;transform:translateX\(-2\.175pt\)/,'memo signer placeholder should match the measured signature name extent');
+assert.match(memoCss,/max-width:29\.8mm;max-height:10\.15mm/,'selected local signatures should fit the measured signature-image bounds without saving them');
+assert.match(memoCss,/line-height:18\.15pt/,'memo body leading should match the measured print row spacing');
+assert.match(memoCss,/\.paper-body p:nth-child\(2\)\{transform:translateY\(-\.36pt\)\}/,'second memo paragraph should align with the measured reference baseline');
+assert.match(memoCss,/\.paper-body p\{margin:0;text-indent:2\.25cm/,'memo body first lines should match the measured reference indent');
+assert.match(memoCss,/\.paper-closing\{margin:0;text-indent:2\.25cm/,'memo closing line should preserve the measured reference indent');
+assert.match(memoJs,/paragraph\.textContent\s*=\s*toThaiNumerals\(value\)/,'memo preview should insert user text as text, not HTML, while formatting Thai numerals');
+assert.match(memoJs,/defaultSrc:new URL\('assets\/garuda-reference\.png',document\.baseURI\)\.href/,'memo emblem reset must resolve inside the module after SPA mounting');
+assert.match(memoJs,/if\(!document\.hidden\)window\.print\(\)/,'delayed print must not print another module after the memo has been hidden');
+assert.match(memoJs,/\$\('fill-sample'\)\.addEventListener\('click'/,'memo reference sample button should populate the form');
+assert.match(memoJs,/department:'\[ชื่อหน่วยงาน\]/,'memo sample should use an organization placeholder instead of a real institution');
+assert.match(memoJs,/signer:'\[ชื่อและนามสกุล\]'/,'memo sample should keep signer identity as a placeholder');
+assert.match(memoJs,/โดยมุ่งจัดทำให้สอดคล้องกับ/,'memo sample wording should stay natural while matching the reference line extent');
+assert.match(memoJs,/เพื่อใช้เป็นหลักฐานประกอบการพัฒนา/,'memo sample wording should stay natural while matching the reference line extent');
+assert.match(memoRouter,/memo:'memorandum\/index\.html'/,'module router should load the memo page');
+assert.match(appNavigation,/memorandum\/index\.html':'memo'/,'direct memo URLs should join the shared shell');
+console.log('PASS memo composer route, accessible tabs, safe live preview and A4 print guidance');
+
 console.log(`PASS ${Object.keys(routes).length} module routes and ${pages.length} top-level pages use shared navigation`);
 
 // Main and module markup must use the same sidebar contract and menu icons.
@@ -135,6 +181,7 @@ function sidebarParityChecks() {
         assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_audit_logs').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
+        assert.equal(el('group_menu_memo').style.display,user?'block':'none','memo creation is available to signed-in staff only');
     }
     console.log('PASS shared sidebar stylesheet, all menu labels/icons and Admin-only AI/request-room visibility');
 }
@@ -339,7 +386,7 @@ async function navigationChecks() {
     assert.equal(window.eofficeSessionState.user,verifiedState.user,'failed checks retain only the old owner boundary, not permission to write');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     const links=list.children.filter(link=>link.tag==='a');
-    assert.equal(links.filter(link=>!link.hidden).length,15);
+    assert.equal(links.filter(link=>!link.hidden).length,16);
     assert.equal(links[0].attributes['aria-current'],'page');
     assert.equal(links[0].href,'http://localhost/eoffice/management/user_manage.html');
     toggle.events.click();assert.equal(nav.inert,false);assert.equal(content.inert,true);assert.equal(toggle.attributes['aria-expanded'],'true');
@@ -378,7 +425,7 @@ async function navigationChecks() {
     assert.ok(restoredWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'an untouched restored draft must still warn before logout');
     restored.hidden=true;
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,9,'basic users must not see staff/admin links');
+    assert.equal(links.filter(link=>!link.hidden).length,10,'basic users must not see staff/admin links');
     console.log('PASS sidebar: document shortcuts, subdirectory URLs, mobile inert/Escape, dirty-form guards and stale session responses');
 }
 navigationChecks().catch(error=>{console.error(error);process.exitCode=1;});
