@@ -166,6 +166,24 @@ async function run() {
         assert.deepEqual(stamped.auto_sent_user_ids,[users.staff.id]);
         assert.equal(inspect().receipts.at(-1).department,department);
     });
+    await test('Chantra simulation: director-department stamp+sign sends to director, pen-only does not',async()=>{
+        fixture('reset-deputy-access');
+        const directorDepartment='ฝ่ายงานผู้อำนวยการ';
+        const before=inspect();
+        await save([route(directorDepartment,'manager','staff'),route('','admin','manager')]);
+        const pen=await sign('manager',[],{pen:true});
+        assert.deepEqual(pen.auto_sent_user_ids,[],'pen-only must not send to the director');
+        assert.equal(inspect().access.some(row=>row.User_Id===users.staff.id),false);
+        assert.equal(inspect().notifications.length,before.notifications.length);
+        assert.deepEqual(inspect().receipts,before.receipts,'pen-only must not create a receipt');
+        const stamped=await sign('manager',[directorDepartment],{pen:true});
+        assert.deepEqual(stamped.auto_sent_user_ids,[users.staff.id],'stamp+sign must send to the director once');
+        assert.deepEqual(stamped.registered_receipt_departments,[directorDepartment]);
+        assert.equal(inspect().receipts.at(-1).department,directorDepartment);
+        assert.equal(inspect().receipts.at(-1).secretary_id,users.manager.id);
+        assert.ok(inspect().access.some(row=>row.User_Id===users.staff.id));
+        assert.equal(inspect().notifications.length,before.notifications.length+1);
+    });
     await test('legacy wildcard dual-role routes cannot authorize stamp receipts',async()=>{
         fixture('wildcard-dual-role');
         assert.deepEqual((await request('/e-sign/receipt_scopes.php?Doc_Id=1',{as:'manager'})).departments,[]);
