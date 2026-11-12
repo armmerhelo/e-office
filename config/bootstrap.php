@@ -156,16 +156,24 @@ function app_times(string $start, string $end): array {
     if ($start >= $end) app_fail('เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่มต้น');
     return [$start, $end];
 }
-function app_document(int $id, array $user, bool $edit = false): array {
+function app_document_lookup(int $id, array $user, bool $edit = false): array {
+    // Returns [document, null] or [null, 'not_found'|'forbidden'] so page
+    // entrypoints can render a readable error instead of a JSON response.
     $q = app_pdo()->prepare("SELECT * FROM t_document WHERE Doc_Id=? AND Is_Delete='active'");
     $q->execute([$id]); $doc = $q->fetch();
-    if (!$doc) app_fail('ไม่พบเอกสาร', 404);
-    if ((int)$doc['User_Id'] === (int)$user['User_Id'] || $user['User_Status'] === 'Admin') return $doc;
+    if (!$doc) return [null, 'not_found'];
+    if ((int)$doc['User_Id'] === (int)$user['User_Id'] || $user['User_Status'] === 'Admin') return [$doc, null];
     if (!$edit) {
         $q = app_pdo()->prepare('SELECT 1 FROM t_access_rights WHERE Doc_Id=? AND User_Id=? UNION SELECT 1 FROM t_access_rights_department a JOIN t_user_department u ON u.Department_Id=a.Department_Id WHERE a.Doc_Id=? AND u.User_Id=?');
         $q->execute([$id, $user['User_Id'], $id, $user['User_Id']]);
-        if ($q->fetchColumn()) return $doc;
+        if ($q->fetchColumn()) return [$doc, null];
     }
+    return [null, 'forbidden'];
+}
+function app_document(int $id, array $user, bool $edit = false): array {
+    [$doc, $error] = app_document_lookup($id, $user, $edit);
+    if ($doc) return $doc;
+    if ($error === 'not_found') app_fail('ไม่พบเอกสาร', 404);
     app_fail('คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้', 403);
 }
 function app_document_transaction(): PDO {

@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__.'/../config/services.php';app_method('POST');$user=app_user();
+$expectedUser=(int)($_POST['expected_user_id']??0);
+if($expectedUser>0&&$expectedUser!==(int)$user['User_Id'])app_json(['status'=>'error','code'=>'user_changed','message'=>'บัญชีผู้ใช้เปลี่ยนแล้ว กรุณาโหลดหน้าใหม่ก่อนลงนาม'],409);
 require_once __DIR__.'/../config/sign-routing.php';
 require_once __DIR__.'/../config/drive-archive.php';
 // Legacy client metadata is never authority to grant recipients.
@@ -11,8 +13,20 @@ if (!is_array($receiptDepartments) || !array_is_list($receiptDepartments) || cou
 foreach ($receiptDepartments as $department) if (!is_string($department) || !in_array($department,app_sign_departments(),true)) app_fail('ข้อมูลฝ่ายที่รับเอกสารไม่ถูกต้อง');
 $receiptDepartments=array_values(array_unique($receiptDepartments));
 if ($receiptDepartments && ($_POST['confirm_receipt']??'')!=='1') app_fail('ต้องยืนยันลงทะเบียนรับเอกสารก่อน Auto send');
+$signatureMethod=app_text($_POST,'signature_method',20);
+if($signatureMethod!==''&&!in_array($signatureMethod,['pen','stamp','mixed'],true))app_fail('ข้อมูลวิธีลงนามไม่ถูกต้อง');
+$signatureJson=app_text($_POST,'signature_departments',2000);
+$signatureDepartments=$signatureJson===''?[]:json_decode($signatureJson);
+if(!is_array($signatureDepartments)||!array_is_list($signatureDepartments)||count($signatureDepartments)>count(app_sign_departments()))app_fail('ข้อมูลฝ่ายที่ลงนามไม่ถูกต้อง');
+foreach($signatureDepartments as $department)if(!is_string($department)||!in_array($department,app_sign_departments(),true))app_fail('ข้อมูลฝ่ายที่ลงนามไม่ถูกต้อง');
+$signatureDepartments=array_values(array_unique($signatureDepartments));
+if($signatureDepartments&&$signatureMethod==='')$signatureMethod='stamp';
+// Optional hash lets a client recover a successful save whose response was
+// lost. It is only accepted when it equals the already-published revision.
+$clientSha=app_text($_POST,'client_sha256',64);
+if($clientSha!==''&&!preg_match('/^[a-f0-9]{64}$/',$clientSha))app_fail('ข้อมูลตรวจสอบไฟล์ไม่ถูกต้อง');
 $id=(int)($_POST['Doc_Id']??0);$doc=app_document($id,$user);$file=$_FILES['file']??[];app_uploaded($file,['pdf']);
-$name=basename($file['name']);app_bound_file($doc,$name);$year=(string)$doc['Doc_Year'];if((string)($_POST['year']??'')!==$year)app_fail('Invalid year');
+$name=basename($file['name']);app_bound_file($doc,$name);$year=trim((string)$doc['Doc_Year']);if(trim((string)($_POST['year']??''))!==$year)app_fail('Invalid year');
 $expected=app_text($_POST,'revision',64,true);if(!preg_match('/^[a-f0-9]{64}$/',$expected))app_fail('Invalid revision');
 // This is an authenticated declaration of signing intent, not verification of
 // handwriting pixels. Old/no-op clients must not silently complete the inbox.
@@ -29,7 +43,7 @@ $pdo=app_document_transaction();$backup=null;$installed=false;$temp=$dir.bin2hex
 try{
  if($receiptDepartments || $penSignature)app_lock_sign_routing($pdo);
  $doc=app_locked_document($id,$user);
- if((string)$doc['Doc_Year']!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง กรุณาโหลดใหม่',409);}
+ if(trim((string)$doc['Doc_Year'])!==$year){$pdo->rollBack();app_fail('ข้อมูลเอกสารเปลี่ยนแปลง กรุณาโหลดใหม่',409);}
  app_bound_file($doc,$name);
  // Reject an unauthorized receipt before installing any bytes or pinning a
  // Drive source. The gate keeps this validation stable until commit.
@@ -41,7 +55,24 @@ try{
   $cloud=app_drive_archive_current($id,$name,'signed')??app_drive_archive_current($id,$name,'original');
   if(!$cloud||!hash_equals($cloud['revision'],$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
  }
- if(!is_file($current)||!hash_equals(hash_file('sha256',$current),$expected)){$pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);}
+ if(!is_file($current)||!hash_equals(hash_file('sha256',$current),$expected)){
+  // A save can commit while its HTTP response is lost. The client sends the
+  // SHA-256 of the exact blob it uploaded; accept it only when that blob is the
+  // already-published signed revision and this user is already marked signed.
+  $currentHash=is_file($current)?hash_file('sha256',$current):'';
+  $uploadedHash=hash_file('sha256',$file['tmp_name']);
+  if($clientSha!==''&&$currentHash!==''&&hash_equals($uploadedHash,$clientSha)&&hash_equals($currentHash,$clientSha)){
+   $signed=$pdo->prepare("SELECT Is_Signed FROM t_access_rights WHERE Doc_Id=? AND User_Id=?");$signed->execute([$id,$user['User_Id']]);
+   $published=$pdo->prepare('SELECT revision,signed_at FROM eoffice_signed_files WHERE Doc_Id=? AND file_name=?');$published->execute([$id,$name]);$publication=$published->fetch();
+   if($signed->fetchColumn()==='true'&&$publication&&hash_equals((string)$publication['revision'],$currentHash)){
+    $registered=$pdo->prepare('SELECT DISTINCT department FROM eoffice_document_receipts WHERE Doc_Id=? AND file_name=? AND revision=? AND secretary_id=?');
+    $registered->execute([$id,$name,$currentHash,$user['User_Id']]);$registeredDepartments=$registered->fetchAll(PDO::FETCH_COLUMN);
+    $pdo->rollBack();$fileLock->release();
+    app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ (กู้คืนสถานะที่บันทึกแล้ว)','revision'=>$currentHash,'signed_at'=>$publication['signed_at'],'auto_sent_user_ids'=>[],'registered_receipt_departments'=>$registeredDepartments,'signature_method'=>$signatureMethod,'signature_departments'=>$signatureDepartments,'idempotent'=>true]);
+   }
+  }
+  $pdo->rollBack();app_fail('เอกสารถูกแก้ไขแล้ว กรุณาโหลดใหม่ก่อนลงนาม',409);
+ }
  $changedSignature=!hash_equals(hash_file('sha256',$file['tmp_name']),$expected);
  if(!$changedSignature){
   $signed=$pdo->prepare("SELECT Is_Signed FROM t_access_rights WHERE Doc_Id=? AND User_Id=?");$signed->execute([$id,$user['User_Id']]);
@@ -63,7 +94,7 @@ try{
  app_drive_archive_track($id,$name,'signed',$target);
   $autoSent=app_register_document_receipts($pdo,(int)$user['User_Id'],$id,$name,$revision,$receiptDepartments);
   if($penSignature && $changedSignature)$autoSent=array_values(array_unique([...$autoSent,...app_sign_auto_send($pdo,(int)$user['User_Id'],$id,null)]));
-  app_audit('document.sign',$user,$id,['receipt_departments'=>$receiptDepartments,'auto_sent_user_ids'=>$autoSent]);
+  app_audit('document.sign',$user,$id,['receipt_departments'=>$receiptDepartments,'auto_sent_user_ids'=>$autoSent,'signature_method'=>$signatureMethod,'signature_departments'=>$signatureDepartments]);
  $pdo->commit();
 }catch(Throwable $e){
  try {
@@ -78,4 +109,4 @@ try{
 }
 if($backup&&is_file($backup)&&!unlink($backup))error_log('Signed file backup cleanup failed');
 $fileLock->release();
-app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ','revision'=>$revision,'auto_sent_user_ids'=>$autoSent,'registered_receipt_departments'=>$receiptDepartments]);
+app_json(['status'=>'success','message'=>'บันทึกการลงนามสำเร็จ','revision'=>$revision,'signed_at'=>date('Y-m-d H:i:s'),'auto_sent_user_ids'=>$autoSent,'registered_receipt_departments'=>$receiptDepartments,'signature_method'=>$signatureMethod,'signature_departments'=>$signatureDepartments]);

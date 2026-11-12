@@ -1,69 +1,158 @@
-
-<!DOCTYPE html>
-<html lang="th">
-<head>
 <?php
+require_once __DIR__.'/../config/services.php';
 require_once __DIR__.'/../config/sign-routing.php';
 
+$rawDocId=$_GET['Doc_Id']??0;
+$docId=filter_var($rawDocId,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])?:0;
+$user=app_user(false);
+$doc=null;$error=null;$statusCode=400;$fileName='';$year='';
 
- $Doc_Id = $_GET['Doc_Id'] ?? '';
- $File_Path = $_GET['File_Path'] ?? '';
- $Year = $_GET['Year'] ?? '';
- $url = $_GET['url'] ?? '';
+if(!$user){$error='กรุณาเข้าสู่ระบบใหม่';$statusCode=401;}
+elseif($docId<1){$error='ไม่พบเอกสาร';$statusCode=404;}
+else{
+    [$doc,$lookupError]=app_document_lookup($docId,$user);
+    if(!$doc){$error=$lookupError==='not_found'?'ไม่พบเอกสาร':'คุณไม่มีสิทธิ์เข้าถึงเอกสารนี้';$statusCode=$lookupError==='not_found'?404:403;}
+}
 
-$version = uniqid();
-$file_request = "../api/view_file.php?Type=signed&Year=$Year&File_Path=$File_Path&version=$version&Doc_Id=$Doc_Id";
-// URL หลัก (อันที่ 1)
-$url_primary = "../api/view_file.php?Type=signed&Year=$Year&File_Path=$File_Path&version=$version&Doc_Id=$Doc_Id";
-// URL สำรอง (อันที่ 2)
-// $url =  'https://amss.sesact.go.th/modules/bookregister/upload_files2/1769410561x2033142038_1.pdf';
-$url_secondary = "../api/cors.php?url=".urlencode($url);
-//
-// $file_request = "../api/view_file.php?File_Path=$File_Path&Type=signed&Year=$Year";
-// // URL หลัก (อันที่ 1)
-// $url_primary = "../api/view_file.php?File_Path=$File_Path&Type=signed&Year=$Year";
-// // URL สำรอง (อันที่ 2)
-// $url_secondary = "https://eoffice.siya.ac.th/file_request.php?Doc_Id=$Doc_Id&File_Path=2567/".$File_Path;
+if($doc){
+    $rawFile=$_GET['File_Path']??'';
+    $fileName=is_string($rawFile)?trim($rawFile):'';
+    if(mb_strlen($fileName)>255){$error='ชื่อไฟล์ยาวเกินไป';$statusCode=400;$doc=null;}
+    else{
+        $pdo=app_pdo();
+        if($fileName===''){
+            $q=$pdo->prepare('SELECT Doc_Upload_Path FROM t_document_upload WHERE Doc_File_Link=? LIMIT 1');
+            $q->execute([$doc['Doc_File_Link']]);$fileName=(string)($q->fetchColumn()?:'');
+        }else{
+            $q=$pdo->prepare('SELECT 1 FROM t_document_upload WHERE Doc_File_Link=? AND Doc_Upload_Path=? LIMIT 1');
+            $q->execute([$doc['Doc_File_Link'],$fileName]);
+            if(!$q->fetchColumn()){$error='ไฟล์ไม่ตรงกับเอกสาร';$statusCode=403;$doc=null;}
+        }
+    }
+    if($doc){
+        $year=trim((string)($doc['Doc_Year']??''));
+        if($fileName===''||$fileName!==basename($fileName)||str_contains($fileName,'\\')||!preg_match('/^\d{4}$/',$year)){
+            $error='ข้อมูลไฟล์เอกสารไม่ถูกต้อง';$statusCode=400;$doc=null;
+        }
+    }
+}
 
+if($error){
+    http_response_code($statusCode);
+    header('Cache-Control: no-store');
+    $safe=htmlspecialchars($error,ENT_QUOTES,'UTF-8');
+    echo '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>เปิดเอกสารไม่ได้</title>'
+        .'<style>body{font-family:"Sarabun",Tahoma,sans-serif;background:#f3f4f6;margin:0;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}'
+        .'.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 12px 40px #0f172a1a;max-width:480px;padding:28px;text-align:center}'
+        .'h1{font-size:20px;margin:0 0 10px;color:#0f172a}p{color:#475569;line-height:1.7;margin:0 0 20px}'
+        .'a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600}</style></head>'
+        .'<body><main class="card"><h1>เปิดเอกสารไม่ได้</h1><p>'.$safe.'</p><a href="../index.php">กลับหน้าหลัก</a></main></body></html>';
+    exit;
+}
 
-$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
+header('Cache-Control: no-store');
+$docId=(int)$doc['Doc_Id'];
+$version=uniqid('',true);
+$urlPrimary='../api/view_file.php?'.http_build_query([
+    'Type'=>'signed',
+    'Year'=>$year,
+    'File_Path'=>$fileName,
+    'version'=>$version,
+    'Doc_Id'=>$docId,
+],'','&',PHP_QUERY_RFC3986);
 
-// 🛡️ SECURITY: JSON_HEX_* กันการหนีออกจากแท็ก <script> (XSS ผ่าน </script>)
-$url_primary_json   = json_encode($url_primary, $jsonFlags);
-$url_secondary_json = json_encode($url_secondary, $jsonFlags);
-$year_json          = json_encode($Year, $jsonFlags);
-$file_basename_json = json_encode(basename($File_Path), $jsonFlags);
-$doc_id_int         = (int)$Doc_Id;
-?>
+$jsonFlags=JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE;
+$urlPrimaryJson=json_encode($urlPrimary,$jsonFlags);
+$docIdInt=$docId;
+$yearJson=json_encode($year,$jsonFlags);
+$fileBasenameJson=json_encode($fileName,$jsonFlags);
 
+$q=app_pdo()->prepare('SELECT Is_Signed,Date FROM t_access_rights WHERE Doc_Id=? AND User_Id=?');
+$q->execute([$docId,$user['User_Id']]);$myAccess=$q->fetch()?:[];
+$docInfoJson=json_encode([
+    'id'=>$docId,
+    'number'=>(string)($doc['Doc_Number']??''),
+    'name'=>(string)($doc['Doc_Name']??''),
+    'date'=>(string)($doc['Doc_Date_Receive']??($doc['Doc_Date']??'')),
+    'from'=>(string)($doc['Doc_Receive_From']??''),
+    'status'=>(string)($doc['Status']??''),
+    'fileName'=>$fileName,
+    'year'=>$year,
+    'mySigned'=>($myAccess['Is_Signed']??'false')==='true',
+    'mySignedDate'=>(string)($myAccess['Date']??''),
+    'userId'=>(int)$user['User_Id'],
+    'userName'=>(string)($user['User_Name']??''),
+],$jsonFlags);
+$departmentsJson=json_encode(app_sign_departments(),$jsonFlags);
+
+$tailwindVersion=@filemtime(__DIR__.'/../assets/tailwind.css')?:'1';
+$pdfjsVersion=@filemtime(__DIR__.'/../assets/vendor/pdfjs/pdf.min.js')?:'1';
+$pdfLibVersion=@filemtime(__DIR__.'/../assets/vendor/pdf-lib.min.js')?:'1';
+$lucideVersion=@filemtime(__DIR__.'/../assets/vendor/lucide.min.js')?:'1';
+$appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
+?><!DOCTYPE html>
+<html lang="th">
+<head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E-Office ระบบหนังสือราชการ  </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>E-Office ระบบหนังสือราชการ</title>
     <link rel="icon" type="image/x-icon" href="eoffice_icon.ico">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../assets/tailwind.css?v=<?= htmlspecialchars($tailwindVersion,ENT_QUOTES,'UTF-8') ?>">
 
-    <!-- PDF.js -->
     <script type="module">
-        import * as pdfjs from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
-        window.pdfjsLib = pdfjs;
-        window.dispatchEvent(new Event('pdfjsready'));
+        (async () => {
+            try {
+                const pdfjs = await import('../assets/vendor/pdfjs/pdf.min.js?v=<?= htmlspecialchars($pdfjsVersion,ENT_QUOTES,'UTF-8') ?>');
+                window.pdfjsLib = pdfjs;
+                window.pdfjsWorkerUrl = '../assets/vendor/pdfjs/pdf.worker.min.js?v=<?= htmlspecialchars($pdfjsVersion,ENT_QUOTES,'UTF-8') ?>';
+                window.dispatchEvent(new Event('pdfjsready'));
+            } catch (localError) {
+                try {
+                    const pdfjs = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');
+                    window.pdfjsLib = pdfjs;
+                    window.pdfjsWorkerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+                    window.dispatchEvent(new Event('pdfjsready'));
+                } catch (remoteError) {
+                    window.pdfjsLoadError = remoteError || localError;
+                    window.dispatchEvent(new Event('pdfjsfailed'));
+                }
+            }
+        })();
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="../assets/vendor/pdf-lib.min.js?v=<?= htmlspecialchars($pdfLibVersion,ENT_QUOTES,'UTF-8') ?>" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'"></script>
     <script src="../assets/stamp-render-queue.js?v=20261008-1"></script>
 
-
-    <!-- Icons (Lucide) -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Icons (local, with CDN fallback) -->
+    <script src="../assets/vendor/lucide.min.js?v=<?= htmlspecialchars($lucideVersion,ENT_QUOTES,'UTF-8') ?>" onerror="this.onerror=null;this.src='https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js'"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap');
+        @font-face {
+            font-family: 'Sarabun';
+            src: url('../assets/fonts/sarabun/Sarabun-Regular.ttf') format('truetype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Sarabun';
+            src: url('../assets/fonts/sarabun/Sarabun-Bold.ttf') format('truetype');
+            font-weight: 600;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        /* Use this page's hidden state even if a CDN stylesheet is unavailable. */
+        .hidden { display: none !important; }
 
         body {
-            font-family: 'Sarabun', sans-serif;
+            font-family: 'Sarabun', Tahoma, sans-serif;
             background-color: #f3f4f6;
             overflow: hidden;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Canvas Container Layering */
@@ -120,119 +209,361 @@ $doc_id_int         = (int)$Doc_Id;
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 50;
+            z-index: 70;
             flex-direction: column;
+        }
+
+        /* --- Signing workspace shell --- */
+        .app-header {
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(15,23,42,.05);
+            flex: none;
+            z-index: 20;
+        }
+        .app-header__inner {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: 10px max(16px, env(safe-area-inset-left)) 10px max(16px, env(safe-area-inset-right));
+            padding-top: max(10px, env(safe-area-inset-top));
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .app-back {
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #4338ca;
+            background: #eef2ff;
+            text-decoration: none;
+        }
+        .app-back:hover { background: #e0e7ff; }
+        .app-back svg { width: 22px; height: 22px; }
+        .app-brand { width: 42px; height: 42px; object-fit: contain; flex: none; }
+        .app-doc { min-width: 0; flex: 1; }
+        .app-doc__eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 12px;
+            color: #475569;
+            line-height: 1.4;
+        }
+        .app-doc__title {
+            font-size: 17px;
+            line-height: 1.35;
+            font-weight: 600;
+            color: #0f172a;
+            margin: 2px 0 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .app-doc__meta {
+            margin: 0;
+            font-size: 12px;
+            color: #64748b;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 2px 9px;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid #fed7aa;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-badge--signed { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+        .app-header__actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: none; }
+        .save-state {
+            max-width: 250px;
+            font-size: 12px;
+            color: #475569;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 999px;
+            padding: 6px 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .save-state--dirty { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+        .save-state--saved { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+
+        .app-banner {
+            flex: none;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px max(16px, env(safe-area-inset-left)) 10px max(16px, env(safe-area-inset-right));
+            border-bottom: 1px solid;
+            font-size: 13px;
+            line-height: 1.5;
+            z-index: 19;
+        }
+        .app-banner--error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+        .app-banner--warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+        .app-banner__text { flex: 1; min-width: 0; }
+        .app-banner__text strong { display: block; margin-bottom: 2px; }
+        .app-banner__text p { margin: 0; }
+        .app-banner__actions { display: flex; gap: 8px; flex: none; }
+
+        .save-success {
+            position: fixed;
+            right: 18px;
+            bottom: calc(92px + env(safe-area-inset-bottom));
+            width: min(460px, calc(100vw - 32px));
+            background: #fff;
+            border: 1px solid #a7f3d0;
+            border-left: 5px solid #059669;
+            border-radius: 14px;
+            box-shadow: 0 18px 50px rgba(15,23,42,.2);
+            padding: 14px 16px;
+            z-index: 45;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .save-success p { margin: 4px 0 0; color: #475569; font-size: 13px; }
+        .save-success__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+
+        .app-toolbar {
+            flex: none;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px 10px;
+            padding: 8px max(12px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-right));
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            box-shadow: 0 -6px 18px rgba(15,23,42,.05);
+            z-index: 25;
+        }
+        .tool-group, .page-group, .zoom-group, .action-group { display: flex; align-items: center; gap: 4px; min-width: 0; }
+        .action-group { margin-left: auto; gap: 8px; }
+        .tool-sep { width: 1px; height: 26px; background: #e2e8f0; margin: 0 3px; flex: none; }
+        .whiteout-dot {
+            position: absolute; right: 7px; bottom: 6px; width: 9px; height: 9px;
+            border-radius: 50%; background: #fff; border: 1px solid #64748b;
+        }
+        .stamp-dot { position: absolute; right: 7px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .page-indicator { min-width: 82px; text-align: center; font-size: 12px; color: #475569; white-space: nowrap; }
+        .download-label { display: inline; }
+        #toast { bottom: calc(96px + env(safe-area-inset-bottom)) !important; max-width: min(560px, calc(100vw - 24px)); }
+
+        #document-container {
+            min-height: 0;
+            overflow: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+        #pages-wrapper {
+            transform-origin: top center;
+            margin: 0 auto;
+            transition: zoom .15s ease;
+        }
+        .page-container { position: relative; }
+        .page-placeholder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #94a3b8;
+            font-size: 12px;
+            border: 1px dashed #e2e8f0;
+            box-sizing: border-box;
+            width: min(100%, 860px);
+        }
+
+        .modal-backdrop, .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.55);
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            backdrop-filter: blur(3px);
+        }
+        .modal-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 24px 80px rgba(15,23,42,.35);
+            width: min(560px, 100%);
+            max-height: calc(100dvh - 32px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .modal-card--stamp { width: min(480px, 100%); }
+        .modal-card__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 18px;
+            border-bottom: 1px solid #e2e8f0;
+            flex: none;
+        }
+        .modal-card__head h2, .modal-card__head h3 { margin: 0; font-size: 17px; }
+        .modal-card__head--blue { background: #1d4ed8; border-bottom-color: #1e40af; color: #fff; }
+        .modal-card__head--blue button { background: transparent; border: 0; color: #fff; min-height: 36px; min-width: 36px; cursor: pointer; }
+        .modal-card__body { padding: 18px; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+        .modal-card__foot {
+            padding: 12px 18px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex: none;
+        }
+        .field-error { color: #b91c1c; font-size: 12px; margin: 6px 0 0; }
+        .muted { color: #64748b; font-size: 13px; }
+        .modal-card__body p { margin: 0; }
+        #stamp-preview-canvas { max-width: 100%; height: auto; }
+        .drawer-backdrop { align-items: stretch; justify-content: flex-end; padding: 0; }
+        .audit-drawer {
+            background: #fff;
+            width: min(460px, 100%);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -20px 0 60px rgba(15,23,42,.25);
+        }
+        .audit-content { padding: 16px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 18px; }
+        .audit-section h3 { margin: 0 0 8px; font-size: 14px; color: #0f172a; }
+        .audit-row { border-bottom: 1px solid #f1f5f9; padding: 8px 0; font-size: 13px; line-height: 1.55; }
+        .audit-row:last-child { border-bottom: 0; }
+        .audit-row strong { color: #0f172a; }
+        .audit-row small { color: #64748b; }
+        .audit-empty { color: #94a3b8; font-size: 13px; }
+        .audit-method { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; background: #eef2ff; color: #4338ca; font-size: 11px; }
+
+        @media (max-width: 760px) {
+            .app-header__inner { gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+            .app-brand { display: none; }
+            .app-doc__title { font-size: 15px; }
+            .save-state { display: none; }
+            .audit-label { display: none; }
+            .app-banner { align-items: flex-start; }
+            .app-banner__actions { flex-direction: column; }
+            .app-toolbar { justify-content: flex-start; gap: 6px; }
+            .action-group { margin-left: 0; width: 100%; justify-content: flex-end; order: 5; }
+            .page-group { order: 2; }
+            .zoom-group { order: 3; }
+            .download-label { display: none; }
+            .save-success { right: 12px; left: 12px; width: auto; bottom: calc(150px + env(safe-area-inset-bottom)); }
+            #toast { bottom: calc(165px + env(safe-area-inset-bottom)) !important; }
+        }
+        @media (max-width: 420px) {
+            .tool-group { width: 100%; justify-content: space-between; }
+            .tool-sep { display: none; }
+            .page-group { flex: 1; justify-content: center; }
+            .zoom-group { flex: 1; justify-content: flex-end; }
+            #btn-save { flex: 1; }
         }
     </style>
     <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261016-buttons-3">
 </head>
-<body class="h-screen flex flex-col">
+<body class="flex flex-col">
 
-<script>
-   var Stamp_Name ;
-      if (!Stamp_Name) {
-   Stamp_Name = 'template_stamp.png';
-      }
-</script>
-
-
+    <noscript>
+        <div class="app-banner app-banner--error" role="alert">
+            <div class="app-banner__text"><strong>ต้องเปิดใช้งาน JavaScript</strong><p>หน้าเซ็นเอกสารต้องใช้ JavaScript ในการแสดงและบันทึกเอกสาร</p></div>
+        </div>
+    </noscript>
 
     <!-- Loading Screen -->
-    <div id="loading" class="loading-overlay hidden">
+    <div id="loading" class="loading-overlay hidden" role="status" aria-live="polite">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
         <p id="loading-text" class="text-gray-600 font-semibold">กำลังเชื่อมต่อ Server...</p>
     </div>
 
-    <!-- Toolbar -->
-    <header class="bg-white border-b border-gray-200 shadow-sm z-20 flex-none px-4 py-3">
-        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-
-            <!-- Title -->
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-              <a class="flex items-center" href="../index.php">
-                <!-- <div class="bg-blue-600 text-white p-2 rounded-lg">
-                    <i data-lucide="file-signature" class="w-6 h-6"></i>
-                </div> -->
-
-                <button class="eo-btn eo-btn--ghost eo-btn--icon" aria-label="กลับ">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-
-                <img src="../img/icon_app_xl.png" width="50px" height="50px">
-                <div>
-                    <h1 class="text-lg font-bold text-gray-800 leading-tight">ระบบหนังสือราชการ</h1>
-                    <p class="text-xs text-gray-500">E-Office</p>
+    <!-- Document header -->
+    <header id="app-header" class="app-header">
+        <div class="app-header__inner">
+            <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+            <img class="app-brand" src="../img/icon_app_xl.png" width="42" height="42" alt="">
+            <div class="app-doc">
+                <div class="app-doc__eyebrow">
+                    <span id="doc-number"><?= htmlspecialchars((string)($doc['Doc_Number']??''),ENT_QUOTES,'UTF-8') ?></span>
+                    <span id="doc-status-badge" class="status-badge <?= ($myAccess['Is_Signed']??'false')==='true'?'status-badge--signed':'' ?>"><?= ($myAccess['Is_Signed']??'false')==='true'?'ลงนามแล้ว':'รอลงนาม' ?></span>
                 </div>
-
-                </a>
+                <h1 id="doc-name" class="app-doc__title"><?= htmlspecialchars((string)($doc['Doc_Name']??'เอกสาร'),ENT_QUOTES,'UTF-8') ?></h1>
+                <p class="app-doc__meta">
+                    <?php
+                    $metaParts=array_filter([
+                        trim((string)($doc['Doc_Date_Receive']??($doc['Doc_Date']??''))),
+                        trim((string)($doc['Doc_Receive_From']??'')),
+                        'ปี '.$year,
+                    ],static fn($value)=>$value!=='');
+                    echo htmlspecialchars(implode(' • ',$metaParts),ENT_QUOTES,'UTF-8');
+                    ?>
+                </p>
             </div>
-
-
-            <!-- Drawing Tools -->
-            <div class="flex items-center bg-gray-50 p-1.5 rounded-xl border border-gray-200 gap-1 shadow-inner overflow-x-auto max-w-full">
-                <button onclick="setTool('hand')" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active flex-shrink-0" title="เลื่อนดู (Hand)" aria-label="เลื่อนดูเอกสาร">
-                    <i data-lucide="hand" class="w-5 h-5"></i>
+            <div class="app-header__actions">
+                <span id="save-state" class="save-state" role="status" aria-live="polite">พร้อมลงนาม</span>
+                <button id="btn-audit" type="button" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="openAuditDrawer()" aria-label="ประวัติการลงนาม">
+                    <i data-lucide="history" class="w-4 h-4"></i><span class="audit-label">ประวัติ</span>
                 </button>
-
-                <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
-
-                <button onclick="setTool('pen')" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn flex-shrink-0" title="ปากกาสีดำ" aria-label="ปากกาสีดำ">
-                    <i data-lucide="pen-tool" class="w-5 h-5"></i>
-                </button>
-
-                <button onclick="setTool('whiteout')" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn relative flex-shrink-0" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว สำหรับปิดทับข้อความ">
-                    <i data-lucide="highlighter" class="w-5 h-5"></i>
-                    <span class="absolute bottom-1 right-1 w-2.5 h-2.5 rounded-full bg-white border border-gray-500" aria-hidden="true"></span>
-                </button>
-
-                <button onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn flex-shrink-0" title="ยางลบ" aria-label="ยางลบ">
-                    <i data-lucide="eraser" class="w-5 h-5"></i>
-                </button>
-
-                <!-- <button onclick="setTool('stamp')" id="btn-stamp" class="tool-btn p-2 rounded-lg hover:bg-white border border-transparent transition group relative flex-shrink-0" title="ประทับตรา">
-                    <i data-lucide="stamp" class="w-5 h-5"></i>
-                    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button> -->
-                <button onclick="openStampModal()" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn group relative flex-shrink-0" title="ประทับตรา" aria-label="ประทับตรา">
-    <i data-lucide="stamp" class="w-5 h-5"></i>
-    <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-</button>
-
-                <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
-
-                <button onclick="undoLastAction()" class="eo-btn eo-btn--ghost eo-btn--icon flex-shrink-0" title="ย้อนกลับ" aria-label="ย้อนกลับ">
-                    <i data-lucide="undo-2" class="w-5 h-5"></i>
-                </button>
-                  <div class="w-px h-6 bg-gray-300 mx-1 flex-shrink-0"></div>
-                <!-- Action Buttons -->
-                <div class="flex items-center gap-3 w-full xl:w-auto justify-end">
-
-                  <!-- Download Button -->
-                  <button onclick="downloadDocument()" class="eo-btn eo-btn--secondary xl:flex-none" aria-label="ดาวน์โหลดเอกสาร">
-                      <i data-lucide="download" class="w-4 h-4"></i>
-
-                  </button>
-
-                    <!-- Save to Server Button -->
-                    <button onclick="saveToServer()" class="eo-btn eo-btn--primary xl:flex-none">
-                        <i data-lucide="cloud-upload" class="w-4 h-4"></i>
-                        <span>บันทึก</span>
-                    </button>
-
-
-                </div>
             </div>
-
-
-
         </div>
-
     </header>
 
+    <div id="error-banner" class="app-banner app-banner--error hidden" role="alert" aria-live="assertive">
+        <div class="app-banner__text">
+            <strong id="error-title">เกิดข้อผิดพลาด</strong>
+            <p id="error-message"></p>
+        </div>
+        <div class="app-banner__actions">
+            <button id="error-retry" type="button" class="eo-btn eo-btn--secondary eo-btn--sm hidden" onclick="retryLastAction()">ลองใหม่</button>
+            <button id="error-dismiss" type="button" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="hideErrorBanner()">ปิด</button>
+        </div>
+    </div>
+
+    <div id="session-banner" class="app-banner app-banner--warning hidden" role="status" aria-live="polite">
+        <div class="app-banner__text">
+            <strong>เซสชันหมดอายุ</strong>
+            <p>ลายเซ็นของคุณยังอยู่บนหน้านี้ กรุณาเข้าสู่ระบบในแท็บใหม่ แล้วกลับมากด “ลงนามและบันทึก” อีกครั้ง</p>
+        </div>
+        <a class="eo-btn eo-btn--secondary eo-btn--sm" href="../index.php" target="_blank" rel="noopener">เข้าสู่ระบบ</a>
+    </div>
+
+    <div id="save-success" class="save-success hidden" role="status" aria-live="polite">
+        <div>
+            <strong>บันทึกการลงนามเรียบร้อย</strong>
+            <p id="save-success-detail"></p>
+        </div>
+        <div class="save-success__actions">
+            <button id="success-download" type="button" class="eo-btn eo-btn--secondary eo-btn--sm" onclick="downloadDocument()">ดาวน์โหลดสำเนา</button>
+            <a class="eo-btn eo-btn--primary eo-btn--sm" href="../index.php">กลับหน้าหลัก</a>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="document.getElementById('save-success').classList.add('hidden')" aria-label="ปิด">×</button>
+        </div>
+    </div>
+
     <!-- Document Container -->
-    <main id="document-container" class="flex-1 overflow-y-auto bg-gray-100 p-4 md:p-8 flex flex-col items-center relative">
+    <main id="document-container" class="flex-1 bg-gray-100 p-4 md:p-8 flex flex-col items-center relative">
         <div id="pages-wrapper" class="flex flex-col gap-6 shadow-2xl"></div>
 
         <div id="empty-state" class="text-center mt-20 hidden">
@@ -240,47 +571,97 @@ $doc_id_int         = (int)$Doc_Id;
             <p class="text-gray-500 text-lg">ไม่พบเอกสาร</p>
             <button onclick="loadServerDocument()" class="eo-btn eo-btn--secondary mt-4">ลองใหม่อีกครั้ง</button>
         </div>
-
-
     </main>
 
+    <!-- Bottom toolbar keeps save/actions reachable on tablets and phones. -->
+    <footer id="toolbar" class="app-toolbar">
+        <div class="tool-group" role="group" aria-label="เครื่องมือลงนาม">
+            <button type="button" onclick="setTool('hand')" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active" title="เลื่อนดู (Hand)" aria-label="เลื่อนดูเอกสาร">
+                <i data-lucide="hand" class="w-5 h-5"></i>
+            </button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button type="button" onclick="setTool('pen')" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกาสีดำ" aria-label="ปากกาสีดำ">
+                <i data-lucide="pen-tool" class="w-5 h-5"></i>
+            </button>
+            <button type="button" onclick="setTool('whiteout')" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn relative" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว สำหรับปิดทับข้อความ">
+                <i data-lucide="highlighter" class="w-5 h-5"></i>
+                <span class="whiteout-dot" aria-hidden="true"></span>
+            </button>
+            <button type="button" onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ยางลบ" aria-label="ยางลบ">
+                <i data-lucide="eraser" class="w-5 h-5"></i>
+            </button>
+            <button type="button" onclick="openStampModal()" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn group relative" title="ประทับตรา" aria-label="ประทับตรา">
+                <i data-lucide="stamp" class="w-5 h-5"></i>
+                <span class="stamp-dot" aria-hidden="true"></span>
+            </button>
+            <span class="tool-sep" aria-hidden="true"></span>
+            <button type="button" onclick="undoLastAction()" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ">
+                <i data-lucide="undo-2" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="page-group" role="group" aria-label="นำทางหน้า">
+            <button type="button" id="page-prev" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="goToRelativePage(-1)" aria-label="หน้าก่อน">‹</button>
+            <span id="page-indicator" class="page-indicator" aria-live="polite">หน้า 1 / 1</span>
+            <button type="button" id="page-next" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="goToRelativePage(1)" aria-label="หน้าถัดไป">›</button>
+            <button type="button" id="page-last" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="goToLastPage()" aria-label="ไปหน้าสุดท้าย">ท้ายเอกสาร</button>
+        </div>
+
+        <div class="zoom-group" role="group" aria-label="ซูม">
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="changeZoom(-0.1)" aria-label="ซูมออก">−</button>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="resetZoom()" aria-label="พอดีความกว้าง">พอดี</button>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="changeZoom(0.1)" aria-label="ซูมเข้า">+</button>
+        </div>
+
+        <div class="action-group">
+            <button type="button" onclick="downloadDocument()" id="btn-download" class="eo-btn eo-btn--secondary" aria-label="ดาวน์โหลดเอกสาร">
+                <i data-lucide="download" class="w-4 h-4"></i><span class="download-label">ดาวน์โหลด</span>
+            </button>
+            <button type="button" onclick="saveToServer()" id="btn-save" class="eo-btn eo-btn--primary" aria-busy="false">
+                <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+                <span>ลงนามและบันทึก</span>
+            </button>
+        </div>
+    </footer>
+
     <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center gap-3 translate-y-4">
-        <i id="toast-icon" data-lucide="check-circle" class="w-5 h-5 text-green-400"></i>
+    <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center gap-3 translate-y-4" role="status" aria-live="polite">
+        <span id="toast-icon" class="w-5 h-5 text-green-400 flex items-center"><i data-lucide="check-circle" class="w-5 h-5"></i></span>
         <span id="toast-message" class="font-medium">แจ้งเตือน</span>
     </div>
 
-    <div id="stamp-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden max-h-[calc(100dvh-2rem)] flex flex-col">
-            <div class="bg-blue-700 px-6 py-4 flex justify-between items-center">
-                <h3 class="text-white font-bold text-lg">ระบุข้อมูลประทับตรา</h3>
-                <button onclick="closeStampModal()" class="text-white hover:bg-blue-700 rounded-full p-1">
+    <div id="stamp-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stamp-title">
+        <div class="modal-card modal-card--stamp">
+            <div class="modal-card__head modal-card__head--blue">
+                <h3 id="stamp-title" class="text-white font-bold text-lg">ระบุข้อมูลประทับตรา</h3>
+                <button type="button" onclick="closeStampModal()" class="text-white" aria-label="ปิด">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
 
-            <div class="p-6 space-y-4 overflow-y-auto min-h-0">
+            <div class="modal-card__body">
               <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">ฝ่ายงาน</label>
-                  <select id="stamp-text-1" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <label for="stamp-text-1" class="block text-sm font-medium text-gray-700 mb-1">ฝ่ายงาน <span class="text-red-600">*</span></label>
+                  <select id="stamp-text-1" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white">
                       <option value="">-- เลือกฝ่ายงาน --</option>
                       <?php foreach (app_sign_departments() as $department): ?>
                       <option value="<?= htmlspecialchars($department, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($department, ENT_QUOTES, 'UTF-8') ?></option>
                       <?php endforeach; ?>
                   </select>
+                  <p id="stamp-department-error" class="field-error hidden" role="alert">กรุณาเลือกฝ่ายงานก่อนประทับตรา</p>
               </div>
                 <div id="stamp-receipt-fields" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">เลขรับ</label>
-                    <input type="text" id="stamp-text-2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เลขรับ...">
+                    <label for="stamp-text-2" class="block text-sm font-medium text-gray-700 mb-1">เลขรับ</label>
+                    <input type="text" id="stamp-text-2" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เลขรับ..." autocomplete="off">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">วันที่</label>
-                    <input type="text" id="stamp-text-3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="วันที่...">
+                    <label for="stamp-text-3" class="block text-sm font-medium text-gray-700 mb-1">วันที่</label>
+                    <input type="text" id="stamp-text-3" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="วันที่..." inputmode="numeric" autocomplete="off">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">เวลา</label>
-                    <input type="text" id="stamp-text-4" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เวลา...">
+                    <label for="stamp-text-4" class="block text-sm font-medium text-gray-700 mb-1">เวลา</label>
+                    <input type="text" id="stamp-text-4" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="เวลา..." inputmode="numeric" autocomplete="off">
                 </div>
                 </div>
                 <p id="stamp-director-hint" class="hidden text-sm text-gray-500">หลังประทับตรา ใช้เครื่องมือปากกาติ๊กฝ่ายงาน เติมข้อความอื่น ๆ และลงลายมือชื่อบนเอกสาร</p>
@@ -290,864 +671,59 @@ $doc_id_int         = (int)$Doc_Id;
                 </div>
             </div>
 
-            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t flex-shrink-0">
-                <button onclick="closeStampModal()" class="eo-btn eo-btn--secondary">ยกเลิก</button>
-                <button onclick="confirmStampData()" class="eo-btn eo-btn--primary">ตกลง</button>
+            <div class="modal-card__foot">
+                <button type="button" onclick="closeStampModal()" class="eo-btn eo-btn--secondary">ยกเลิก</button>
+                <button type="button" onclick="confirmStampData()" class="eo-btn eo-btn--primary">ตกลง</button>
             </div>
         </div>
     </div>
 
+    <!-- Conflict recovery -->
+    <div id="conflict-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
+        <div class="modal-card">
+            <div class="modal-card__head">
+                <h2 id="conflict-title">เอกสารถูกแก้ไขระหว่างที่คุณลงนาม</h2>
+                <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="hideConflictModal()" aria-label="ปิด">×</button>
+            </div>
+            <div class="modal-card__body">
+                <p>ระบบยังเก็บลายเซ็นที่คุณทำไว้บนหน้านี้ แต่ไม่สามารถบันทึกทับเอกสารเวอร์ชันใหม่ได้โดยตรง</p>
+                <p class="muted">เลือกดาวน์โหลดสำเนาที่คุณลงนามไว้เพื่อเก็บหลักฐาน หรือโหลดเอกสารล่าสุด (ลายเซ็นที่ยังไม่บันทึกจะหายไป)</p>
+            </div>
+            <div class="modal-card__foot">
+                <button type="button" class="eo-btn eo-btn--secondary" onclick="hideConflictModal()">ยกเลิก</button>
+                <button type="button" class="eo-btn eo-btn--secondary" onclick="downloadDocument()">ดาวน์โหลดสำเนา</button>
+                <button type="button" class="eo-btn eo-btn--primary" onclick="reloadLatestDocument()">โหลดล่าสุด</button>
+            </div>
+        </div>
+    </div>
 
-
+    <!-- Signing history -->
+    <div id="audit-overlay" class="drawer-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="audit-title" onclick="if(event.target===this)closeAuditDrawer()">
+        <aside class="audit-drawer">
+            <div class="modal-card__head">
+                <h2 id="audit-title">ประวัติการลงนาม</h2>
+                <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="closeAuditDrawer()" aria-label="ปิด">×</button>
+            </div>
+            <div id="audit-content" class="audit-content">
+                <p class="muted">กำลังโหลด...</p>
+            </div>
+        </aside>
+    </div>
 
     <script>
-
-
-        window.addEventListener('pdfjsready', function () {
-        // --- 1. CONFIGURATION ---
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
-
-//
-//"https://eoffice.siya.ac.th/file_request.php?File_Name="+Doc_Id+'.pdf',
-const CONFIG = {
-            PDF_URL_1: <?= $url_primary_json ?>,
-            PDF_URL_2: <?= $url_secondary_json ?>,
-            STAMP_URL: "e-stamp/"+Stamp_Name,
-            SCALE: 2.5
+        window.ESIGN_CONFIG = {
+            PDF_URL: <?= $urlPrimaryJson ?>,
+            docId: <?= $docIdInt ?>,
+            year: <?= $yearJson ?>,
+            fileName: <?= $fileBasenameJson ?>,
+            document: <?= $docInfoJson ?>,
+            departments: <?= $departmentsJson ?>,
+            SCALE: 2.5,
+            workerUrl: '../assets/vendor/pdfjs/pdf.worker.min.js?v=<?= htmlspecialchars($pdfjsVersion,ENT_QUOTES,'UTF-8') ?>',
+            stampUrl: 'e-stamp/template_stamp.png'
         };
-
-        const FALLBACK = {
-            PDF: "JVBERi0xLjcKCjEgMCBvYmogPDwKICAvVHlwZSAvQ2F0YWxvZwogIC9QYWdlcyAyIDAgUgo+PgplbmRvYmoKCjIgMCBvYmogPDwKICAvVHlwZSAvUGFnZXMKICAvTWVkaWFCb3ggWyAwIDAgNTk1LjI4IDg0MS44OSBdCiAgL0NvdW50IDEKICAvS2lkcyBbIDMgMCBSIF0KPj4KZW5kb2JqCgozIDAgb2JqIDw8CiAgL1R5cGUgL1BhZ2UKICAvUGFyZW50IDIgMCBSCiAgL1Jlc291cmNlcyA8PAogICAgL0ZvbnQgPDwKICAgICAgL0YxIDQgMCBSCgogICAgPj4KICA+PgogIC9Db250ZW50cyA1IDAgUgo+PgplbmRvYmoKCjQgMCBvYmogPDwKICAvVHlwZSAvRm9udAogIC9TdWJ0eXBlIC9UeXBlMQogIC9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iagoKNSAwIG9iaiA8PAogIC9MZW5ndGggMTIyCj4+CnN0cmVhbQpCVAo3MCA3MDAgVEQKL0YxIDI0IFRmCihTSVlBIEUtT0ZGSUNFIERFTU8pIFRqCkVUCkJUCjcwIDY1MCBURAovRjEgMTIgVGYKKFRoaXMgaXMgYSBmYWxsYmFjayBkb2N1bWVudCBiZWNhdXNlIHRoZSByZWFsIFVSTCB3YXMgYmxvY2tlZCBieSBDT1JTLikgVGoKRVQKRVQKZW5kc3RyZWFtCmVuZG9iagoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDEwIDAwMDAwIG4gCjAwMDAwMDAwNjAgMDAwMDAgbiAKMDAwMDAwMDE1NyAwMDAwMCBuIAowMDAwMDAwMjY0IDAwMDAwIG4gCjAwMDAwMDAzNTIgMDAwMDAgbiAKdHJhaWxlcgo8PAogIC9TaXplIDYKICAvUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNTI0CiUlRU9GCg==",
-            STAMP: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJYAAAAyCAYAAACg344VAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3wQeFxo5K9n/2QAAA+NJREFUeNrtnE1oXFUYht9z78xM/kyaTOoP0tQ0aSL+oK2iC10IuCi40I2Ldhe6sLgQdFGlWxfuWnCnbiqILgRBECy1Wq1Z2qSNTOpMZu6953ycycx0MpnJ3Jm5c+F5N5N7z/2+8533fOf7zsB99913X/iJ3W53VCl1Sim1Ryn1gVJqUin1rlLqVa31mNb6jNb6jNb6ba31R61W6/j+/fuf63G3U1NTY1tbWx9pre9RSu0F7QE/aK1/1Fqf01qPzM/Pn6/HPe8FDFaD2O12R5VSp5RSe2p4zT/AH1rrl+bn58/V8N5/BIPVINxut0cptafG1/4F/Ky1fkApdbJO97xnMFgNYHZ29l6l1Kka3u8PpNbf01q/12w2f6zhvf8Ig9UguN1uj1JqT42v/UZr/YpS6kyNB/1vYLAawOzs7L1KqVM1vt/P2uvvNpvNH2p477YwWNvEbrc7qrXeV+Pr39Zan2y1Wot1uudhMFgN4PmpqanHa3y/n7XW3zWbzZ9qeO+2MFjbxPPT09OP1fj6P2qtv6jDPQ+DwWqA52dmZh6q8f1+01p/Xod73gsYrG1ienr6PqXUnoa/9s/a609rrc9W/a6FhYUvGngtg9UAMzMzD2utR2p8v0Va6w9ardbpGt67LQzWNjE9Pf2wUupwja//u9b6ZLPZ/K0O9zwMBqsBZmZmnqjx/X7VWn9ah3veCxisa2B6evqRGt/vt9rrU81m8/s63POuwWBdAzMzM0/W+Pr/aK1P1uGe9wIG6xqYnp5+Qik1VuP7/aa1/qwO97wXMFjXwMzMzJM1vv4/WuuTdbjnvYDBugamp6efVEqN1/h+i7TWn9XhnvcCBuuamJmZebLG1/9Ha32yDve8FzBY18D09PTTSqnxGt/vN631Z3W4572AwboGZmZmnqzx9f/RWp+swz3vBQzWNTI9Pf2MUmqsxvd7Q2v9aR3ueS9gsK6RmZmZp2p8/X+01ifrcM97AYN1jUxPTz+rlBqt8f3e0Fp/Wod73gsYrGtEx/hUja//r9b6ZLPZ/LEO97xrMFjXyPT09HNKy/wNrfWnNbzru4bBukZ0jM/U+Pp/a61P1uGe9wIG6xqZnp5+Tim1p8b3e0Nr/Wkd7nkvYLCukemZ5x6t8fX/0VqfbDab39fhnncNQ1M/f7fbfVFr/ZTW+rGduKdW6mWt9Yv5+fnjdbhfL9xr/7jWeqDita5qrT9vtVrf7d+//6uK19oJNPUDut3ui1rrwzt5r9b6i/n5+W938r6Vwn/1D2utBytea1Fr/XSr1fpuL4PVYNWfVkrtq3itP7XWc81m87uK19oJGKxtYrdb/1BrPVjxWn/VWs81GaxmYrAawH/1D2utX6x4rb9rrb9tNpvfVrzWTsBgbQO73fp7WutXKl7rH631t81m85uK19oWDFYDuN3un7TWL1W81j9a6++azeY3Fa+1E2jqiv1///1fAvhNCPGrEOJZIcSzQogRQohJQogJQohJQog9O3GvbeB+IcT3QogfAPwghHhWCPGjEGKPEOIxIcRjQojHhBCP7eSeO4Gm/sDMzMwRrfVbWuvDWusDWutxrfXDWusHlH/RLfKA1vpRrfV3WusvtdbTWutvK37XtjEzM3Ow1vrQbrf+4Ha79Qe3260/uN1u/cG+Wut9Nbzvf0YikUgkEolEIpFIJBKJRCKRSCQSiUQikUgk/wF+wW33fR4+ogAAAABJRU5ErkJggg=="
-        };
-
-        let currentPDF = null;
-        let sourceBytes = null;
-        let documentRevision = null;
-        let scale = CONFIG.SCALE;
-        let currentTool = 'hand';
-        let whiteoutWarningAccepted = false;
-        // Keep live strokes and history replays on the same geometry/color.
-        const TOOL_WIDTHS = {pen: 2, whiteout: 12, eraser: 20};
-        const TOOL_COLORS = {pen: '#000000', whiteout: '#ffffff'};
-        let isDrawing = false;
-        let lastX = 0;
-        let lastY = 0;
-        let documentHistory = {};
-        let currentStampDepartment = '';
-        let savingDocument = false;
-        const stampRenderQueue = new StampRenderQueue();
-        async function loadReceiptScopes() {
-            const response = await fetch(`receipt_scopes.php?Doc_Id=<?= $doc_id_int ?>`, {cache:'no-store'});
-            const result = await response.json();
-            if (!response.ok || result.status !== 'success' || !Array.isArray(result.departments)) throw new Error(result.message || 'โหลดบทบาทเลขาไม่สำเร็จ กรุณาลองบันทึกอีกครั้ง');
-            return result.departments;
-        }
-
-        // --- 2. INITIALIZATION ---
-
-        window.onload = function() {
-            lucide.createIcons();
-            loadServerDocument(); // Auto start (Requested #2)
-        };
-
-        // --- 3. LOADING LOGIC ---
-
-        // ฟังก์ชันสำหรับดึงไฟล์ (แยกออกมาเพื่อให้เรียกซ้ำได้ง่าย)
-                async function fetchPDF(url) {
-                    const response = await fetch(url, {
-                        method: 'GET',
-                        credentials: 'include'
-                    });
-                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-                   
-                    documentRevision = response.headers.get('X-Document-Revision');
-                    const blob = await response.blob();
-                    const arrayBuffer = await blob.arrayBuffer();
-                    return new Uint8Array(arrayBuffer);
-                }
-
-                async function loadServerDocument() {
-                    if (savingDocument) return;
-                    showLoading(true, "กำลังดึงไฟล์จาก Server หลัก...");
-
-                    try {
-                        // --- 1. ลอง URL หลัก ---
-                        const data = await fetchPDF(CONFIG.PDF_URL_1);
-                        await renderPDF(data);
-                        showToast("โหลดจาก Server หลักสำเร็จ", "success");
-
-                    } catch (error1) {
-                        console.warn("URL 1 Failed:", error1);
-                       
-                        // ถ้า URL 1 พลาด ให้ลอง URL 2
-                        showLoading(true, "Server หลักขัดข้อง กำลังลอง Server สำรอง...");
-                       
-                        try {
-                            // --- 2. ลอง URL ที่ 2 ---
-                            const data = await fetchPDF(CONFIG.PDF_URL_2);
-                            await renderPDF(data);
-                            showToast("โหลดจาก Server สำรองสำเร็จ", "success");
-
-                        } catch (error2) {
-                            console.warn("URL 2 Failed:", error2);
-
-                            // --- 3. ถ้าพลาดทั้งคู่ ใช้ไฟล์ Base64 (FALLBACK) ---
-                            showToast("ไม่สามารถเชื่อมต่อ Server ได้ ใช้ไฟล์ตัวอย่างแทน", "warning");
-                            loadPDFFromBase64(FALLBACK.PDF);
-                        }
-                    } finally {
-                        showLoading(false);
-                    }
-                }
-
-        async function loadPDFFromBase64(base64) {
-            currentPDF = null;
-            showToast('โหลดเอกสารจริงไม่สำเร็จ ไม่สามารถลงนามได้', 'error');
-            document.getElementById('empty-state').classList.remove('hidden');
-            return;
-            const binaryString = window.atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            await renderPDF(bytes);
-        }
-
-        async function renderPDF(data) {
-            const container = document.getElementById('pages-wrapper');
-            container.innerHTML = '';
-            documentHistory = {};
-
-            try {
-                sourceBytes = data.slice();
-                currentPDF = await pdfjsLib.getDocument({data: data.slice(), isEvalSupported: false}).promise;
-                for (let pageNum = 1; pageNum <= currentPDF.numPages; pageNum++) {
-                    await renderPage(pageNum, container);
-                }
-                setTool('hand');
-            } catch (error) {
-                console.error("PDF Render Error:", error);
-                currentPDF = null;
-                document.getElementById('empty-state').classList.remove('hidden');
-                throw error;
-            }
-        }
-
-        async function renderPage(pageNum, container) {
-            const page = await currentPDF.getPage(pageNum);
-            const viewport = page.getViewport({ scale: scale });
-
-            // Calculate display dimensions based on scale
-            // If scale is high (e.g. 3.0), we want to display it at a reasonable size but keep the canvas resolution high.
-            // We use CSS to scale it down visually.
-            const displayScale = 1; // Visual scale (how big it looks)
-            const displayWidth = (viewport.width / scale) * displayScale;
-            const displayHeight = (viewport.height / scale) * displayScale;
-
-            // Or simpler approach: Use the viewport size directly for canvas size,
-            // but let CSS handle responsive width (max-w-full).
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'page-container bg-white';
-            // Explicitly setting width/height helps prevent layout shifts,
-            // but for responsive scale-down we rely on max-w-full in CSS
-            wrapper.style.maxWidth = `${viewport.width}px`;
-
-            const pdfCanvas = document.createElement('canvas');
-            pdfCanvas.className = 'pdf-canvas';
-            pdfCanvas.id = `pdf-render-${pageNum}`;
-            pdfCanvas.height = viewport.height;
-            pdfCanvas.width = viewport.width;
-
-            const drawCanvas = document.createElement('canvas');
-            drawCanvas.className = 'drawing-canvas';
-            drawCanvas.id = `draw-layer-${pageNum}`;
-            drawCanvas.height = viewport.height;
-            drawCanvas.width = viewport.width;
-            drawCanvas.setAttribute('data-page', pageNum);
-
-            wrapper.appendChild(pdfCanvas);
-            wrapper.appendChild(drawCanvas);
-            container.appendChild(wrapper);
-
-            const renderContext = {
-                canvasContext: pdfCanvas.getContext('2d'),
-                viewport: viewport
-            };
-            await page.render(renderContext).promise;
-
-            setupDrawingEvents(drawCanvas, pageNum);
-        }
-
-        // --- 4. TOOL LOGIC ---
-
-        function setTool(toolName) {
-            if (toolName === 'whiteout' && !whiteoutWarningAccepted) {
-                const accepted = confirm(
-                    'ปากกาสีขาวใช้ "ปิดทับ" ข้อความเท่านั้น ไม่ได้ลบข้อมูลจริง\n\n' +
-                    '- ข้อความเดิมยังอยู่ในไฟล์ PDF และยังค้นหาคัดลอกได้\n' +
-                    '- พื้นหลังเอกสารที่ไม่ขาวสนิทจะเห็นรอยปิดทับ\n' +
-                    '- เอกสารราชการควรแก้ไขที่ต้นฉบับก่อนนำมาเซ็น\n\n' +
-                    'หากต้องการลบลายเส้นที่เขียนเอง ให้ใช้ยางลบ\n\n' +
-                    'ยืนยันเปิดใช้ปากกาสีขาว?'
-                );
-                if (!accepted) return;
-                whiteoutWarningAccepted = true;
-                showToast('ปากกาสีขาว: ปิดทับข้อความเท่านั้น ไม่ได้ลบข้อความจริง', 'info');
-            }
-
-            currentTool = toolName;
-
-            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
-            document.getElementById(`btn-${toolName}`).classList.add('active');
-
-            const canvases = document.querySelectorAll('.drawing-canvas');
-            canvases.forEach(canvas => {
-                canvas.style.pointerEvents = (toolName === 'hand') ? 'none' : 'auto';
-
-                if (toolName === 'stamp') {
-                    canvas.style.cursor = 'copy';
-                } else if (toolName === 'eraser') {
-                    canvas.style.cursor = 'cell';
-                } else if (toolName === 'pen' || toolName === 'whiteout') {
-                    canvas.style.cursor = 'crosshair';
-                } else {
-                    canvas.style.cursor = 'default';
-                }
-            });
-        }
-
-        function setupDrawingEvents(canvas, pageNum) {
-            const ctx = canvas.getContext('2d');
-            let points = [];
-
-            const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                // Support both Touch and Mouse
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                return {
-                    x: (clientX - rect.left) * scaleX,
-                    y: (clientY - rect.top) * scaleY
-                };
-            };
-
-            const startDraw = (e) => {
-                if (currentTool === 'hand' || savingDocument || stampRenderQueue.pending.size) return;
-
-                const { x, y } = getPos(e);
-
-                // --- STAMP LOGIC (Requested #3) ---
-                if (currentTool === 'stamp') {
-                    const stampSource = CONFIG.STAMP_URL;
-                    const stampDepartment = currentStampDepartment;
-                    const pageHistory = documentHistory;
-                    stampRenderQueue.add(() => new Promise((resolve, reject) => {
-                        const stampToDraw = new Image();
-                        const timeout = setTimeout(() => { stampToDraw.onload = null; stampToDraw.onerror = null; reject(new Error('โหลดรูปตราเกินเวลา กรุณาวางตราใหม่')); }, 15000);
-                        stampToDraw.crossOrigin = "Anonymous"; // Ensure crossOrigin is set for the draw instance too
-                        stampToDraw.onerror = () => { clearTimeout(timeout); reject(new Error('โหลดรูปตราไม่สำเร็จ กรุณาวางตราใหม่ก่อนบันทึก')); };
-                        stampToDraw.onload = () => {
-                            clearTimeout(timeout);
-                            try {
-                            if (pageHistory !== documentHistory) { resolve(); return; }
-                            // --- AUTO SIZE LOGIC (แก้ไขตรงนี้) ---
-                            // 1. กำหนดความกว้างฐานที่ต้องการ (เช่น 120px) แล้วคูณด้วย scale ของ PDF เพื่อให้คมชัด
-                            const baseWidth = 270;
-                            const scaleFactor = scale / 1.5;
-
-                            // 2. หาขนาดจริงของรูปภาพ
-                            const natW = stampToDraw.naturalWidth || 100;
-                            const natH = stampToDraw.naturalHeight || 50;
-
-                            // 3. คำนวณ Aspect Ratio (สูง / กว้าง)
-                            const aspectRatio = natH / natW;
-
-                            // 4. คำนวณขนาดที่จะวาด (กว้างตามที่ตั้ง, สูงปล่อยไหลตามสัดส่วน)
-                            const stampW = baseWidth * scaleFactor;
-                            const stampH = stampW * aspectRatio; // Auto Height
-
-                            // 5. หาจุดกึ่งกลาง
-                            const drawX = x - (stampW / 2);
-                            const drawY = y - (stampH / 2);
-
-                            ctx.globalCompositeOperation = 'source-over';
-                            ctx.drawImage(stampToDraw, drawX, drawY, stampW, stampH);
-
-                            if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
-                            documentHistory[pageNum].push({
-                                tool: 'stamp',
-                                x: drawX, y: drawY, w: stampW, h: stampH,
-                                src: stampSource,
-                                department: stampDepartment,
-                                saved: false,
-                                receiptRegistered: false
-                            });
-                            resolve();
-                            } catch (error) { reject(error); }
-                        }
-                        stampToDraw.src = stampSource;
-                    })).catch(error => showToast(error.message, 'error'));
-                    return;
-                }
-
-                isDrawing = true;
-                lastX = x;
-                lastY = y;
-                points = [{ x, y }];
-
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-
-                // Adjust Pen/Eraser/Whiteout width based on Scale
-                const toolWidth = (TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5);
-                if (currentTool === 'eraser') {
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = toolWidth;
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = toolWidth;
-                    ctx.strokeStyle = TOOL_COLORS[currentTool] || TOOL_COLORS.pen;
-                }
-            };
-
-            const draw = (e) => {
-                if (!isDrawing || savingDocument || currentTool === 'hand' || currentTool === 'stamp') return;
-                if (e.cancelable) e.preventDefault();
-
-                const { x, y } = getPos(e);
-
-                ctx.quadraticCurveTo(lastX, lastY, (lastX + x) / 2, (lastY + y) / 2);
-                ctx.stroke();
-
-                points.push({ x, y });
-                lastX = x;
-                lastY = y;
-            };
-
-            const stopDraw = () => {
-                if (!isDrawing) return;
-                isDrawing = false;
-                ctx.closePath();
-
-                if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
-                documentHistory[pageNum].push({
-                    tool: currentTool,
-                    points: [...points],
-                    color: TOOL_COLORS[currentTool] || TOOL_COLORS.pen,
-                    width: (TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5)
-                });
-            };
-
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stopDraw);
-            canvas.addEventListener('mouseout', stopDraw);
-
-            canvas.addEventListener('touchstart', startDraw, { passive: false });
-            canvas.addEventListener('touchmove', draw, { passive: false });
-            canvas.addEventListener('touchend', stopDraw);
-        }
-
-        function undoLastAction() {
-            if (savingDocument || isDrawing || stampRenderQueue.pending.size) return;
-            // Find last active page
-            let lastPageNum = -1;
-            const pages = Object.keys(documentHistory);
-
-            // Simple approach: check all pages for history
-            for (let i = pages.length - 1; i >= 0; i--) {
-                const p = pages[i];
-                if (documentHistory[p] && documentHistory[p].length > 0) {
-                    lastPageNum = p;
-                    break;
-                }
-            }
-
-            if (lastPageNum !== -1) {
-                const actions = documentHistory[lastPageNum].slice(0, -1);
-                redrawCanvas(lastPageNum, actions)
-                    .then(applied => { if (applied) showToast("ย้อนกลับการกระทำล่าสุด", "info"); })
-                    .catch(error => showToast(error.message, 'error'));
-            } else {
-                showToast("ไม่มีการกระทำที่สามารถย้อนกลับได้", "info");
-            }
-        }
-
-        function redrawCanvas(pageNum, actions = (documentHistory[pageNum] || []).slice()) {
-            const canvas = document.getElementById(`draw-layer-${pageNum}`);
-            const history = documentHistory;
-            return stampRenderQueue.add(async () => {
-            if (!canvas) throw new Error('ไม่พบหน้าที่ต้องวาดใหม่');
-            // Build a complete layer offscreen. Failure leaves both the visible
-            // canvas and action history untouched, so retry cannot lose a stamp.
-            const layer = document.createElement('canvas');
-            layer.width = canvas.width; layer.height = canvas.height;
-            const ctx = layer.getContext('2d');
-            for (const action of actions) {
-                if (action.tool === 'stamp') {
-                    const img = await new Promise((resolve, reject) => {
-                        const image = new Image();
-                        const timeout = setTimeout(() => { image.onload = null; image.onerror = null; reject(new Error('โหลดรูปตราเกินเวลา ย้อนกลับไม่สำเร็จ')); }, 15000);
-                        image.onload = () => { clearTimeout(timeout); resolve(image); };
-                        image.onerror = () => { clearTimeout(timeout); reject(new Error('โหลดรูปตราไม่สำเร็จ ย้อนกลับไม่สำเร็จ')); };
-                        image.src = action.src;
-                    });
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.drawImage(img, action.x, action.y, action.w, action.h);
-                } else {
-                    ctx.beginPath();
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    ctx.lineWidth = action.width;
-
-                    if (action.tool === 'eraser') {
-                        ctx.globalCompositeOperation = 'destination-out';
-                    } else {
-                        ctx.globalCompositeOperation = 'source-over';
-                        ctx.strokeStyle = action.color;
-                    }
-
-                    if (action.points.length > 0) {
-                        ctx.moveTo(action.points[0].x, action.points[0].y);
-                        let pLastX = action.points[0].x;
-                        let pLastY = action.points[0].y;
-                        for (let i = 1; i < action.points.length; i++) {
-                            const p = action.points[i];
-                            ctx.quadraticCurveTo(pLastX, pLastY, (pLastX + p.x) / 2, (pLastY + p.y) / 2);
-                            pLastX = p.x;
-                            pLastY = p.y;
-                        }
-                        ctx.stroke();
-                    }
-                    ctx.closePath();
-                }
-            }
-            if (history !== documentHistory || canvas !== document.getElementById(`draw-layer-${pageNum}`)) return false;
-            const visible = canvas.getContext('2d');
-            visible.globalCompositeOperation = 'source-over';
-            visible.clearRect(0, 0, canvas.width, canvas.height);
-            visible.drawImage(layer, 0, 0);
-            documentHistory[pageNum] = actions;
-            return true;
-            });
-        }
-
-        // --- 5. SAVE & DOWNLOAD ---
-
-        function getCookie(name) {
-            const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/[.\\+*?\[\^\]$(){}=!<>|:\-]/g, '\\$&') + '=([^;]*)'));
-            return match ? decodeURIComponent(match[1]) : '';
-        }
-
-        // Whiteout pixels are opaque white and must never count as a signature.
-        // Only visible, non-white pixels represent real ink or stamp content.
-        function hasVisibleNonWhitePixel(pixels) {
-            for (let i = 0; i < pixels.length; i += 4) {
-                if (pixels[i + 3] > 0 && (pixels[i] < 251 || pixels[i + 1] < 251 || pixels[i + 2] < 251)) return true;
-            }
-            return false;
-        }
-
-        function hasVisibleSignature() {
-            // History alone is insufficient: Undo, the eraser, or whiteout may
-            // leave an empty overlay. Inspect only the current user's drawing
-            // layer, never the original PDF (which may contain someone else's ink).
-            return Object.entries(documentHistory).some(([page, actions]) => {
-                const hasInkAction = actions.some(action => action.tool === 'stamp' ||
-                    (action.tool === 'pen' && action.points?.some(point =>
-                        point.x !== action.points[0].x || point.y !== action.points[0].y)));
-                if (!hasInkAction) return false;
-                const canvas = document.getElementById(`draw-layer-${page}`);
-                if (!canvas) return false;
-                const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-                return hasVisibleNonWhitePixel(pixels);
-            });
-        }
-
-        function hasVisiblePenSignature() {
-            return Object.entries(documentHistory).some(([page, actions]) => {
-                if (!actions.some(action => action.tool === 'pen' && action.points?.some(point => point.x !== action.points[0].x || point.y !== action.points[0].y))) return false;
-                const visible = document.getElementById(`draw-layer-${page}`);
-                if (!visible) return false;
-                // Replay pen/eraser/whiteout actions: a surviving stamp must not
-                // turn fully erased pen marks into an all-department send, and
-                // whiteout must be able to cover pen ink.
-                const layer = document.createElement('canvas');
-                layer.width = visible.width; layer.height = visible.height;
-                const ctx = layer.getContext('2d');
-                for (const action of actions) {
-                    if (!['pen', 'eraser', 'whiteout'].includes(action.tool) || !action.points?.length) continue;
-                    ctx.beginPath(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = action.width;
-                    ctx.globalCompositeOperation = action.tool === 'eraser' ? 'destination-out' : 'source-over';
-                    ctx.strokeStyle = action.color || '#000000';
-                    let last = action.points[0]; ctx.moveTo(last.x, last.y);
-                    for (const point of action.points.slice(1)) {
-                        ctx.quadraticCurveTo(last.x, last.y, (last.x + point.x) / 2, (last.y + point.y) / 2);
-                        last = point;
-                    }
-                    ctx.stroke(); ctx.closePath();
-                }
-                const pixels = ctx.getImageData(0, 0, layer.width, layer.height).data;
-                return hasVisibleNonWhitePixel(pixels);
-            });
-        }
-
-        // UPDATE: Function to Save to Server (Real Implementation Logic Added)
-        async function saveToServer() {
-            if (!currentPDF || savingDocument || isDrawing) return;
-            savingDocument = true;
-            showLoading(true, "กำลังส่งข้อมูลไปยัง Server...");
-
-            try {
-                await stampRenderQueue.wait();
-                if (!hasVisibleSignature()) throw new Error('กรุณาลงนามหรือประทับตราก่อนบันทึก');
-                const stamps = Object.values(documentHistory).flat().filter(action => action.tool === 'stamp' && action.department);
-                const pendingReceipts = stamps.filter(action => !action.receiptRegistered);
-                let registeredDepartments = [];
-                if (pendingReceipts.length) {
-                    const scopes = await loadReceiptScopes();
-                    registeredDepartments = [...new Set(pendingReceipts.map(action => action.department))].filter(department => scopes.includes(department));
-                    if (registeredDepartments.length && !confirm(`ยืนยันลงทะเบียนรับเอกสารในนามเลขาฝ่าย:\n${registeredDepartments.join('\n')}\nระบบจะบันทึกประวัติการรับและเพิ่มรองฝ่ายอัตโนมัติเมื่อบันทึกสำเร็จ`)) return;
-                }
-                // 1. สร้างไฟล์ PDF (Blob)
-                const blob = await generatePDFBlob();
-                var year = <?= $year_json ?>;
-                // 2. เตรียมข้อมูลสำหรับส่ง (FormData)
-                const formData = new FormData();
-                formData.append('file', blob, <?= $file_basename_json ?>); // ชื่อไฟล์
-                formData.append('user_id', 'USER_123');
-                formData.append('year', year);
-                formData.append('Doc_Id', <?= $doc_id_int ?>);
-                formData.append('revision', documentRevision || '');
-                // Explicit signing intent, separate from the optional secretary receipt.
-                formData.append('confirm_signature', '1');
-                const penSignature = hasVisiblePenSignature();
-                if (penSignature) formData.append('confirm_pen_signature', '1');
-                formData.append('receipt_departments', JSON.stringify(registeredDepartments));
-                if (registeredDepartments.length) formData.append('confirm_receipt', '1');
-
-                // --- ส่วนการส่งไฟล์จริง (Real Upload) ---
-                // วิธีใช้: แก้ไข URL ด้านล่างให้เป็น API ของคุณ
-                const SERVER_URL = "upload_pdf.php"; // ตัวอย่าง: "https://eoffice.siya.ac.th/upload_pdf.php"
-
-                if (SERVER_URL) {
-                    const response = await fetch(SERVER_URL, {
-                        method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + (getCookie('User_Token') || '') },
-                        body: formData
-                    });
-
-                    if (response.ok) {
-                        const result = await response.json(); // อ่านค่าตอบกลับจาก Server
-                        if (result.status !== 'success') throw new Error(result.message);
-                        documentRevision = result.revision;
-                        const confirmedReceipts = result.registered_receipt_departments || [];
-                        stamps.forEach(action => {
-                            action.saved = true;
-                            if (registeredDepartments.includes(action.department) && confirmedReceipts.includes(action.department)) action.receiptRegistered = true;
-                        });
-                        console.log("Server response:", result);
-                        showToast(result.auto_sent_user_ids?.length ? `บันทึกเรียบร้อย และเพิ่มรองฝ่ายอัตโนมัติ ${result.auto_sent_user_ids.length} คน` : "บันทึกข้อมูลเรียบร้อย!", "success");
-                    } else {
-                        const result = await response.json().catch(() => ({}));
-                        throw new Error(result.message || "Server Error: " + response.status);
-                    }
-                } else {
-                    // --- จำลองการทำงาน (Simulation) เมื่อยังไม่มี URL ---
-                    await new Promise(r => setTimeout(r, 1500)); // รอ 1.5 วินาที
-                    console.log("Simulated Upload Success. Blob size:", blob.size);
-                    console.log("FormData ready to send:", formData);
-                    showToast("บันทึก (จำลอง) เรียบร้อย! (กรุณาใส่ URL จริงในโค้ด)", "success");
-                }
-
-            } catch (err) {
-                console.error(err);
-                showToast(err.message || "การเชื่อมต่อ Server ล้มเหลว", "error");
-            } finally {
-                savingDocument = false;
-                showLoading(false);
-            }
-        }
-
-        async function downloadDocument() {
-                    if (!currentPDF) return;
-                    showLoading(true, "กำลังประมวลผล PDF...");
-
-                    setTimeout(async () => {
-                        try {
-                            const blob = await generatePDFBlob();
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a'); a.href = url; a.download = 'signed_document_siya.pdf'; a.click();
-                            setTimeout(() => URL.revokeObjectURL(url), 1000);
-                        } catch (err) { showToast('สร้าง PDF ไม่สำเร็จ', 'error'); }
-                        finally { showLoading(false); }
-                    }, 100);
-                }
-
-        // Helper to merge layers for a specific page
-        async function getMergedCanvas(pageNum) {
-            const pdfCanvas = document.getElementById(`pdf-render-${pageNum}`);
-            const drawCanvas = document.getElementById(`draw-layer-${pageNum}`);
-
-            if (!pdfCanvas || !drawCanvas) return null;
-
-            const mergedCanvas = document.createElement('canvas');
-            mergedCanvas.width = pdfCanvas.width;
-            mergedCanvas.height = pdfCanvas.height;
-            const mergedCtx = mergedCanvas.getContext('2d');
-
-            mergedCtx.drawImage(pdfCanvas, 0, 0);
-            mergedCtx.drawImage(drawCanvas, 0, 0);
-
-            return {
-                imgData: mergedCanvas.toDataURL('image/jpeg', 1.0), // High quality JPEG
-                width: mergedCanvas.width,
-                height: mergedCanvas.height
-            };
-        }
-
-        // Helper to generate Blob (for Upload)
-        // Helper to generate Blob (for Upload)
-                async function generatePDFBlob() {
-                    await stampRenderQueue.wait();
-                    const pdf = await PDFLib.PDFDocument.load(sourceBytes);
-                    const pages = pdf.getPages();
-                    for (let i = 0; i < pages.length; i++) {
-                        const layer = document.getElementById(`draw-layer-${i + 1}`);
-                        if (!layer) throw new Error('Incomplete PDF rendering');
-                        const overlay = await pdf.embedPng(layer.toDataURL('image/png'));
-                        const {width, height} = pages[i].getSize();
-                        const rotation = pages[i].getRotation().angle;
-                        const rotated = rotation === 90 || rotation === 270;
-                        pages[i].drawImage(overlay, {
-                            x: rotation === 90 || rotation === 180 ? width : 0,
-                            y: rotation === 180 || rotation === 270 ? height : 0,
-                            width: rotated ? height : width, height: rotated ? width : height,
-                            rotate: PDFLib.degrees(rotation)
-                        });
-                    }
-                    return new Blob([await pdf.save()], {type:'application/pdf'});
-                }
-
-        // --- 6. UTILS ---
-
-        function showLoading(show, text) {
-            const el = document.getElementById('loading');
-            if(text) document.getElementById('loading-text').innerText = text;
-            if (show) el.classList.remove('hidden');
-            else el.classList.add('hidden');
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.getElementById('toast');
-            const icon = document.getElementById('toast-icon');
-            const msg = document.getElementById('toast-message');
-
-            msg.innerText = message;
-
-            // Icon Logic
-            if(type === 'success') {
-                icon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>';
-                icon.classList.value = "w-5 h-5 text-green-400";
-            } else if (type === 'error') {
-                icon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" x2="12" y1="8" y2="12"></line><line x1="12" x2="12.01" y1="16" y2="16"></line>';
-                icon.classList.value = "w-5 h-5 text-red-400";
-            } else {
-                icon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>';
-                icon.classList.value = "w-5 h-5 text-blue-400";
-            }
-
-            toast.classList.remove('opacity-0', 'translate-y-4');
-            toast.classList.add('opacity-100', 'translate-y-0');
-
-            setTimeout(() => {
-                toast.classList.remove('opacity-100', 'translate-y-0');
-                toast.classList.add('opacity-0', 'translate-y-4');
-            }, 3000);
-        }
-
-        // --- 7. STAMP MODAL LOGIC ---
-
-            let currentStampDataUrl = null; // ตัวแปรเก็บรูปแสตมป์ที่สร้างเสร็จแล้ว
-
-            function openStampModal() {
-                // เปิด Modal
-                document.getElementById('stamp-modal').classList.remove('hidden');
-                // รีเซ็ตค่า (ถ้าต้องการ) หรือคงค่าเดิมไว้
-                // document.getElementById('stamp-text-1').value = '';
-                generateStampPreview(); // สร้างพรีวิวเบื้องต้น
-                document.fonts.load('22px "Sarabun"').then(() => {
-                    if (!document.getElementById('stamp-modal').classList.contains('hidden')) {
-                        generateStampPreview();
-                    }
-                });
-            }
-
-            function closeStampModal() {
-                document.getElementById('stamp-modal').classList.add('hidden');
-            }
-
-            function generateDirectorStampPreview(canvas) {
-                canvas.width = 460;
-                canvas.height = 470;
-                const ctx = canvas.getContext('2d');
-                ctx.strokeStyle = '#1e40af';
-                ctx.fillStyle = '#1e40af';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-                ctx.font = '24px "Sarabun", sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText('เรียน', 30, 55);
-                ctx.fillText('ผู้อำนวยการโปรดทราบ', 120, 55);
-                ctx.fillText('และแจ้งกลุ่มดำเนินการ', 120, 95);
-
-                const departments = ['บริหารวิชาการ', 'บริหารงบประมาณ', 'บริหารงานบุคคล', 'บริหารทั่วไป', 'อื่น ๆ'];
-                const drawDottedLine = (x, y, endX) => {
-                    ctx.save();
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([1, 7]);
-                    ctx.lineCap = 'round';
-                    ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(endX, y);
-                    ctx.stroke();
-                    ctx.restore();
-                };
-
-                departments.forEach((department, index) => {
-                    const y = 155 + index * 52;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(48, y - 25, 30, 30);
-                    ctx.fillText(department, 108, y);
-                    if (index === departments.length - 1) {
-                        drawDottedLine(108 + ctx.measureText(department).width + 8, y + 5, 420);
-                    }
-                });
-                ctx.fillText('ลงชื่อ', 30, 433);
-                drawDottedLine(30 + ctx.measureText('ลงชื่อ').width + 10, 438, 420);
-            }
-
-            // สลับรูปแบบตราตามฝ่ายงาน และสร้างพรีวิวแบบเรียลไทม์
-            function generateStampPreview() {
-    const isDirectorStamp = document.getElementById('stamp-text-1').value === 'ฝ่ายงานผู้อำนวยการ';
-    document.getElementById('stamp-receipt-fields').classList.toggle('hidden', isDirectorStamp);
-    document.getElementById('stamp-director-hint').classList.toggle('hidden', !isDirectorStamp);
-    if (isDirectorStamp) {
-        generateDirectorStampPreview(document.getElementById('stamp-preview-canvas'));
-        return;
-    }
-    // 1. ดึงค่าจาก Input
-    const label1 = ""; // บรรทัดแรกถ้าเป็นฝ่ายงาน อาจจะไม่ต้องมีหัวข้อ
-    const val1 = document.getElementById('stamp-text-1').value || 'ฝ่ายงาน..........................';
-
-    const label2 = "เลขรับ ";
-    const val2 = document.getElementById('stamp-text-2').value || "";
-
-    const label3 = "วันที่ ";
-    const val3 = document.getElementById('stamp-text-3').value || "";
-
-    const label4 = "เวลา ";
-    const val4 = document.getElementById('stamp-text-4').value || "";
-
-    const canvas = document.getElementById('stamp-preview-canvas');
-    const ctx = canvas.getContext('2d');
-
-    canvas.width = 400;  // ขยายความกว้างให้พอสำหรับตราประทับ
-    canvas.height = 200; // ขยายความสูงสำหรับ 4 บรรทัด + ระยะห่าง
-
-    // ล้าง Canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // ตั้งค่าสไตล์
-    const stampColor = '#1e40af'; // สีน้ำเงินตราประทับ
-    ctx.strokeStyle = stampColor;
-    ctx.fillStyle = stampColor;
-    const fontFamily = '"Sarabun", sans-serif';
-
-    // 2. วาดกรอบนอก
-    ctx.lineWidth = 3;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-
-    // ฟังก์ชันช่วยวาดบรรทัดที่มีการเติมคำในช่องว่าง
-    const drawStampLine = (label, value, y) => {
-            const startX = 30;
-            const endX = canvas.width - 30;
-
-            // --- 1. วาดหัวข้อ (ใช้สีน้ำเงิน) ---
-            ctx.textAlign = 'left';
-            ctx.fillStyle = '#1e40af'; // สีน้ำเงินตราประทับ
-            ctx.font = '20px ' + fontFamily;
-            ctx.fillText(label, startX, y);
-
-            const labelWidth = ctx.measureText(label).width;
-            const lineStartX = startX + labelWidth + 5;
-
-            // --- 2. วาดเส้นใต้ (ใช้สีน้ำเงิน) ---
-            ctx.beginPath();
-            ctx.strokeStyle = '#1e40af';
-            ctx.lineWidth = 1.5;
-            ctx.moveTo(lineStartX, y + 5);
-            ctx.lineTo(endX, y + 5);
-            ctx.stroke();
-
-            // --- 3. วาดข้อมูลที่รับเข้ามา (เปลี่ยนเป็นสีดำ) ---
-            if (value) {
-                ctx.textAlign = 'center';
-                ctx.fillStyle = '#000000'; // <--- เปลี่ยนเป็นสีดำตรงนี้
-                ctx.font = '22px ' + fontFamily;
-                const middleOfLine = lineStartX + ((endX - lineStartX) / 2);
-                ctx.fillText(value, middleOfLine, y);
-
-                // เปลี่ยนสีกลับเป็นน้ำเงินเผื่อบรรทัดถัดไป
-                ctx.fillStyle = '#1e40af';
-            }
-        };
-
-    // 3. วาดทั้ง 4 บรรทัด
-    // บรรทัดที่ 1: กรณีฝ่ายงาน (อาจจะวาดตรงกลางบรรทัดเดียว)
-    ctx.textAlign = 'center';
-    ctx.font = '22px ' + fontFamily;
-    ctx.fillText(val1, canvas.width / 2, 45);
-
-    // บรรทัดที่ 2, 3, 4: ใช้ฟังก์ชันวาดเส้น
-    drawStampLine(label2, val2, 80);
-    drawStampLine(label3, val3, 115);
-    drawStampLine(label4, val4, 150);
-}
-
-
-            // เมื่อกดปุ่ม "ตกลง" ใน Modal
-            function confirmStampData() {
-                generateStampPreview();
-                const canvas = document.getElementById('stamp-preview-canvas');
-                // แปลง Canvas เป็นรูปภาพ Base64
-                currentStampDataUrl = canvas.toDataURL('image/png');
-
-                // เปลี่ยน URL ของแสตมป์ใน CONFIG ให้เป็นรูปที่เราเพิ่งสร้าง
-                CONFIG.STAMP_URL = currentStampDataUrl;
-                currentStampDepartment = document.getElementById('stamp-text-1').value;
-
-                // ปิด Modal และเลือกเครื่องมือ Stamp
-                closeStampModal();
-                setTool('stamp');
-                showToast('เลือกจุดที่ต้องการประทับตรา', 'info');
-            }
-
-            // เพิ่ม Event Listener ให้ Input เพื่อดู Preview แบบ Realtime
-            document.getElementById('stamp-text-1').addEventListener('input', generateStampPreview);
-            document.getElementById('stamp-text-2').addEventListener('input', generateStampPreview);
-            document.getElementById('stamp-text-3').addEventListener('input', generateStampPreview);
-            document.getElementById('stamp-text-4').addEventListener('input', generateStampPreview);
-            Object.assign(window, {setTool, openStampModal, closeStampModal, confirmStampData, undoLastAction, saveToServer, downloadDocument, loadServerDocument});
-        });
     </script>
+    <script src="../assets/e-sign-app.js?v=<?= htmlspecialchars($appVersion,ENT_QUOTES,'UTF-8') ?>"></script>
 
     <style media="screen">
       .btn-back {
