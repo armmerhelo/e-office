@@ -4,7 +4,13 @@ const vm = require('node:vm');
 require('./release-updates.cjs');
 const source = fs.readFileSync('assets/system-updates.js', 'utf8');
 const pageSource = fs.readFileSync('assets/system-updates-page.js', 'utf8');
+const pageHtml = fs.readFileSync('updates/index.html', 'utf8');
 const releases = JSON.parse(fs.readFileSync('data/system-updates.json', 'utf8'));
+const sharedFeedScript = pageHtml.indexOf('../assets/system-updates.js');
+const pageRendererScript = pageHtml.indexOf('../assets/system-updates-page.js');
+assert.ok(sharedFeedScript >= 0 && sharedFeedScript < pageRendererScript,
+    'standalone updates page loads the shared feed before its renderer');
+console.log('PASS standalone updates page loads its shared feed module before rendering');
 const item = (id, date = '2026-01-01') => ({id,date,title:'<script>plain text</script>',summary:'รายละเอียด',added:['เพิ่ม'],improved:[],fixed:[]});
 class Node {
     constructor() { this.children=[]; this.hidden=false; this.attributes={}; this.listeners={}; this.textContent=''; }
