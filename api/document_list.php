@@ -13,13 +13,14 @@ function document_list(string $mode): never {
     elseif($mode==='received'){$where.=' AND (EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=d.Doc_Id AND a.User_Id=?) OR EXISTS (SELECT 1 FROM t_access_rights_department a JOIN t_user_department u ON u.Department_Id=a.Department_Id WHERE a.Doc_Id=d.Doc_Id AND u.User_Id=?))';$params[]=$uid;$params[]=$uid;
       // Keep filter values compatible without rewriting historical read/sign facts.
       if(in_array($d['Read_Status_find']??'', ['NotRead','Readed'],true)){$exists=app_inbox_completed_sql($uid);$where.=' AND '.(($d['Read_Status_find']==='NotRead')?'NOT ':'').$exists;}}
-    elseif($stamp){$where.=" AND EXISTS (SELECT 1 FROM t_access_rights a WHERE a.Doc_Id=d.Doc_Id AND a.User_Id=? AND a.Is_Signed='true')";$params[]=$uid;}
-    else{$where.=' AND d.User_Id=?';$params[]=$uid;if(in_array($d['doc_type']??'', ['Internal','External'],true)){$where.=' AND d.Doc_Type=?';$params[]=$d['doc_type'];}}
-    if($search!==''){$where.=' AND (d.Doc_Id LIKE ? OR d.Doc_Name LIKE ? OR d.Doc_Number LIKE ? OR d.Doc_Date LIKE ? OR d.Doc_Number_Receive LIKE ? OR d.Doc_Receive_From LIKE ?)';array_push($params,...array_fill(0,6,'%'.$search.'%'));}
-    $q=$pdo->prepare("SELECT COUNT(*) FROM t_document d WHERE $where");$q->execute($params);$total=(int)$q->fetchColumn();$pages=(int)ceil($total/$paginationLimit);
-    $order=$mode==='public'?'d.External_Number DESC,d.Doc_Id DESC':'d.Doc_Id DESC';
+    elseif(!$stamp){$where.=' AND d.User_Id=?';$params[]=$uid;if(in_array($d['doc_type']??'', ['Internal','External'],true)){$where.=' AND d.Doc_Type=?';$params[]=$d['doc_type'];}}
+    $stampJoin=$stamp?" JOIN t_access_rights stamp_access ON stamp_access.Doc_Id=d.Doc_Id AND stamp_access.User_Id=? AND stamp_access.Is_Signed='true'":'';
+    if($search!==''){$where.=' AND (d.Doc_Id LIKE ? OR d.Doc_Name LIKE ? OR d.Doc_Number LIKE ? OR d.Doc_Date LIKE ? OR d.Doc_Number_Receive LIKE ? OR d.Doc_Receive_From LIKE ?';array_push($params,...array_fill(0,6,'%'.$search.'%'));if($stamp){$where.=' OR stamp_access.Stamp_Recieve_Number LIKE ?';$params[]='%'.$search.'%';}$where.=')';}
+    $queryParams=$stamp?[$uid,...$params]:$params;
+    $q=$pdo->prepare("SELECT COUNT(*) FROM t_document d $stampJoin WHERE $where");$q->execute($queryParams);$total=(int)$q->fetchColumn();$pages=(int)ceil($total/$paginationLimit);
+    $order=$mode==='public'?'d.External_Number DESC,d.Doc_Id DESC':($stamp?"(NULLIF(TRIM(stamp_access.Stamp_Recieve_Number),'') IS NULL) DESC, CAST(SUBSTRING_INDEX(TRIM(stamp_access.Stamp_Recieve_Number),'/',1) AS UNSIGNED) DESC, CAST(SUBSTRING_INDEX(TRIM(stamp_access.Stamp_Recieve_Number),'/',-1) AS UNSIGNED) DESC, TRIM(stamp_access.Stamp_Recieve_Number) DESC, d.Doc_Id DESC":'d.Doc_Id DESC');
     $completion=$mode==='received'?', '.app_inbox_delivery_sql($uid).' inbox_delivery_utc, '.app_inbox_completed_sql($uid).' inbox_completed':'';
-    $q=$pdo->prepare("SELECT d.*,u.User_Name owner_name $completion FROM t_document d JOIN t_user u ON u.User_Id=d.User_Id WHERE $where ORDER BY $order LIMIT $limit OFFSET $offset");$q->execute($params);$documents=$q->fetchAll();if(!$documents)app_json([]);
+    $q=$pdo->prepare("SELECT d.*,u.User_Name owner_name $completion FROM t_document d JOIN t_user u ON u.User_Id=d.User_Id $stampJoin WHERE $where ORDER BY $order LIMIT $limit OFFSET $offset");$q->execute($queryParams);$documents=$q->fetchAll();if(!$documents)app_json([]);
     $ids=array_column($documents,'Doc_Id');$links=array_column($documents,'Doc_File_Link');$marks=implode(',',array_fill(0,count($ids),'?'));
     $files=[];$q=$pdo->prepare("SELECT * FROM t_document_upload WHERE Doc_File_Link IN ($marks) ORDER BY Doc_Upload_Id");$q->execute($links);foreach($q as $file)$files[$file['Doc_File_Link']][]=['file_id'=>$file['Doc_Upload_Id'],'path'=>$file['Doc_Upload_Path'],'detail'=>$file['Doc_Upload_Detail']];
     if($mode==='public'){

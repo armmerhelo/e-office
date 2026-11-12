@@ -92,6 +92,29 @@ async function run(){
   });
  await test('recipient cannot modify shared document',async()=>{await request('/api/create_document.php',{cookie:recipient,form:form({formtype:'edit_document',doc_id:doc,doc_name:'ATTACK',doc_type:'คำสั่ง',doc_number_receive_stamp:'123'})});const list=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:'QA'+stamp}});assert.equal(list.body[0].doc_name,'QA landscape document');});
   await test('signed PDF save and stale revision rejected',async()=>{const f=()=>form({Doc_Id:doc,year:2569,revision},{file:{name:fileName,data:Buffer.concat([pdf,Buffer.from('\n% signed\n')])}});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f()});await request('/e-sign/upload_pdf.php',{cookie:recipient,form:f(),status:409});});
+  await test('stamp register sorts blank first then numeric receipt descending',async()=>{
+     const prefix='STAMP-SORT-'+stamp;
+     const createSignedStamp=async(suffix,receiptNumber)=>{
+       const number=prefix+'-'+suffix;const filename='stamp-'+stamp+'-'+suffix+'.pdf';
+       const created=await request('/api/create_document.php',{cookie:owner,form:form({doc_number:number,doc_name:prefix,doc_type:'หนังสือ',doc_date_receive:'2026-10-07',doc_receive_from:'QA',doc_file_name:['Stamp sort fixture'],file_id:[''],send_to:[seed.users.recipient]},{'doc_upload[]':{data:pdf,name:filename}})});
+       const id=created.body.doc_id;assert.ok(id);
+       const listed=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',search_txt:number}});
+       const path=listed.body.find(row=>row.doc_id===id)?.doc_upload_path?.[0]?.path;assert.ok(path);
+       const current=await request(`/api/view_file.php?Doc_Id=${id}&File_Path=${encodeURIComponent(path)}&Type=signed`,{cookie:recipient});
+       await request('/e-sign/upload_pdf.php',{cookie:recipient,form:form({Doc_Id:id,year:2569,revision:current.r.headers.get('X-Document-Revision')},{file:{name:path,data:Buffer.concat([Buffer.from(current.text),Buffer.from('\n% signed\n')])}})});
+       await request('/api/create_document.php',{cookie:recipient,form:form({formtype:'edit_document',doc_id:id,doc_number_receive_stamp:receiptNumber,stamp_date_recieve:'12/11/2569'})});
+       return id;
+     };
+     const noNumber=await createSignedStamp('blank','');
+     const two=await createSignedStamp('two','2/2569');
+     const ten=await createSignedStamp('ten','10/2569');
+     const stamps=await request('/api/get_data_send.php',{cookie:recipient,data:{Year:'2569',doc_type:'Stamp',search_txt:prefix}});
+     assert.deepEqual(stamps.body.map(row=>row.doc_id),[noNumber,ten,two]);
+     const byReceipt=await request('/api/get_data_send.php',{cookie:recipient,data:{Year:'2569',doc_type:'Stamp',search_txt:'10/2569'}});
+     assert.ok(byReceipt.body.some(row=>row.doc_id===ten),'Stamp receipt number is searchable');
+     const regular=await request('/api/get_data_send.php',{cookie:owner,data:{Year:'2569',doc_type:'Internal',search_txt:prefix}});
+     assert.deepEqual(regular.body.map(row=>row.doc_id),[noNumber,two,ten].sort((a,b)=>b-a),'non-stamp lists remain ordered by Doc_Id descending');
+   });
   await test('successful signature moves only the signer out of pending',async()=>{
     const stampList=(await request('/api/get_data_send.php',{cookie:recipient,data:{Year:'2569',doc_type:'Stamp',search_txt:values.doc_number}})).body;
     assert.equal(stampList.find(row=>row.doc_id===doc).can_delete,false,'signing never grants document deletion');
