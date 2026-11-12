@@ -200,7 +200,7 @@ $configJson = json_encode([
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 14.5c0-2 1.4-3.4 3-4.2V7a3 3 0 0 1 6 0v3.3c1.6.8 3 2.2 3 4.2V17H6v-2.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </button>
             <span class="tool-sep" aria-hidden="true"></span>
-            <button type="button" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ">
+            <button type="button" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ" disabled>
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 7 4 12l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a6 6 0 0 1 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </button>
         </div>
@@ -223,7 +223,7 @@ $configJson = json_encode([
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                 <span>ดาวน์โหลด</span>
             </button>
-            <button type="button" id="btn-save" class="eo-btn eo-btn--primary" aria-label="ลงนามและบันทึก">
+            <button type="button" id="btn-save" class="eo-btn eo-btn--primary" aria-label="ลงนามและบันทึก" aria-busy="false">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17h10a3 3 0 0 0 .4-6 5 5 0 0 0-9.6-1.3A4 4 0 0 0 7 17Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 12v5m0-5-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span>ลงนามและบันทึก</span>
             </button>

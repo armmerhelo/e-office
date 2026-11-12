@@ -105,6 +105,19 @@ check('responsive layout has mobile toolbar rules', () => {
     assert.ok(css.includes('touch-action: none'));
 });
 
+check('UI layout fixes are present', () => {
+    assert.ok(css.includes('--toolbar-height'));
+    assert.ok(css.includes('#stamp-close'));
+    assert.ok(css.includes('safe-area-inset-top'));
+    assert.ok(css.includes('font-size: 16px'));
+    assert.ok(app.includes('ResizeObserver'));
+    assert.ok(app.includes('updateZoomControls'));
+    assert.ok(app.includes("els.save.disabled = saving || !sourceBytes"));
+    assert.ok(app.includes("els.save.setAttribute('aria-busy'"));
+    assert.ok(stamp.includes('this.lastFocus'));
+    assert.ok(stamp.includes('this.select.focus()'));
+});
+
 check('RDP simplification keeps endpoints', () => {
     const line = [[0, 0], [1, 0.01], [2, 0], [3, 0.01], [4, 0]];
     const simplified = geometry.simplifyRdp(line, 0.1);

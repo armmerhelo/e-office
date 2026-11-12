@@ -31,14 +31,31 @@ export class StampComposer {
         this.modal.addEventListener('click', (event) => {
             if (event.target === this.modal) this.close();
         });
+        this.modal.addEventListener('keydown', (event) => {
+            if (event.key !== 'Tab') return;
+            const focusables = [...this.modal.querySelectorAll('button, select, input')]
+                .filter((element) => !element.disabled && element.getBoundingClientRect().width > 0);
+            if (!focusables.length) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        });
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && !this.modal.classList.contains('hidden')) this.close();
         });
     }
 
     open() {
+        this.lastFocus = document.activeElement;
         this.modal.classList.remove('hidden');
         this.generate();
+        this.select.focus();
         if (document.fonts && document.fonts.load) {
             document.fonts.load('22px "Sarabun"').then(() => {
                 if (!this.modal.classList.contains('hidden')) this.generate();
@@ -48,6 +65,10 @@ export class StampComposer {
 
     close() {
         this.modal.classList.add('hidden');
+        const target = this.lastFocus && this.lastFocus !== document.body
+            ? this.lastFocus
+            : document.getElementById('btn-stamp');
+        if (target && typeof target.focus === 'function') target.focus();
     }
 
     department() {

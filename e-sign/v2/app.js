@@ -1,8 +1,8 @@
 import * as pdfjs from './vendor/pdf.min.js';
-import { PdfViewer } from './viewer.js?v=20261112-3';
-import { AnnotationLayer } from './annotations.js?v=20261112-3';
-import { StampComposer } from './stamp.js?v=20261112-3';
-import { buildSignedPdf } from './export-pdf.js?v=20261112-3';
+import { PdfViewer } from './viewer.js?v=20261112-4';
+import { AnnotationLayer } from './annotations.js?v=20261112-4';
+import { StampComposer } from './stamp.js?v=20261112-4';
+import { buildSignedPdf } from './export-pdf.js?v=20261112-4';
 
 const config = window.ESIGN_V2_CONFIG || {};
 window.pdfjsLib = pdfjs;
@@ -41,7 +41,10 @@ const els = {
     next: $('btn-next'),
     save: $('btn-save'),
     download: $('btn-download'),
+    undo: $('btn-undo'),
     zoomFit: $('btn-zoom-fit'),
+    zoomIn: $('btn-zoom-in'),
+    zoomOut: $('btn-zoom-out'),
     finger: $('btn-finger'),
     toast: $('toast'),
     toastMessage: $('toast-message'),
@@ -82,13 +85,19 @@ function hideError() {
 }
 
 function updateSaveState() {
+    const hasInk = annotations && annotations.hasVisibleSignature();
+    if (els.save) {
+        els.save.disabled = saving || !sourceBytes;
+        els.save.setAttribute('aria-busy', saving ? 'true' : 'false');
+    }
+    if (els.download) els.download.disabled = saving || !sourceBytes;
+    if (els.undo) els.undo.disabled = saving || !annotations || !annotations.undoStack.length;
     if (!els.saveState) return;
     if (saving) {
         els.saveState.textContent = 'กำลังบันทึก...';
         els.saveState.className = 'save-state';
         return;
     }
-    const hasInk = annotations && annotations.hasVisibleSignature();
     if (!hasInk) {
         els.saveState.textContent = 'พร้อมลงนาม';
         els.saveState.className = 'save-state';
@@ -101,6 +110,12 @@ function updateSaveState() {
         els.saveState.textContent = 'ยังไม่บันทึก';
         els.saveState.className = 'save-state is-dirty';
     }
+}
+
+function updateZoomControls() {
+    const zoom = viewer ? viewer.zoom : 1;
+    if (els.zoomOut) els.zoomOut.disabled = zoom <= 0.26;
+    if (els.zoomIn) els.zoomIn.disabled = zoom >= 2.99;
 }
 
 function updatePenMode(penSeen) {
@@ -127,6 +142,7 @@ function setTool(tool) {
 }
 
 function openStampModal() {
+    if (els.toast) els.toast.classList.add('hidden');
     if (composer) composer.open();
 }
 
@@ -172,6 +188,9 @@ async function loadDocument() {
     savedOnce = false;
     firstRenderResolve = null;
     if (els.empty) els.empty.classList.add('hidden');
+    if (els.toast) els.toast.classList.add('hidden');
+    if (els.finger) els.finger.classList.add('hidden');
+    updateSaveState();
     showLoading(true, 'กำลังเชื่อมต่อเซิร์ฟเวอร์...');
     try {
         const { bytes, revision } = await fetchDocument();
@@ -196,6 +215,7 @@ async function loadDocument() {
             onZoom: (zoom, fit) => {
                 els.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
                 els.zoomFit.classList.toggle('is-active', fit);
+                updateZoomControls();
             },
         });
         annotations = new AnnotationLayer({
@@ -221,11 +241,15 @@ async function loadDocument() {
         if (!viewer.pages.length) throw new Error('ไม่พบหน้าเอกสาร');
         hideError();
         setTool('hand');
+        updateZoomControls();
+        updatePenMode(false);
         updateSaveState();
         toast(`โหลดเอกสาร ${result.pages} หน้าแล้ว`, 'success');
     } catch (error) {
         console.error(error);
         showLoading(false);
+        sourceBytes = null;
+        updateSaveState();
         if (els.empty) els.empty.classList.remove('hidden');
         showError(error.message || 'โหลดเอกสารไม่สำเร็จ กรุณาลองใหม่', { title: 'เปิดเอกสารไม่ได้', retry: true });
     }
@@ -353,6 +377,15 @@ async function downloadDocument() {
 }
 
 function bindUi() {
+    const toolbar = document.querySelector('.app-toolbar');
+    const syncToolbarHeight = () => {
+        if (!toolbar) return;
+        document.documentElement.style.setProperty('--toolbar-height', `${Math.round(toolbar.getBoundingClientRect().height)}px`);
+    };
+    syncToolbarHeight();
+    if (window.ResizeObserver) new ResizeObserver(syncToolbarHeight).observe(toolbar);
+    window.addEventListener('resize', syncToolbarHeight);
+
     document.querySelectorAll('.tool-btn').forEach((button) => {
         button.addEventListener('click', () => {
             const tool = button.id.replace('btn-', '');
@@ -401,6 +434,8 @@ function bindUi() {
             undo();
         }
     });
+    updateSaveState();
+    updateZoomControls();
 }
 
 function exposeApi() {

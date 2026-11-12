@@ -265,12 +265,16 @@ export class PdfViewer {
         const beforeTop = current ? current.el.offsetTop : 0;
         const beforeScroll = this.scrollEl.scrollTop;
         const ratio = current ? (beforeScroll - beforeTop) / Math.max(1, current.el.offsetHeight) : 0;
+        const beforeMaxX = Math.max(0, this.scrollEl.scrollWidth - this.scrollEl.clientWidth);
+        const horizontalRatio = beforeMaxX ? this.scrollEl.scrollLeft / beforeMaxX : 0;
         this.zoom = next;
         this.fitMode = fit;
         this.applySizes();
         if (current) {
             this.scrollEl.scrollTop = Math.max(0, current.el.offsetTop + ratio * current.el.offsetHeight);
         }
+        const afterMaxX = Math.max(0, this.scrollEl.scrollWidth - this.scrollEl.clientWidth);
+        this.scrollEl.scrollLeft = horizontalRatio * afterMaxX;
         this.onZoom(this.zoom, this.fitMode);
         this.scheduleScrollUpdate();
     }
