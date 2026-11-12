@@ -17,6 +17,23 @@ class PresentFTP:
         callback(self.files[name])
 
 class DependencyPlan(unittest.TestCase):
+    def test_font_assets_and_licenses_are_deployable(self):
+        files=dict(staging.deployment_files())
+        required={
+            'assets/fonts/sarabun/OFL.txt',
+            'assets/fonts/sarabun/Sarabun-Regular.ttf',
+            'assets/fonts/sarabun/Sarabun-Bold.ttf',
+            'assets/fonts/sarabun/Sarabun-Italic.ttf',
+            'assets/fonts/sarabun/Sarabun-BoldItalic.ttf',
+            'assets/vendor/JSPDF-LICENSE.txt',
+            'assets/vendor/KONVA-LICENSE.txt',
+            'memorandum/assets/fonts/TH-Sarabun-PSK-LICENSE.txt',
+            'memorandum/assets/fonts/TH-Sarabun-PSK.ttf',
+            'memorandum/assets/fonts/TH-Sarabun-PSK-Bold.ttf',
+            'docs/SIYA_NEWS_USER_GUIDE.pdf',
+        }
+        self.assertTrue(required.issubset(files))
+
     def test_full_deployment_static_php_closure_is_complete_and_ordered(self):
         files=dict(staging.deployment_files());remote={**files,'config/local.php':b'<?php return [];'}
         plan=staging.sync_dependency_plan(PresentFTP(remote),set(files),files)

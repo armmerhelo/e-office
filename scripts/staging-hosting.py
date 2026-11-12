@@ -160,7 +160,7 @@ def deployment_files():
         name=relative.as_posix()
         if name.startswith('email_send/backup/') or name.startswith('email_send/User_Data') or name in ['config/local.php','config/production.example.php','email_send/process_pdf_bup.php','assets/php_function.php']:continue
         if name.startswith('e-sign/e-sign') and name.endswith('.php') and name!='e-sign/e-sign.php':continue
-        if name.endswith('.php') or path.suffix.lower() in {'.html','.js','.css','.png','.jpg','.jpeg','.gif','.webp','.svg','.ico'} or name in ['manifest.json','.htaccess','config/.htaccess','e-sign/generated_images/.htaccess']:
+        if name.endswith('.php') or path.suffix.lower() in {'.html','.js','.css','.png','.jpg','.jpeg','.gif','.webp','.svg','.ico','.ttf'} or name in ['manifest.json','.htaccess','config/.htaccess','e-sign/generated_images/.htaccess','assets/fonts/sarabun/OFL.txt','assets/vendor/JSPDF-LICENSE.txt','assets/vendor/KONVA-LICENSE.txt','memorandum/assets/fonts/TH-Sarabun-PSK-LICENSE.txt','docs/SIYA_NEWS_USER_GUIDE.pdf']:
             yield name,path.read_bytes()
 
 
