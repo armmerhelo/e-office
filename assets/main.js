@@ -10,8 +10,7 @@ function applyPermissionMenus() {
         departments: ['menu-groups', 'group_menu_groups'],
         email: ['send_email', 'group_send_email'],
         maintenance: ['menu-maintenance-admin', 'group_maintenance_admin'],
-        siya_news: ['menu-siya-news'],
-        news_producer: ['menu-siya-news-studio', 'group_siya_news_studio']
+        siya_news: ['menu-siya-news']
     })) {
         for (const id of ids) {
             const node = document.getElementById(id);
@@ -27,8 +26,10 @@ function applyPermissionMenus() {
     if (auditMenu) auditMenu.style.display = window.eofficeUser?.status === 'Admin' ? 'block' : 'none';
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
-    const memoMenu = document.getElementById('group_menu_memo');
-    if (memoMenu) memoMenu.style.display = window.eofficeUser ? 'block' : 'none';
+    for (const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
+        const node = document.getElementById(id);
+        if (node) node.style.display = 'none';
+    }
     for (const [id,visible] of [['menu-logout',!!window.eofficeUser],['openModal',!window.eofficeUser]]) {
         const node=document.getElementById(id);if(node)node.style.display=visible?'flex':'none';
     }

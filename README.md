@@ -47,7 +47,7 @@ npm.cmd run serve:test
 
 - Tests ใช้บัญชี QA และเอกสารจำลองในฐานข้อมูลทดสอบเท่านั้น
 - SMTP, Push, AI และ Drive ใช้ adapter จำลองระหว่าง tests
-- `serve:test` เปิดเว็บที่ localhost; ใช้ `DEV_PORT` หากต้องการเปลี่ยนพอร์ต
+- `serve:test` เปิดเว็บที่ localhost; ใช้ `DEV_PORT` หากต้องการเปลี่ยนพอร์ต และ `DEV_HOST=127.0.0.1` หากต้องการเข้าผ่าน IPv4
 - หาก MySQL ทดสอบใช้พอร์ตอื่น ให้กำหนด `DB_PORT` ก่อนรัน เช่น `$env:DB_PORT = '3307'`; ดูผลตรวจล่าสุดและค่ารอบ QA ใน `TEST_REPORT.md`
 - สำหรับ migration ฐานทดสอบ ใช้ `php scripts/migrate.php --test` พร้อม `TEST_DATABASE` ที่จบด้วย `_test` และ `EOFFICE_MOCK_SERVICES=true` หากมี TEST_DATABASE แต่ไม่ได้กำหนด DB_DATABASE คำสั่ง migration ปกติจะปฏิเสธ เพื่อกัน fallback ไปฐานเริ่มต้น
 - ข้อมูลลับ config จริง เอกสารที่อัปโหลด และข้อมูลบุคลากรถูกกันออกจาก Git
@@ -58,6 +58,7 @@ npm.cmd run serve:test
 
 - [MEMBER_PERMISSIONS.md](MEMBER_PERMISSIONS.md): การให้สิทธิ์รายบุคคลและการจัดการสมาชิกโดย Admin สูงสุด
 - [SIYA_NEWS.md](SIYA_NEWS.md): ขั้นตอนข่าว สิทธิ์ การอัปโหลดภาพ และการย้ายภาพไป Google Drive หลังครบ 30 วัน
+- [คู่มือผู้ใช้งาน SIYA NEWS](docs/SIYA_NEWS_USER_GUIDE.html): คู่มือภาษาไทยพร้อมภาพหน้าจอ ตั้งแต่ส่งข่าว ตรวจข่าว จัดหน้าใน Studio จนถึงส่งออก PNG/PDF
 
 - [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md): เปิดใช้งาน Google login และตั้งค่า OAuth Client
 - [DEPLOYMENT.md](DEPLOYMENT.md): การตั้งค่า production, migration และ notification worker

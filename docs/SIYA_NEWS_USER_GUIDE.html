@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>คู่มือผู้ใช้งาน SIYA NEWS</title>
+  <style>
+    @font-face{font-family:Sarabun;src:url("../assets/fonts/sarabun/Sarabun-Regular.ttf") format("truetype");font-style:normal;font-weight:400;font-display:swap}
+    @font-face{font-family:Sarabun;src:url("../assets/fonts/sarabun/Sarabun-Bold.ttf") format("truetype");font-style:normal;font-weight:700;font-display:swap}
+    @font-face{font-family:Sarabun;src:url("../assets/fonts/sarabun/Sarabun-Italic.ttf") format("truetype");font-style:italic;font-weight:400;font-display:swap}
+    @font-face{font-family:Sarabun;src:url("../assets/fonts/sarabun/Sarabun-BoldItalic.ttf") format("truetype");font-style:italic;font-weight:700;font-display:swap}
+    :root{color-scheme:light;--ink:#172554;--muted:#52617d;--line:#dbe3f0;--paper:#fff;--wash:#f3f6fc;--brand:#4f46e5;--brand-dark:#312e81;--mint:#e8fbf2;--gold:#fff7df;--red:#fff0f0}
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:#edf1f8;color:#1e293b;font-family:Sarabun,Tahoma,"Segoe UI",sans-serif;font-size:16px;line-height:1.65}
+    a{color:#4338ca;text-decoration:none}a:hover{text-decoration:underline}
+    .page{max-width:1040px;margin:28px auto;padding:0 24px 44px}
+    .cover{position:relative;overflow:hidden;min-height:400px;padding:54px 58px;border-radius:24px;background:linear-gradient(128deg,#27256f,#4338ca 62%,#786cf7);color:white;box-shadow:0 18px 55px #20235c26;display:flex;flex-direction:column;justify-content:space-between}
+    .cover:after{content:"";position:absolute;width:390px;height:390px;right:-100px;bottom:-210px;border:1px solid #ffffff4a;border-radius:50%;box-shadow:0 0 0 34px #ffffff10,0 0 0 72px #ffffff0b}
+    .brand{font-size:14px;letter-spacing:.12em;font-weight:800;text-transform:uppercase;opacity:.9}
+    .eyebrow{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#c7d2fe;font-weight:700}
+    h1{font-size:clamp(38px,7vw,64px);line-height:1.18;margin:12px 0 10px;letter-spacing:-.03em}
+    .cover p{font-size:19px;max-width:650px;color:#eef2ff;margin:0}
+    .cover-meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:30px;position:relative;z-index:1}
+    .pill{border:1px solid #ffffff55;background:#ffffff14;border-radius:999px;padding:6px 13px;font-size:13px}
+    .cover-foot{position:relative;z-index:1;margin-top:45px;font-size:13px;color:#e0e7ff}
+    .intro,.chapter,.toc{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px 34px;margin-top:22px;box-shadow:0 6px 24px #17255408}
+    .intro{display:grid;grid-template-columns:1.2fr .8fr;gap:22px;align-items:center}
+    h2{color:var(--ink);font-size:27px;line-height:1.35;margin:0 0 10px}
+    h3{color:#263779;font-size:19px;line-height:1.4;margin:26px 0 8px}
+    h4{color:#312e81;font-size:16px;margin:18px 0 6px}
+    p{margin:8px 0 12px}
+    .lead{font-size:17px;color:#34435f}
+    .callout{border-radius:12px;padding:14px 17px;margin:14px 0;background:#eef2ff;border-left:4px solid var(--brand)}
+    .callout.warn{background:var(--gold);border-left-color:#e9a700}
+    .callout.safe{background:var(--mint);border-left-color:#169b68}
+    .callout.alert{background:var(--red);border-left-color:#e24d58}
+    .quick{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .quick-card{border:1px solid var(--line);border-radius:13px;padding:15px;background:#fbfcff}
+    .quick-card b{display:block;color:#312e81;margin-bottom:5px}
+    .toc ol{margin:10px 0 0;padding-left:22px;columns:2;column-gap:38px}
+    .toc li{padding:4px 0;break-inside:avoid}
+    .role-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+    .role-table th,.role-table td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}
+    .role-table th{background:#eef2ff;color:#312e81}
+    .steps{counter-reset:step;list-style:none;padding:0;margin:12px 0}
+    .steps li{counter-increment:step;position:relative;padding:4px 0 13px 48px;min-height:42px}
+    .steps li:before{content:counter(step);position:absolute;left:0;top:1px;width:31px;height:31px;border-radius:50%;background:#e7eaff;color:#3730a3;font-weight:800;text-align:center;line-height:31px}
+    .screen{position:relative;overflow:hidden;border:1px solid #d7dfec;border-radius:12px;background:#f4f6fa;box-shadow:0 8px 22px #0f172a12}
+    .screen img{display:block;width:100%;height:auto}
+    .marker{position:absolute;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#e94567;color:#fff;border:2px solid white;font:800 14px/1 "Segoe UI",sans-serif;box-shadow:0 2px 8px #11182766;transform:translate(-50%,-50%)}
+    .marker.blue{background:#4338ca}
+    .legend{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 20px;margin:13px 0 0;padding:0;list-style:none;font-size:14px}
+    .legend li{display:flex;gap:9px;align-items:flex-start}
+    .n{flex:0 0 23px;height:23px;border-radius:50%;background:#e94567;color:white;text-align:center;font:800 12px/23px "Segoe UI",sans-serif}
+    .n.blue{background:#4338ca}
+    figure{margin:18px 0 22px}
+    figcaption{color:#52617d;font-size:13px;margin-top:8px}
+    .figure-note{font-size:12px;color:#64748b}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .card{background:#f8faff;border:1px solid var(--line);border-radius:13px;padding:16px}
+    .card h3,.card h4{margin-top:0}
+    .tag{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;background:#e8eaff;color:#3730a3;vertical-align:middle}
+    .mini-flow{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap;padding:14px;border-radius:12px;background:#f5f6ff;color:#312e81;font-weight:700;margin:14px 0}
+    .mini-flow span:not(.arrow){border:1px solid #d6d9fb;border-radius:999px;padding:5px 11px;background:white}
+    .arrow{color:#818cf8;font-size:19px}
+    kbd{font:600 12px/1.5 "Segoe UI",sans-serif;border:1px solid #cbd5e1;border-bottom-width:2px;border-radius:5px;padding:2px 6px;background:white;color:#334155;white-space:nowrap}
+    .checklist{list-style:none;padding:0}
+    .checklist li{padding:5px 0 5px 29px;position:relative}
+    .checklist li:before{content:"✓";position:absolute;left:0;top:5px;width:20px;height:20px;border-radius:6px;background:#dcfce7;color:#15803d;font-weight:800;text-align:center;line-height:20px}
+    .faq details{border-top:1px solid var(--line);padding:11px 0}
+    .faq summary{cursor:pointer;color:#312e81;font-weight:700}
+    .foot{color:#64748b;text-align:center;font-size:12px;padding:24px 8px}
+    .print-button{position:fixed;right:22px;bottom:20px;border:0;border-radius:999px;background:#312e81;color:white;padding:12px 18px;font:inherit;font-weight:700;box-shadow:0 6px 20px #17255440;cursor:pointer;z-index:5}
+    .chapter-kicker{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#6366f1;font-weight:800;margin-bottom:7px}
+    .subtle{color:var(--muted);font-size:14px}
+    .small{font-size:13px;color:var(--muted)}
+    .section-break{height:1px;background:var(--line);margin:24px 0}
+    @media(max-width:720px){.page{padding:0 12px 24px;margin:12px auto}.cover{padding:32px 26px;min-height:350px;border-radius:18px}.intro{grid-template-columns:1fr;padding:22px}.chapter,.toc{padding:22px 19px}.quick,.two-col{grid-template-columns:1fr}.toc ol{columns:1}.legend{grid-template-columns:1fr}.marker{width:24px;height:24px;font-size:12px}.role-table{font-size:12px}.role-table th,.role-table td{padding:7px}.print-button{right:12px;bottom:12px}}
+    @page{size:A4;margin:15mm 14mm 16mm}
+    @media print{
+      body{background:#fff;font-size:10.2pt;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{max-width:none;margin:0;padding:0}
+      .cover{min-height:255mm;border-radius:0;padding:25mm 20mm;box-shadow:none;break-after:page}
+      .intro,.chapter,.toc{box-shadow:none;border-radius:0;margin:0 0 8mm;padding:9mm 10mm}
+      .intro{display:block}.intro .quick{grid-template-columns:repeat(3,1fr);margin-top:8mm}
+      .toc{break-after:page}
+      .chapter{break-before:auto}
+      .chapter > .chapter-kicker,.chapter > h2{break-after:avoid-page}
+      h2{font-size:21pt}h3{font-size:15pt}
+      figure,.card,.callout,.quick-card{break-inside:avoid}
+      .screen{border-radius:5px;box-shadow:none}
+      .screen img{max-height:155mm;object-fit:contain}
+      .review-screen img{max-height:115mm}
+      .trash-screen img{max-height:125mm}
+      .crop-screen img{max-height:88mm}
+      .checklist{break-inside:avoid}
+      details:not([open])>*:not(summary){display:block!important}
+      .foot{display:none}
+      .print-button{display:none}
+      a{color:inherit}
+      .foot{padding:10mm 0 0}
+    }
+  </style>
+</head>
+<body>
+  <button class="print-button" type="button" onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button>
+  <main class="page">
+    <header class="cover">
+      <div class="brand">E-Office · SIYA NEWS</div>
+      <div>
+        <div class="eyebrow">คู่มือผู้ใช้งาน · ฉบับย่อพร้อมภาพหน้าจอ</div>
+        <h1>SIYA NEWS</h1>
+        <p>ตั้งแต่ส่งข่าว ตรวจเนื้อหา จนถึงจัดหน้าวารสารและส่งออกไฟล์</p>
+        <div class="cover-meta"><span class="pill">ผู้ส่งข่าว</span><span class="pill">บรรณาธิการ / ผู้ตรวจคำ</span><span class="pill">ผู้จัดทำวารสาร</span></div>
+      </div>
+      <div class="cover-foot">โรงเรียนศรียานุสรณ์ · ปรับปรุง 9 พฤศจิกายน 2569</div>
+    </header>
+
+    <section class="intro">
+      <div>
+        <div class="chapter-kicker">เริ่มต้นที่นี่</div>
+        <h2>ทำงานตามขั้นตอน ข่าวไม่หลุดคิว</h2>
+        <p class="lead">SIYA NEWS เป็นพื้นที่ภายใน E-Office สำหรับรวบรวมและตรวจข่าวที่ใช้จัดทำวารสาร ไม่ใช่เว็บไซต์เผยแพร่ข่าวสาธารณะ</p>
+      </div>
+      <div class="quick">
+        <div class="quick-card"><b>① ส่งข่าว</b>กรอกข้อมูลและแนบภาพ แล้วส่งให้ตรวจ</div>
+        <div class="quick-card"><b>② ผ่านตรวจ</b>ผู้ตรวจแก้ไขข้อเท็จจริงและอนุมัติ</div>
+        <div class="quick-card"><b>③ จัดหน้า</b>ผู้ผลิตเลือกข่าวที่ผ่านตรวจ แล้วส่งออก PNG/PDF</div>
+      </div>
+      <div class="callout safe" style="grid-column:1/-1;margin-bottom:0"><b>ภาพประกอบ:</b> เป็นภาพหน้าจอจริงจากการทดสอบบนระบบ ด้วยข่าวและภาพสังเคราะห์ในฐานทดสอบแยก ไม่ใช่ข้อมูลบุคลากรหรือข่าวจริง รายการใน Studio เป็นข่าวสถานะผ่านตรวจ และภาพโหลดผ่าน API ที่ยังบังคับสิทธิ์ส่วนตัว</div>
+    </section>
+
+    <nav class="toc" aria-label="สารบัญ">
+      <div class="chapter-kicker">สารบัญ</div>
+      <h2>เลือกหัวข้อที่ต้องการ</h2>
+      <ol>
+        <li><a href="#roles">สิทธิ์และหน้าจอข่าว</a></li>
+        <li><a href="#submit">สร้างและส่งข่าว</a></li>
+        <li><a href="#proofread">ตัวช่วยตรวจคำผิด</a></li>
+        <li><a href="#review">ตรวจและอนุมัติข่าว</a></li>
+        <li><a href="#producer">นำข่าวที่ผ่านตรวจไปใช้</a></li>
+        <li><a href="#studio">เริ่มต้น SIYA NEWS Studio</a></li>
+        <li><a href="#design">จัดหน้า ข้อความ รูป และภาพ</a></li>
+        <li><a href="#save-export">บันทึก ประวัติ และส่งออก</a></li>
+        <li><a href="#trash">ถังขยะและกู้คืน</a></li>
+        <li><a href="#troubleshoot">แก้ปัญหาและเช็กลิสต์</a></li>
+      </ol>
+    </nav>
+
+    <section class="chapter" id="roles">
+      <div class="chapter-kicker">01 · การเข้าถึง</div>
+      <h2>สิทธิ์ผู้ใช้งานและหน้ารายการข่าว</h2>
+      <p>เมนูและรายการที่เห็นจะขึ้นกับสิทธิ์ที่ Admin มอบหมาย บัญชีเดียวรับได้หลายบทบาท ส่วน Admin ใช้งานได้ทุกบทบาท</p>
+      <table class="role-table">
+        <thead><tr><th>บทบาท</th><th>งานที่ทำได้</th><th>รายการหลักที่เห็น</th></tr></thead>
+        <tbody>
+          <tr><td><b>ผู้ส่งข่าว</b><br><span class="tag">news_submit</span></td><td>สร้างร่างข่าวของตนเอง แก้ไขร่าง/ข่าวที่ส่งกลับ แนบภาพ และส่งตรวจคำ</td><td>ข่าวของฉัน · ถังขยะของตน</td></tr>
+          <tr><td><b>บรรณาธิการ / ผู้ตรวจคำ</b><br><span class="tag">news_editor</span></td><td>อ่านคิวตรวจ แก้ข้อความ/ภาพ เพิ่มหมายเหตุ และบันทึกพร้อมผ่านตรวจ</td><td>รอตรวจคำ · คลังบรรณาธิการ · ถังขยะตามสิทธิ์</td></tr>
+          <tr><td><b>ผู้จัดทำวารสาร</b><br><span class="tag">news_producer</span></td><td>อ่านและดาวน์โหลดข่าว/ภาพที่ผ่านตรวจ ส่งออกชุดข่าว และใช้ Studio จัดหน้า</td><td>พร้อมจัดทำ · SIYA NEWS — จัดหน้าวารสาร</td></tr>
+          <tr><td><b>Admin</b></td><td>สิทธิ์ทั้งหมด และเป็นผู้มอบหมาย/ถอนสิทธิ์สมาชิก</td><td>ทุกส่วน</td></tr>
+        </tbody>
+      </table>
+      <figure>
+        <div class="screen">
+          <img src="siya-news-guide/images/news-workspace-desktop.png" alt="ภาพหน้าจอ SIYA NEWS บนคอมพิวเตอร์ แสดงรายการข่าว แท็บตามสิทธิ์ และรายละเอียดข่าวที่ผ่านตรวจ">
+          <span class="marker" style="left:42%;top:16%">1</span><span class="marker" style="left:31%;top:23%">2</span><span class="marker" style="left:34%;top:42%">3</span><span class="marker" style="left:84%;top:16%">4</span><span class="marker" style="left:70%;top:25%">5</span>
+        </div>
+        <figcaption>ภาพที่ 1 · หน้าข่าวบนคอมพิวเตอร์ ตัวอย่างที่เห็นแท็บหลายแบบเพราะเป็นบัญชีทดสอบที่รวมสิทธิ์ไว้</figcaption>
+        <ul class="legend">
+          <li><span class="n">1</span><span><b>สร้างข่าว</b> แสดงเมื่อบัญชีมีสิทธิ์ผู้ส่งข่าว</span></li>
+          <li><span class="n">2</span><span><b>แท็บรายการ</b> เปลี่ยนระหว่างข่าวของฉัน, คิวตรวจ, พร้อมจัดทำ หรือถังขยะ</span></li>
+          <li><span class="n">3</span><span><b>รายการและค้นหา</b> เลือกข่าวเพื่อดูหรือทำงานต่อ</span></li>
+          <li><span class="n">4</span><span><b>สถานะข่าว</b> “ผ่านตรวจ — พร้อมทำกราฟิก” ใช้ในขั้นจัดวารสาร</span></li>
+          <li><span class="n">5</span><span><b>คำสั่งของบทบาท</b> เช่น ดาวน์โหลดชุดข่าว ZIP หรือบันทึกว่านำไปใช้แล้ว</span></li>
+        </ul>
+      </figure>
+      <div class="callout safe"><b>ความเป็นส่วนตัว:</b> ข่าวและภาพใช้ได้เฉพาะผู้มีสิทธิ์ ภาพไม่ใช่ลิงก์สาธารณะ และผู้จัดทำวารสารจะเห็นเฉพาะข่าวที่ผ่านตรวจแล้ว</div>
+    </section>
+
+    <section class="chapter" id="submit">
+      <div class="chapter-kicker">02 · ผู้ส่งข่าว</div>
+      <h2>สร้างข่าว เขียนข้อมูล และส่งตรวจ</h2>
+      <ol class="steps">
+        <li>เปิดเมนู <b>SIYA NEWS</b> แล้วกด <b>＋ สร้างข่าว</b> ข่าวใหม่จะเริ่มเป็นสถานะ <b>ร่าง</b></li>
+        <li>กรอก <b>หัวข้อข่าว</b>, <b>วันที่จัดกิจกรรม</b>, <b>กลุ่มงาน / ผู้รับผิดชอบ</b>, <b>สถานที่</b> และ <b>รายละเอียดข่าว</b></li>
+        <li>เขียนรายละเอียดให้ตอบคำถามว่า <b>ใคร ทำอะไร ที่ไหน เมื่อไร และเกิดผลอย่างไร</b> ใช้ชื่อบุคคล/กลุ่มงานให้ถูกต้อง</li>
+        <li>กด <b>บันทึกการแก้ไขทั้งหมด</b> เพื่อเก็บร่าง การพิมพ์ในหน้านี้ <b>ไม่มี autosave</b> จึงควรบันทึกก่อนเปลี่ยนข่าวหรือออกจากหน้า</li>
+        <li>แนบภาพที่ <b>＋ เพิ่มภาพ</b> รองรับ JPEG, PNG, WebP ไม่เกิน 20 MB ต่อภาพ และไม่เกิน 10 ภาพต่อข่าว</li>
+        <li>ใส่คำบรรยายและเครดิตภาพ เรียงภาพด้วยปุ่มลูกศร แล้วบันทึกอีกครั้ง</li>
+        <li>เมื่อพร้อม กด <b>บันทึกและส่งตรวจคำ</b> ระบบบันทึกข้อมูลก่อนเปลี่ยนสถานะเป็นรอตรวจ</li>
+      </ol>
+      <div class="callout warn"><b>การอัปโหลดที่ผลยังไม่ชัดเจน:</b> หากเครือข่ายค้างหรือมีข้อความว่ายืนยันผลไม่ได้ ให้ตรวจว่าภาพปรากฏในรายการแล้วหรือยัง ก่อนเลือกส่งซ้ำ เพื่อป้องกันภาพซ้ำ</div>
+      <div class="two-col">
+        <div class="card"><h3>เขียนให้พร้อมตรวจ</h3><ul><li>ใช้หัวข้อสั้น ชัดเจน บอกกิจกรรมหรือผลลัพธ์</li><li>ตรวจวัน/สถานที่และชื่อผู้รับผิดชอบ</li><li>เลือกภาพที่เกี่ยวข้องและมีสิทธิ์นำมาใช้</li><li>อย่าใส่ข้อมูลส่วนบุคคลที่ไม่จำเป็น</li></ul></div>
+        <div class="card"><h3>ปรับข่าวหลังส่งแล้ว</h3><p>ผู้ส่งแก้ได้ในร่างหรือข่าวที่ผู้ตรวจส่งกลับ หากแก้เนื้อหาหรือภาพของข่าวที่ผ่านตรวจ ข่าวจะกลับเข้าคิวตรวจ และผู้จัดทำจะยังใช้ไม่ได้จนกว่าจะผ่านตรวจใหม่</p></div>
+      </div>
+    </section>
+
+    <section class="chapter" id="proofread">
+      <div class="chapter-kicker">03 · ตัวช่วยเสริม</div>
+      <h2>ใช้ตัวช่วยตรวจคำผิดอย่างมีวิจารณญาณ</h2>
+      <ol class="steps">
+        <li>เปิดข่าวในโหมดแก้ไข แล้วกด <b>ช่วยตรวจคำผิด</b></li>
+        <li>อ่านข้อความยืนยันก่อนส่ง ระบบส่งเฉพาะหัวข้อและรายละเอียดข่าวปัจจุบันไปยังบริการ AI ภายนอก</li>
+        <li>อ่านคำแนะนำทีละรายการ ตรวจชื่อเฉพาะ บริบท และข้อเท็จจริง แล้วกด <b>ใช้คำแก้</b> เฉพาะข้อที่เห็นด้วย</li>
+        <li>ถ้าแก้หัวข้อหรือรายละเอียดเองหลังตรวจ ผลแนะนำเดิมจะหมดอายุ ให้ตรวจใหม่หากต้องการ</li>
+        <li>บันทึกข่าวและส่งตรวจตามปกติ ตัวช่วยไม่บันทึกข่าวและไม่อนุมัติให้อัตโนมัติ</li>
+      </ol>
+      <div class="callout alert"><b>ข้อควรระวัง:</b> AI อาจให้คำแนะนำผิดหรือไม่รู้บริบท ไม่ใช่การรับรองการสะกด ชื่อบุคคล หรือความถูกต้องของข่าว การใช้งานจริงขึ้นกับการตั้งค่าบริการของระบบ</div>
+    </section>
+
+    <section class="chapter" id="review">
+      <div class="chapter-kicker">04 · บรรณาธิการ / ผู้ตรวจคำ</div>
+      <h2>ตรวจ แก้ และผ่านตรวจข่าว</h2>
+      <p>เลือกแท็บ <b>รอตรวจคำ</b> เปิดข่าว ตรวจหัวข้อ เนื้อหา วันที่ กลุ่มงาน สถานที่ และภาพประกอบ ผู้ตรวจแก้ข้อมูลได้โดยตรง ไม่ต้องส่งกลับผู้เขียนเพื่อแก้ผ่านปุ่มแยก</p>
+      <figure>
+        <div class="screen review-screen"><img src="siya-news-guide/images/news-review-panels.png" alt="ภาพสองช่วงของหน้าตรวจข่าวบนมือถือ แสดงข้อมูลข่าวและภาพทางซ้าย พร้อมหมายเหตุและปุ่มบันทึกและผ่านตรวจทางขว"></div>
+        <figcaption>ภาพที่ 2 · ตัวอย่างส่วนรายละเอียดและส่วนอนุมัติจากหน้าทดสอบ โดยใช้บทความ/ภาพสังเคราะห์</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>หากต้องการแก้ ให้กด <b>แก้ไขข่าว</b> แล้วปรับเนื้อหาหรือ metadata ภาพ</li>
+        <li>ตรวจภาพ คำบรรยาย และเครดิต หากจำเป็นสามารถจัดลำดับหรือนำภาพออกได้</li>
+        <li>ใส่ <b>หมายเหตุผู้ตรวจ</b> เมื่อมีข้อสังเกตที่ต้องบันทึก</li>
+        <li>กด <b>บันทึกการแก้ไขทั้งหมด</b> เพื่อเก็บไว้ก่อน หรือกด <b>บันทึกและผ่านตรวจ</b> เมื่อเนื้อหาถูกต้องครบถ้วน</li>
+        <li>เมื่อผ่านตรวจ สถานะจะเป็น <b>ผ่านตรวจ — พร้อมทำกราฟิก</b> และข่าวจะปรากฏในคลังของผู้จัดทำวารสาร</li>
+      </ol>
+      <div class="callout warn"><b>แก้ข่าวหลังอนุมัติ:</b> การเปลี่ยนข้อความหรือภาพหลังผ่านตรวจจะถอนสถานะอนุมัติและนำกลับเข้าคิวตรวจ เพื่อให้ผู้ตรวจยืนยันอีกครั้ง</div>
+    </section>
+
+    <section class="chapter" id="producer">
+      <div class="chapter-kicker">05 · ผู้จัดทำวารสาร</div>
+      <h2>เลือกข่าวที่ผ่านตรวจและรับไฟล์ต้นฉบับ</h2>
+      <ol class="steps">
+        <li>เลือกแท็บ <b>พร้อมจัดทำ</b> แล้วเปิดข่าวที่ต้องการ ข่าวร่าง/รอตรวจจะไม่อยู่ในรายการนี้</li>
+        <li>ใช้ <b>คัดลอกข้อความ</b> เพื่อคัดลอกเนื้อหาข่าว หรือ <b>ดาวน์โหลดชุดข่าว ZIP</b> เพื่อรับไฟล์ `ข่าว.txt`, โฟลเดอร์ภาพต้นฉบับ และรายการภาพพร้อมคำบรรยาย/เครดิต</li>
+        <li>จะดาวน์โหลดภาพเป็นรายไฟล์จากส่วนภาพประกอบก็ได้</li>
+        <li>เมื่อใช้ข่าวในงานแล้ว กด <b>บันทึกว่านำไปใช้แล้ว</b> เพื่อทำเครื่องหมายการใช้งาน</li>
+        <li>กดเมนู <b>SIYA NEWS — จัดหน้าวารสาร</b> เพื่อออกแบบหน้าใน Studio</li>
+      </ol>
+      <div class="callout safe">Studio อ้างอิงภาพข่าวผ่านระบบสิทธิ์ ไม่ได้คัดลอกหรือแก้ไฟล์ต้นฉบับ การครอปและตกแต่งมีผลเฉพาะในงานออกแบบ</div>
+    </section>
+
+    <section class="chapter" id="studio">
+      <div class="chapter-kicker">06 · SIYA NEWS Studio</div>
+      <h2>รู้จักพื้นที่จัดหน้าวารสาร</h2>
+      <p>Studio ใช้ได้สำหรับผู้มีสิทธิ์ <b>ผู้จัดทำวารสาร</b> และ Admin เมื่อเปิดหน้า ระบบจะแสดงคลังข่าวที่ผ่านตรวจ ทางซ้ายเป็นเครื่องมือ กลางเป็นหน้าออกแบบ และขวาเป็นแผงปรับแต่ง</p>
+      <figure>
+        <div class="screen">
+          <img src="siya-news-guide/images/studio-workspace-desktop.png" alt="หน้าจอ SIYA NEWS Studio บนคอมพิวเตอร์ แสดงแถบเครื่องมือ คลังข่าว ผืนผ้าใบ และแผงปรับแต่ง">
+          <span class="marker blue" style="left:81%;top:7%">1</span><span class="marker blue" style="left:2.5%;top:23%">2</span><span class="marker blue" style="left:14%;top:37%">3</span><span class="marker blue" style="left:51%;top:48%">4</span><span class="marker blue" style="left:88%;top:37%">5</span><span class="marker blue" style="left:29%;top:97%">6</span>
+        </div>
+        <figcaption>ภาพที่ 3 · หน้าจอ Studio ในชุดทดสอบแยก รายการข่าว/ชื่อชุดจัดหน้าในภาพเป็นข้อมูลสังเคราะห์ ไม่ใช่ข้อมูลจริง</figcaption>
+        <ul class="legend">
+          <li><span class="n blue">1</span><span><b>แถบบน</b> ชื่อชุดจัดหน้า, ย้อน/ทำซ้ำ, สถานะบันทึก, ประวัติ, ตรวจความพร้อม และ PNG/PDF</span></li>
+          <li><span class="n blue">2</span><span><b>หมวดเครื่องมือ</b> ข่าว, ข้อความ, รูปทรง, เทมเพลต, เลเยอร์ และหน้า</span></li>
+          <li><span class="n blue">3</span><span><b>คลังข่าว</b> ค้นข่าวที่ผ่านตรวจ กดข่าวเพื่อแทรก หรือเลือกภาพย่อยเพื่อแทรกเฉพาะภาพ</span></li>
+          <li><span class="n blue">4</span><span><b>ผืนผ้าใบ</b> คลิกเพื่อเลือกวัตถุ ลาก ย่อ/ขยาย หรือหมุน</span></li>
+          <li><span class="n blue">5</span><span><b>ปรับแต่ง</b> แก้ข้อความ ฟอนต์ ขนาด สี ขอบ ครอป ตำแหน่ง และล็อกวัตถุ</span></li>
+          <li><span class="n blue">6</span><span><b>แถบหน้า</b> สลับหน้า เพิ่มหน้า และดูหน้าปัจจุบัน</span></li>
+        </ul>
+      </figure>
+      <h3>สร้างชุดจัดหน้า</h3>
+      <ol class="steps">
+        <li>กดปุ่ม <b>＋</b> ข้างรายการชุดจัดหน้าเพื่อสร้างงานใหม่ แล้วตั้งชื่อในช่องชื่องาน</li>
+        <li>เลือกเริ่มด้วยเทมเพลต <b>หน้าปกวารสาร</b>, <b>ข่าวเด่น</b>, <b>กิจกรรมโรงเรียน</b> หรือ <b>เริ่มหน้าว่าง</b> จากแท็บเทมเพลต</li>
+        <li>เลือกขนาดหน้าให้ตรงงาน: A4 แนวตั้ง/แนวนอน, สไลด์ 16:9, โพสต์จัตุรัส, Story หรือโปสเตอร์</li>
+        <li>เปลี่ยนพื้นหลังและตั้งระยะปลอดภัยได้ที่แท็บ <b>หน้า</b> เส้นระยะปลอดภัยเป็นเส้นช่วยเท่านั้น ไม่ปรากฏในไฟล์ส่งออก</li>
+      </ol>
+      <div class="callout warn">การใช้เทมเพลตแทนองค์ประกอบบนหน้าปัจจุบัน ควรบันทึกงานและตรวจคำยืนยันก่อนทำ รายการข่าวและภาพต้นฉบับจะไม่ถูกลบ</div>
+    </section>
+
+    <section class="chapter" id="design">
+      <div class="chapter-kicker">07 · จัดองค์ประกอบ</div>
+      <h2>เพิ่มข่าว ข้อความ รูปทรง และตกแต่งภาพ</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3>แทรกข่าวและภาพ</h3>
+          <ul><li>เปิดแถบ <b>ข่าว</b> แล้วค้นด้วยหัวข้อ กลุ่มงาน หรือเนื้อหา</li><li>คลิกหัวข้อข่าวหรือปุ่มแทรกข่าวเพื่อวางหัวข้อ วัน/กลุ่มงาน เนื้อหาบางส่วน และภาพแรกที่ผ่านตรวจ</li><li>คลิกภาพย่อเพื่อวางเฉพาะภาพนั้น</li><li>ภาพและข้อความที่แทรกเป็นสำเนาสำหรับจัดหน้า แก้ได้โดยไม่เปลี่ยนข่าวต้นฉบับ</li></ul>
+        </div>
+        <div class="card">
+          <h3>เพิ่มและแก้ข้อความ</h3>
+          <ul><li>แท็บ <b>ข้อความ</b> มีหัวเรื่อง หัวข้อย่อย และข้อความทั่วไป</li><li>ดับเบิลคลิกข้อความบนหน้าเพื่อพิมพ์แก้โดยตรง หรือเลือกวัตถุแล้วแก้ในช่องข้อความด้านขวา</li><li>เปลี่ยนฟอนต์ ขนาด น้ำหนัก สี การจัดแนว ระยะบรรทัด ระยะตัวอักษร และเส้นใต้ได้</li><li><b>Sarabun — สารบรรณ</b> เหมาะกับเอกสารทางการ มีตัวหนา/เอียงให้ใช้</li></ul>
+        </div>
+        <div class="card">
+          <h3>ปรับวัตถุและรูปทรง</h3>
+          <ul><li>แท็บ <b>รูปทรง</b> เพิ่มสี่เหลี่ยม มุมมน วงกลม สามเหลี่ยม ดาว และเส้น</li><li>คลิกวัตถุแล้วลากเพื่อย้าย ใช้จุดจับเพื่อย่อ/ขยายหรือหมุน</li><li>กำหนดพิกัด ขนาด สี ความทึบ และขอบจากแผง <b>ปรับแต่ง</b></li><li>ใช้ปุ่มจัดแนวซ้าย/กลาง/ขวา/บน/ล่าง หรือดูดแนว (Snap) เข้ากับกึ่งกลาง ขอบ ระยะปลอดภัย และวัตถุอื่น</li></ul>
+        </div>
+        <div class="card">
+          <h3>เลเยอร์และล็อก</h3>
+          <ul><li>แท็บ <b>เลเยอร์</b> เลือก ซ่อน/แสดง หรือเลื่อนวัตถุขึ้นลง</li><li>กด <b>ล็อกวัตถุ</b> เพื่อกันลาก แก้ ลบ หรือเลื่อนด้วยคีย์บอร์ด</li><li>กดปลดล็อกจากแผงปรับแต่งหรือรายการเลเยอร์</li><li>ใช้ <b>ทำสำเนา</b>, <b>ลบ</b> และปุ่ม ↶/↷ เพื่อย้อน/ทำซ้ำ</li></ul>
+        </div>
+      </div>
+      <h3>ครอปภาพโดยไม่แก้ต้นฉบับ</h3>
+      <ol class="steps">
+        <li>เลือกภาพบนหน้า แผง <b>ครอปภาพ</b> จะปรากฏ</li>
+        <li>เลือกสัดส่วนกรอบ: กรอบปัจจุบัน, ภาพเดิม, 1:1, 4:3, 16:9 หรือ 3:4</li>
+        <li>ปรับซูมและตำแหน่งแนวนอน/แนวตั้งด้วยแถบเลื่อน หรือเลือก <b>ลากภาพภายในกรอบ</b> แล้วลากภาพด้วยเมาส์/นิ้ว</li>
+        <li>กด <b>คืนภาพเต็ม</b> เพื่อคืนสัดส่วนภาพเดิม การครอปเก็บในงานจัดหน้าเท่านั้น ไม่เขียนทับไฟล์ข่าว</li>
+      </ol>
+      <figure>
+        <div class="screen crop-screen"><img src="siya-news-guide/images/studio-image-inspector.png" alt="ภาพหน้าจอ Studio เมื่อเลือกภาพ แสดงตำแหน่ง ขนาด ขอบ มุมมน และตัวควบคุมการครอปในแผงด้านขวา"></div>
+        <figcaption>ภาพที่ 4 · เลือกภาพเพื่อเปิดตัวควบคุมครอปและตกแต่ง ภาพที่วางในตัวอย่างเป็นภาพสังเคราะห์สำหรับทดสอบ</figcaption>
+      </figure>
+      <div class="callout safe">รูปทรง ข้อความ และภาพทุกชิ้นเป็นองค์ประกอบบนผืนผ้าใบ ข่าวและภาพที่เลือกได้มาจากคลังข่าวที่ผ่านตรวจเท่านั้น</div>
+    </section>
+
+    <section class="chapter" id="save-export">
+      <div class="chapter-kicker">08 · บันทึกและส่งออก</div>
+      <h2>บันทึกงาน ตรวจความพร้อม และส่งออก</h2>
+      <div class="mini-flow"><span>จัดหน้า</span><span class="arrow">→</span><span>รอ “บันทึกแล้ว”</span><span class="arrow">→</span><span>ตรวจความพร้อม</span><span class="arrow">→</span><span>PNG / PDF</span></div>
+      <ul>
+        <li>Studio บันทึกอัตโนมัติหลังหยุดแก้ไขชั่วครู่ สถานะด้านบนจะแสดง <b>มีการแก้ไข — รอบันทึก</b>, <b>กำลังบันทึก…</b> หรือ <b>บันทึกแล้ว</b></li>
+        <li>สั่งบันทึกทันทีด้วย <kbd>Ctrl</kbd> + <kbd>S</kbd> (Mac: <kbd>⌘</kbd> + <kbd>S</kbd>) รอให้สถานะเป็นบันทึกแล้วก่อนปิดหน้า</li>
+        <li>ปุ่ม <b>ประวัติ</b> แสดงเวอร์ชันย้อนหลัง เลือก <b>ย้อนกลับ</b> เพื่อกู้เนื้อหาเวอร์ชันหนึ่ง การกู้คืนจะสร้างเวอร์ชันใหม่ ไม่ลบประวัติเดิม</li>
+        <li>กด <b>ตรวจความพร้อม</b> ก่อนส่งออก ระบบตรวจสถานะข่าวและการเข้าถึงภาพอ้างอิง หากข่าวถูกถอนอนุมัติหรือภาพเปิดไม่ได้ ระบบจะแจ้งและหยุดส่งออก</li>
+        <li><b>PNG</b> ส่งออกหน้าปัจจุบันเท่านั้น · <b>PDF</b> ส่งออกทุกหน้าในชุดงาน</li>
+      </ul>
+      <div class="two-col">
+        <div class="card"><h3>PNG</h3><p>เหมาะกับการนำภาพหน้าไปใช้งานต่อ ได้ภาพความละเอียด 2× จากขนาดเอกสาร โดยไม่ขึ้นกับระดับซูมบนหน้าจอ</p></div>
+        <div class="card"><h3>PDF</h3><p>แต่ละหน้าเป็นภาพ raster ไม่มีข้อความที่เลือกหรือค้นหาได้ A4 แนวตั้งได้ประมาณ 1588 × 2246 px จึงไม่ใช่ไฟล์ตั้งโรงพิมพ์ 300 DPI</p></div>
+      </div>
+      <div class="callout alert"><b>ข้อมูลชนกัน:</b> หากมีคนอื่นบันทึกชุดงานเดียวกัน ระบบหยุด autosave และให้กด <b>โหลดเวอร์ชันล่าสุด</b> การยืนยันจะทิ้งการแก้ไขที่ยังไม่บันทึก หากยังไม่พร้อมให้ยกเลิกและคัดลอก/บันทึกงานของตนก่อน อย่าแก้ชุดเดียวกันพร้อมกันหลายคน</div>
+    </section>
+
+    <section class="chapter" id="trash">
+      <div class="chapter-kicker">09 · กู้คืนข่าว</div>
+      <h2>ถังขยะและการกู้คืน</h2>
+      <p>ผู้ส่งข่าวย้าย/กู้คืนได้เฉพาะร่างของตนเอง ผู้ตรวจและ Admin จัดการข่าวได้ตามสิทธิ์ ข่าวในถังขยะจะไม่อยู่ในรายการปกติและไม่สามารถดาวน์โหลดภาพหรือใช้ใน Studio จนกว่าจะกู้คืน</p>
+      <figure>
+        <div class="screen trash-screen"><img src="siya-news-guide/images/news-trash-action.png" alt="ตัวอย่างหน้าข่าวในถังขยะบนมือถือ แสดงปุ่มกู้คืนข่าวและคำเตือนเกี่ยวกับสถานะ"></div>
+        <figcaption>ภาพที่ 5 · ตัวอย่างมุมมองถังขยะบนมือถือจากชุดทดสอบ ข้อมูลตัวอย่างเป็นข้อมูลสังเคราะห์</figcaption>
+      </figure>
+      <ol class="steps">
+        <li>เลือกแท็บ <b>ถังขยะ</b> และเปิดข่าวที่ต้องการ</li>
+        <li>ตรวจหัวข้อและสถานะให้แน่ใจ แล้วกด <b>กู้คืนข่าว</b> และยืนยัน</li>
+        <li>ร่างเดิมจะกลับเป็นร่าง ส่วนข่าวที่เคยส่งตรวจหรือผ่านตรวจจะกลับเข้าคิวตรวจคำ ไม่อนุมัติให้อัตโนมัติ</li>
+      </ol>
+      <div class="callout warn">การย้ายเข้าถังขยะเป็นการลบแบบกู้คืนได้ ไม่มีปุ่มลบถาวรในหน้าผู้ใช้ ข่าวที่มีการแก้ไขแต่ยังไม่บันทึกจะไม่ถูกรวมไปกับการย้ายถังขยะ</div>
+    </section>
+
+    <section class="chapter" id="troubleshoot">
+      <div class="chapter-kicker">10 · ช่วยเหลือ</div>
+      <h2>แก้ปัญหาที่พบบ่อย</h2>
+      <div class="faq">
+        <details open><summary>ไม่เห็นเมนูสร้างข่าวหรือจัดหน้าวารสาร</summary><p>ตรวจว่าลงชื่อเข้าใช้บัญชีที่ถูกต้อง หากยังไม่เห็น ให้ Admin ตรวจสิทธิ์ `news_submit` สำหรับผู้ส่ง หรือ `news_producer` สำหรับ Studio แล้วโหลดหน้าใหม่</p></details>
+        <details open><summary>ไม่มีข่าวในคลังของ Studio</summary><p>Studio แสดงเฉพาะข่าวที่ผ่านตรวจ ลองค้นด้วยคำอื่น ตรวจแท็บ “พร้อมจัดทำ” และให้ผู้ตรวจผ่านข่าวก่อน ข่าวที่กลับเข้าคิวตรวจจะไม่ปรากฏจนกว่าจะอนุมัติอีกครั้ง</p></details>
+        <details open><summary>ปุ่มส่งออกไม่ทำงานหรือภาพหาย</summary><p>กด “ตรวจความพร้อม” ตรวจข้อความสถานะ และลองเปิดข่าวต้นทางว่าผ่านตรวจอยู่หรือไม่ หากภาพโหลดไม่สำเร็จให้กดลองแสดงหน้าใหม่ แล้วตรวจความพร้อมก่อนส่งออกอีกครั้ง</p></details>
+        <details open><summary>ขึ้นว่ามีเวอร์ชันใหม่จากที่อื่น</summary><p>Autosave หยุดเพื่อป้องกันเขียนทับงานคนอื่น คัดลอกงานที่ยังไม่บันทึกไว้ก่อน แล้วจึงเลือกโหลดเวอร์ชันล่าสุด หรือยกเลิกเพื่อกลับไปจัดการงานเดิม</p></details>
+        <details open><summary>แก้ข่าวแล้วข่าวหายจาก Studio</summary><p>การเปลี่ยนเนื้อหาหรือภาพของข่าวที่อนุมัติจะนำข่าวกลับเข้าคิวตรวจ ผู้ตรวจต้องตรวจและผ่านข่าวอีกครั้งก่อนผู้ผลิตจะใช้งานได้</p></details>
+        <details open><summary>กำลังจะออกจากหน้าแต่ยังไม่มั่นใจว่าบันทึกหรือไม่</summary><p>หน้าข่าวไม่มี autosave ให้กดบันทึกด้วยตนเอง ส่วน Studio ให้รอสถานะ “บันทึกแล้ว” ทั้งสองหน้าจะแจ้งเตือนเมื่อมีงานที่ยังไม่เรียบร้อย อย่าปิดแท็บทันทีระหว่างกำลังบันทึก</p></details>
+      </div>
+      <div class="section-break"></div>
+      <h3>เช็กลิสต์ก่อนส่งงานจัดหน้า</h3>
+      <ul class="checklist">
+        <li>ข่าวทุกชิ้นที่ใช้ยังมีสถานะผ่านตรวจ</li>
+        <li>ตรวจหัวข้อ ชื่อ วันที่ เครดิตภาพ และการสะกดบนผืนผ้าใบด้วยตนเอง</li>
+        <li>ภาพไม่ถูกยืดผิดสัดส่วน และจุดสำคัญไม่ถูกตัดด้วยกรอบครอป</li>
+        <li>ระยะขอบและองค์ประกอบไม่ชิดขอบหน้ากระดาษเกินไป</li>
+        <li>สถานะ Studio เป็น “บันทึกแล้ว” และกด “ตรวจความพร้อม” ผ่าน</li>
+        <li>เลือก PNG สำหรับหน้าเดียว หรือ PDF สำหรับทุกหน้า แล้วเปิดไฟล์ที่ดาวน์โหลดตรวจอีกครั้ง</li>
+      </ul>
+      <div class="foot">SIYA NEWS · คู่มือผู้ใช้งาน · ใช้ภายใน E-Office เท่านั้น<br>ฟอนต์ Sarabun · ภาพหน้าจอระบบจากชุดทดสอบที่ใช้ข้อมูลสังเคราะห์</div>
+    </section>
+  </main>
+</body>
+</html>
