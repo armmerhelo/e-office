@@ -501,7 +501,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         .audit-empty { color: #94a3b8; font-size: 13px; }
         .audit-method { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; background: #eef2ff; color: #4338ca; font-size: 11px; }
 
-        @media (max-width: 840px) {
+        @media (max-width: 900px) {
             .signing-header { flex-wrap: wrap; justify-content: center; gap: 10px; }
             .signing-brand { width: 100%; justify-content: flex-start; }
             .signing-tools { order: 2; }
