@@ -408,7 +408,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         .stamp-dot { position: absolute; right: 7px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
         .page-indicator { min-width: 82px; text-align: center; font-size: 12px; color: #475569; white-space: nowrap; }
         .download-label { display: inline; }
-        #toast { bottom: calc(96px + env(safe-area-inset-bottom)) !important; max-width: min(560px, calc(100vw - 24px)); }
+        #toast { bottom: calc(var(--toast-bottom-offset, 24px) + env(safe-area-inset-bottom, 0px)) !important; max-width: min(560px, calc(100vw - 24px)); transition-property: opacity, transform, translate; }
 
         #document-container {
             min-height: 0;
@@ -528,7 +528,6 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
             .zoom-group { order: 3; }
             .download-label { display: none; }
             .save-success { right: 12px; left: 12px; width: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
-            #toast { bottom: calc(110px + env(safe-area-inset-bottom)) !important; }
         }
         @media (max-width: 420px) {
             .tool-group { width: 100%; justify-content: space-between; }
@@ -644,7 +643,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         <div class="save-success__actions">
             <button id="success-download" type="button" class="eo-btn eo-btn--secondary eo-btn--sm" onclick="downloadDocument()">ดาวน์โหลดสำเนา</button>
             <a class="eo-btn eo-btn--primary eo-btn--sm" href="../index.php">กลับหน้าหลัก</a>
-            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="document.getElementById('save-success').classList.add('hidden')" aria-label="ปิด">×</button>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="dismissSaveSuccess()" aria-label="ปิด">×</button>
         </div>
     </div>
 

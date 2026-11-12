@@ -111,6 +111,7 @@ function markDirty() {
     dirty = true;
     stampIntentConfirmed = false;
     byId('save-success')?.classList.add('hidden');
+    positionToast();
     updateSaveState();
 }
 
@@ -282,6 +283,7 @@ function bindUi() {
     window.addEventListener('focus', refreshReceiptScopesIfNeeded);
     window.addEventListener('load', updateSaveState);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshReceiptScopesIfNeeded(); });
+    window.addEventListener('resize', positionToast, {passive: true});
 }
 
 async function refreshReceiptScopesIfNeeded() {
@@ -1099,6 +1101,12 @@ function showSaveSuccess(result) {
     if (result?.registered_receipt_departments?.length) pieces.push(`ลงทะเบียนรับ ${result.registered_receipt_departments.join(', ')}`);
     detail.textContent = pieces.join(' • ') || 'ระบบบันทึกไฟล์ลงนามเรียบร้อย';
     panel.classList.remove('hidden');
+    positionToast();
+}
+
+function dismissSaveSuccess() {
+    byId('save-success')?.classList.add('hidden');
+    positionToast();
 }
 
 async function downloadDocument() {
@@ -1296,11 +1304,23 @@ function showLoading(show, text) {
     element.classList.toggle('hidden', !show);
 }
 
+function positionToast() {
+    const toast = byId('toast');
+    const panel = byId('save-success');
+    if (!toast) return;
+    const panelVisible = panel && !panel.classList.contains('hidden');
+    const bottom = panelVisible
+        ? Math.ceil(window.innerHeight - panel.getBoundingClientRect().top + 12)
+        : 24;
+    toast.style.setProperty('--toast-bottom-offset', `${bottom}px`);
+}
+
 function showToast(message, type = 'info') {
     const toast = byId('toast');
     const icon = byId('toast-icon');
     const label = byId('toast-message');
     if (!toast || !label) return;
+    positionToast();
     label.textContent = message;
     if (icon) {
         if (type === 'success') {

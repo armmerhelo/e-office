@@ -72,6 +72,15 @@ async function request(route,body,auth=''){
  const saved=await evaluate('window.__esignSaved');
  assert.equal(saved?.status,'success','real stamp-only save must succeed');
  assert.equal(await evaluate("document.getElementById('save-success').classList.contains('hidden')"),false,'success panel remains visible');
+ const saveFeedback=[];
+ await until("getComputedStyle(document.getElementById('toast')).opacity==='1'");
+ for(const width of [390,768,1024]){
+  await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<700});
+  await until("(()=>{const t=document.getElementById('toast').getBoundingClientRect(),p=document.getElementById('save-success').getBoundingClientRect();return !(t.left<p.right&&t.right>p.left&&t.top<p.bottom&&t.bottom>p.top)})()");
+  saveFeedback.push(await evaluate("(()=>{const el=document.getElementById('toast'),rect=id=>document.getElementById(id).getBoundingClientRect();const toast=rect('toast'),panel=rect('save-success');return {width:innerWidth,toastVisible:el.classList.contains('opacity-100'),overlap:toast.left<panel.right&&toast.right>panel.left&&toast.top<panel.bottom&&toast.bottom>panel.top,transition:getComputedStyle(el).transitionProperty,toast:{top:toast.top,bottom:toast.bottom},panel:{top:panel.top,bottom:panel.bottom}}})()"));
+ }
+ assert.ok(saveFeedback.every(layout=>layout.toastVisible&&!layout.overlap&&!layout.transition.includes('bottom')),'save toast must remain visible without obscuring the persistent success panel: '+JSON.stringify(saveFeedback));
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
  assert.equal(await evaluate("document.getElementById('btn-save').disabled"),true,'save is disabled until something changes again');
  await evaluate('openStampModal()');
  await evaluate("['stamp-text-1','stamp-text-2','stamp-text-3','stamp-text-4'].forEach(id=>{document.getElementById(id).value='';});closeStampModal();openStampModal()");
@@ -207,7 +216,15 @@ async function request(route,body,auth=''){
   await evaluate('closeAuditDrawer()');
   assert.equal(await evaluate("document.getElementById('audit-overlay').classList.contains('hidden')"),true,'history drawer closes');
 
-  for(const width of [390,320]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:true});assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true,'no mobile overflow '+width);}
+  for(const width of [1088,900,872,840,768,601,600,390,320]){
+   await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<700});
+   const layout=await evaluate(`(()=>{const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom}};const brand=box('.signing-brand'),tools=box('.signing-tools'),actions=box('.signing-actions'),audit=document.getElementById('btn-audit');const overlap=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;return {scrollWidth:document.documentElement.scrollWidth,brandOnSeparateRow:brand.bottom<=tools.top,groupsOverlap:overlap(tools,actions),historyText:audit.innerText.trim(),historyLabel:audit.getAttribute('aria-label')}})()`);
+   assert.ok(layout.scrollWidth<=width,'no horizontal overflow '+width);
+   assert.equal(layout.brandOnSeparateRow,width<=900,'header wraps at the tablet breakpoint '+width);
+   assert.equal(layout.groupsOverlap,false,'toolbar and actions do not overlap '+width);
+   assert.equal(layout.historyText,'','history stays icon-only '+width);
+   assert.equal(layout.historyLabel,'ประวัติการลงนาม','icon-only history remains accessible '+width);
+  }
   const outsider=await login('outsider');
   await send('Network.setCookie',{name:'User_Token',value:outsider.split(';')[0].split('=')[1],url:base,httpOnly:true});
   await send('Page.navigate',{url:base+'/e-sign/e-sign.php?Doc_Id='+multiDoc+'&File_Path='+encodeURIComponent(multiFile)+'&Year='+encodeURIComponent(multiYear)});
@@ -215,7 +232,7 @@ async function request(route,body,auth=''){
   assert.ok((await evaluate('document.body.innerText')).includes('ไม่มีสิทธิ์'),'unauthorized signer sees a readable access error');
   assert.equal(await evaluate("typeof window.saveToServer"),'undefined','unauthorized page never loads the signing editor');
  assert.equal(exceptions.length,0,JSON.stringify(exceptions));
- console.log('PASS real stamp-only save/Back, legacy read completion without signature, categories, cross-document storage, failed background list/retry and mobile 390/320px');
+ console.log('PASS signing flows, history drawer, responsive toolbar at 1088–320px, icon-only history, no overflow and non-overlapping save feedback');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
  if(socket)socket.close();if(chrome){const done=new Promise(resolve=>chrome.once('exit',resolve));chrome.kill();await done;}server.kill();
  if(doc)cp.execFileSync(php,['-r',`require 'config/bootstrap.php';$p=app_pdo();$q=$p->prepare('DELETE FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([(string)${doc}]);$q=$p->prepare('DELETE FROM t_document WHERE Doc_Id=?');$q->execute([${doc}]);`],{env,stdio:'ignore'});
