@@ -214,6 +214,51 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         }
 
         /* --- Signing workspace shell --- */
+        .signing-header-wrap {
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(15,23,42,.05);
+            flex: none;
+            z-index: 20;
+        }
+        .signing-header {
+            max-width: 1440px;
+            margin: 0 auto;
+            padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            min-width: 0;
+        }
+        .signing-brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: none; }
+        .signing-logo { width: 50px; height: 50px; object-fit: contain; flex: none; }
+        .signing-title { margin: 0; font-size: 18px; line-height: 1.25; font-weight: 700; color: #1e293b; white-space: nowrap; }
+        .signing-subtitle { margin: 1px 0 0; font-size: 12px; line-height: 1.3; color: #64748b; }
+        .signing-tools {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 6px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            box-shadow: inset 0 1px 3px rgba(15,23,42,.06);
+            min-width: 0;
+            flex: none;
+        }
+        .signing-actions { display: flex; align-items: center; gap: 8px; flex: none; box-sizing: border-box; }
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
         .app-header {
             background: #fff;
             border-bottom: 1px solid #e2e8f0;
@@ -324,7 +369,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         .save-success {
             position: fixed;
             right: 18px;
-            bottom: calc(92px + env(safe-area-inset-bottom));
+            bottom: calc(18px + env(safe-area-inset-bottom));
             width: min(460px, calc(100vw - 32px));
             background: #fff;
             border: 1px solid #a7f3d0;
@@ -363,7 +408,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         .stamp-dot { position: absolute; right: 7px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
         .page-indicator { min-width: 82px; text-align: center; font-size: 12px; color: #475569; white-space: nowrap; }
         .download-label { display: inline; }
-        #toast { bottom: calc(96px + env(safe-area-inset-bottom)) !important; max-width: min(560px, calc(100vw - 24px)); }
+        #toast { bottom: calc(var(--toast-bottom-offset, 24px) + env(safe-area-inset-bottom, 0px)) !important; max-width: min(560px, calc(100vw - 24px)); transition-property: opacity, transform, translate; }
 
         #document-container {
             min-height: 0;
@@ -456,6 +501,19 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         .audit-empty { color: #94a3b8; font-size: 13px; }
         .audit-method { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; background: #eef2ff; color: #4338ca; font-size: 11px; }
 
+        @media (max-width: 900px) {
+            .signing-header { flex-wrap: wrap; justify-content: center; gap: 10px; }
+            .signing-brand { width: 100%; justify-content: flex-start; }
+            .signing-tools { order: 2; }
+            .signing-actions { order: 3; margin-left: auto; }
+        }
+        @media (max-width: 600px) {
+            .signing-header { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+            .signing-logo { width: 42px; height: 42px; }
+            .signing-title { font-size: 16px; }
+            .signing-tools { width: 100%; overflow-x: auto; justify-content: flex-start; }
+            .signing-actions { width: 100%; justify-content: flex-end; }
+        }
         @media (max-width: 760px) {
             .app-header__inner { gap: 8px; padding-top: 8px; padding-bottom: 8px; }
             .app-brand { display: none; }
@@ -469,8 +527,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
             .page-group { order: 2; }
             .zoom-group { order: 3; }
             .download-label { display: none; }
-            .save-success { right: 12px; left: 12px; width: auto; bottom: calc(150px + env(safe-area-inset-bottom)); }
-            #toast { bottom: calc(165px + env(safe-area-inset-bottom)) !important; }
+            .save-success { right: 12px; left: 12px; width: auto; bottom: calc(12px + env(safe-area-inset-bottom)); }
         }
         @media (max-width: 420px) {
             .tool-group { width: 100%; justify-content: space-between; }
@@ -496,36 +553,64 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         <p id="loading-text" class="text-gray-600 font-semibold">กำลังเชื่อมต่อ Server...</p>
     </div>
 
-    <!-- Document header -->
-    <header id="app-header" class="app-header">
-        <div class="app-header__inner">
-            <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </a>
-            <img class="app-brand" src="../img/icon_app_xl.png" width="42" height="42" alt="">
-            <div class="app-doc">
-                <div class="app-doc__eyebrow">
-                    <span id="doc-number"><?= htmlspecialchars((string)($doc['Doc_Number']??''),ENT_QUOTES,'UTF-8') ?></span>
-                    <span id="doc-status-badge" class="status-badge <?= ($myAccess['Is_Signed']??'false')==='true'?'status-badge--signed':'' ?>"><?= ($myAccess['Is_Signed']??'false')==='true'?'ลงนามแล้ว':'รอลงนาม' ?></span>
+    <!-- Toolbar -->
+    <header class="signing-header-wrap">
+        <div class="signing-header">
+            <div class="signing-brand">
+                <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </a>
+                <img class="signing-logo" src="../img/icon_app_xl.png" width="50" height="50" alt="">
+                <div>
+                    <h1 class="signing-title">ระบบหนังสือราชการ</h1>
+                    <p class="signing-subtitle">E-Office</p>
                 </div>
-                <h1 id="doc-name" class="app-doc__title"><?= htmlspecialchars((string)($doc['Doc_Name']??'เอกสาร'),ENT_QUOTES,'UTF-8') ?></h1>
-                <p class="app-doc__meta">
-                    <?php
-                    $metaParts=array_filter([
-                        trim((string)($doc['Doc_Date_Receive']??($doc['Doc_Date']??''))),
-                        trim((string)($doc['Doc_Receive_From']??'')),
-                        'ปี '.$year,
-                    ],static fn($value)=>$value!=='');
-                    echo htmlspecialchars(implode(' • ',$metaParts),ENT_QUOTES,'UTF-8');
-                    ?>
-                </p>
             </div>
-            <div class="app-header__actions">
-                <span id="save-state" class="save-state" role="status" aria-live="polite">พร้อมลงนาม</span>
-                <button id="btn-audit" type="button" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="openAuditDrawer()" aria-label="ประวัติการลงนาม">
-                    <i data-lucide="history" class="w-4 h-4"></i><span class="audit-label">ประวัติ</span>
+
+            <div class="signing-tools" role="group" aria-label="เครื่องมือลงนาม">
+                <button type="button" onclick="setTool('hand')" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active" title="เลื่อนดู (Hand)" aria-label="เลื่อนดูเอกสาร">
+                    <i data-lucide="hand" class="w-5 h-5"></i>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" onclick="setTool('pen')" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกาสีดำ" aria-label="ปากกาสีดำ">
+                    <i data-lucide="pen-tool" class="w-5 h-5"></i>
+                </button>
+                <button type="button" onclick="setTool('whiteout')" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn relative" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว สำหรับปิดทับข้อความ">
+                    <i data-lucide="highlighter" class="w-5 h-5"></i>
+                    <span class="whiteout-dot" aria-hidden="true"></span>
+                </button>
+                <button type="button" onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ยางลบ" aria-label="ยางลบ">
+                    <i data-lucide="eraser" class="w-5 h-5"></i>
+                </button>
+                <button type="button" onclick="openStampModal()" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn group relative" title="ประทับตรา" aria-label="ประทับตรา">
+                    <i data-lucide="stamp" class="w-5 h-5"></i>
+                    <span class="stamp-dot" aria-hidden="true"></span>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" onclick="undoLastAction()" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ">
+                    <i data-lucide="undo-2" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="signing-actions">
+                <div class="sr-only">
+                    <span id="doc-number"><?= htmlspecialchars((string)($doc['Doc_Number']??''),ENT_QUOTES,'UTF-8') ?></span>
+                    <span id="doc-name"><?= htmlspecialchars((string)($doc['Doc_Name']??'เอกสาร'),ENT_QUOTES,'UTF-8') ?></span>
+                    <span id="doc-status-badge" class="<?= ($myAccess['Is_Signed']??'false')==='true'?'status-badge--signed':'' ?>"><?= ($myAccess['Is_Signed']??'false')==='true'?'ลงนามแล้ว':'รอลงนาม' ?></span>
+                    <span id="save-state" role="status" aria-live="polite">พร้อมลงนาม</span>
+                    <span id="page-indicator" aria-live="polite">หน้า 1 / 1</span>
+                </div>
+                <button type="button" onclick="downloadDocument()" id="btn-download" class="eo-btn eo-btn--secondary eo-btn--icon" aria-label="ดาวน์โหลดเอกสาร" title="ดาวน์โหลดเอกสาร">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+                <button id="btn-audit" type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="openAuditDrawer()" aria-label="ประวัติการลงนาม" title="ประวัติการลงนาม">
+                    <i data-lucide="history" class="w-4 h-4"></i>
+                </button>
+                <button type="button" onclick="saveToServer()" id="btn-save" class="eo-btn eo-btn--primary" aria-busy="false">
+                    <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+                    <span>บันทึก</span>
                 </button>
             </div>
         </div>
@@ -545,7 +630,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
     <div id="session-banner" class="app-banner app-banner--warning hidden" role="status" aria-live="polite">
         <div class="app-banner__text">
             <strong>เซสชันหมดอายุ</strong>
-            <p>ลายเซ็นของคุณยังอยู่บนหน้านี้ กรุณาเข้าสู่ระบบในแท็บใหม่ แล้วกลับมากด “ลงนามและบันทึก” อีกครั้ง</p>
+            <p>ลายเซ็นของคุณยังอยู่บนหน้านี้ กรุณาเข้าสู่ระบบในแท็บใหม่ แล้วกลับมากด “บันทึก” อีกครั้ง</p>
         </div>
         <a class="eo-btn eo-btn--secondary eo-btn--sm" href="../index.php" target="_blank" rel="noopener">เข้าสู่ระบบ</a>
     </div>
@@ -558,7 +643,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         <div class="save-success__actions">
             <button id="success-download" type="button" class="eo-btn eo-btn--secondary eo-btn--sm" onclick="downloadDocument()">ดาวน์โหลดสำเนา</button>
             <a class="eo-btn eo-btn--primary eo-btn--sm" href="../index.php">กลับหน้าหลัก</a>
-            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="document.getElementById('save-success').classList.add('hidden')" aria-label="ปิด">×</button>
+            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="dismissSaveSuccess()" aria-label="ปิด">×</button>
         </div>
     </div>
 
@@ -572,57 +657,6 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
             <button onclick="loadServerDocument()" class="eo-btn eo-btn--secondary mt-4">ลองใหม่อีกครั้ง</button>
         </div>
     </main>
-
-    <!-- Bottom toolbar keeps save/actions reachable on tablets and phones. -->
-    <footer id="toolbar" class="app-toolbar">
-        <div class="tool-group" role="group" aria-label="เครื่องมือลงนาม">
-            <button type="button" onclick="setTool('hand')" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active" title="เลื่อนดู (Hand)" aria-label="เลื่อนดูเอกสาร">
-                <i data-lucide="hand" class="w-5 h-5"></i>
-            </button>
-            <span class="tool-sep" aria-hidden="true"></span>
-            <button type="button" onclick="setTool('pen')" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกาสีดำ" aria-label="ปากกาสีดำ">
-                <i data-lucide="pen-tool" class="w-5 h-5"></i>
-            </button>
-            <button type="button" onclick="setTool('whiteout')" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn relative" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว สำหรับปิดทับข้อความ">
-                <i data-lucide="highlighter" class="w-5 h-5"></i>
-                <span class="whiteout-dot" aria-hidden="true"></span>
-            </button>
-            <button type="button" onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ยางลบ" aria-label="ยางลบ">
-                <i data-lucide="eraser" class="w-5 h-5"></i>
-            </button>
-            <button type="button" onclick="openStampModal()" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn group relative" title="ประทับตรา" aria-label="ประทับตรา">
-                <i data-lucide="stamp" class="w-5 h-5"></i>
-                <span class="stamp-dot" aria-hidden="true"></span>
-            </button>
-            <span class="tool-sep" aria-hidden="true"></span>
-            <button type="button" onclick="undoLastAction()" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ">
-                <i data-lucide="undo-2" class="w-5 h-5"></i>
-            </button>
-        </div>
-
-        <div class="page-group" role="group" aria-label="นำทางหน้า">
-            <button type="button" id="page-prev" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="goToRelativePage(-1)" aria-label="หน้าก่อน">‹</button>
-            <span id="page-indicator" class="page-indicator" aria-live="polite">หน้า 1 / 1</span>
-            <button type="button" id="page-next" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="goToRelativePage(1)" aria-label="หน้าถัดไป">›</button>
-            <button type="button" id="page-last" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="goToLastPage()" aria-label="ไปหน้าสุดท้าย">ท้ายเอกสาร</button>
-        </div>
-
-        <div class="zoom-group" role="group" aria-label="ซูม">
-            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="changeZoom(-0.1)" aria-label="ซูมออก">−</button>
-            <button type="button" class="eo-btn eo-btn--ghost eo-btn--sm" onclick="resetZoom()" aria-label="พอดีความกว้าง">พอดี</button>
-            <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" onclick="changeZoom(0.1)" aria-label="ซูมเข้า">+</button>
-        </div>
-
-        <div class="action-group">
-            <button type="button" onclick="downloadDocument()" id="btn-download" class="eo-btn eo-btn--secondary" aria-label="ดาวน์โหลดเอกสาร">
-                <i data-lucide="download" class="w-4 h-4"></i><span class="download-label">ดาวน์โหลด</span>
-            </button>
-            <button type="button" onclick="saveToServer()" id="btn-save" class="eo-btn eo-btn--primary" aria-busy="false">
-                <i data-lucide="cloud-upload" class="w-4 h-4"></i>
-                <span>ลงนามและบันทึก</span>
-            </button>
-        </div>
-    </footer>
 
     <!-- Notification Toast -->
     <div id="toast" class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800/90 backdrop-blur text-white px-6 py-3 rounded-full shadow-2xl opacity-0 transition-all duration-300 pointer-events-none z-50 flex items-center gap-3 translate-y-4" role="status" aria-live="polite">
@@ -674,6 +708,24 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
             <div class="modal-card__foot">
                 <button type="button" onclick="closeStampModal()" class="eo-btn eo-btn--secondary">ยกเลิก</button>
                 <button type="button" onclick="confirmStampData()" class="eo-btn eo-btn--primary">ตกลง</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stamp-only signing intent -->
+    <div id="stamp-intent-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stamp-intent-title">
+        <div class="modal-card modal-card--confirm">
+            <div class="modal-card__head">
+                <h2 id="stamp-intent-title">ยืนยันการใช้ตราประทับ</h2>
+                <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="resolveStampIntent(false)" aria-label="ปิด">×</button>
+            </div>
+            <div class="modal-card__body">
+                <p>เอกสารนี้ยังไม่มีลายมือชื่อด้วยปากกา ระบบจะใช้ตราประทับเป็นลายเซ็นของคุณ</p>
+                <p class="muted">การยืนยันนี้เป็นเจตนาลงนาม ไม่ได้ยืนยันว่าตราเป็นลายมือชื่อจริง และจะถูกบันทึกในประวัติการลงนาม</p>
+            </div>
+            <div class="modal-card__foot">
+                <button type="button" class="eo-btn eo-btn--secondary" onclick="resolveStampIntent(false)">ยกเลิก</button>
+                <button id="stamp-intent-accept" type="button" class="eo-btn eo-btn--primary" onclick="resolveStampIntent(true)">ใช้ตราเป็นลายเซ็น</button>
             </div>
         </div>
     </div>
