@@ -327,6 +327,9 @@ const CONFIG = {
         let scale = CONFIG.SCALE;
         let currentTool = 'hand';
         let whiteoutWarningAccepted = false;
+        // Keep live strokes and history replays on the same geometry/color.
+        const TOOL_WIDTHS = {pen: 2, whiteout: 12, eraser: 20};
+        const TOOL_COLORS = {pen: '#000000', whiteout: '#ffffff'};
         let isDrawing = false;
         let lastX = 0;
         let lastY = 0;
@@ -603,18 +606,14 @@ const CONFIG = {
                 ctx.lineJoin = 'round';
 
                 // Adjust Pen/Eraser/Whiteout width based on Scale
+                const toolWidth = (TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5);
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = 20 * (scale / 1.5);
+                    ctx.lineWidth = toolWidth;
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
-                    if (currentTool === 'whiteout') {
-                        ctx.lineWidth = 12 * (scale / 1.5);
-                        ctx.strokeStyle = '#ffffff'; // Whiteout: paint over, does not erase PDF text
-                    } else {
-                        ctx.lineWidth = 2 * (scale / 1.5);
-                        ctx.strokeStyle = '#000000'; // Black Pen
-                    }
+                    ctx.lineWidth = toolWidth;
+                    ctx.strokeStyle = TOOL_COLORS[currentTool] || TOOL_COLORS.pen;
                 }
             };
 
@@ -638,14 +637,11 @@ const CONFIG = {
                 ctx.closePath();
 
                 if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
-                const isWhiteout = currentTool === 'whiteout';
                 documentHistory[pageNum].push({
                     tool: currentTool,
                     points: [...points],
-                    color: isWhiteout ? '#ffffff' : '#000000',
-                    width: currentTool === 'eraser'
-                        ? (20 * (scale / 1.5))
-                        : ((isWhiteout ? 12 : 2) * (scale / 1.5))
+                    color: TOOL_COLORS[currentTool] || TOOL_COLORS.pen,
+                    width: (TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5)
                 });
             };
 
