@@ -182,6 +182,11 @@ $doc_id_int         = (int)$Doc_Id;
                     <i data-lucide="pen-tool" class="w-5 h-5"></i>
                 </button>
 
+                <button onclick="setTool('whiteout')" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn relative flex-shrink-0" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว สำหรับปิดทับข้อความ">
+                    <i data-lucide="highlighter" class="w-5 h-5"></i>
+                    <span class="absolute bottom-1 right-1 w-2.5 h-2.5 rounded-full bg-white border border-gray-500" aria-hidden="true"></span>
+                </button>
+
                 <button onclick="setTool('eraser')" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn flex-shrink-0" title="ยางลบ" aria-label="ยางลบ">
                     <i data-lucide="eraser" class="w-5 h-5"></i>
                 </button>
@@ -321,6 +326,7 @@ const CONFIG = {
         let documentRevision = null;
         let scale = CONFIG.SCALE;
         let currentTool = 'hand';
+        let whiteoutWarningAccepted = false;
         let isDrawing = false;
         let lastX = 0;
         let lastY = 0;
@@ -475,6 +481,20 @@ const CONFIG = {
         // --- 4. TOOL LOGIC ---
 
         function setTool(toolName) {
+            if (toolName === 'whiteout' && !whiteoutWarningAccepted) {
+                const accepted = confirm(
+                    'ปากกาสีขาวใช้ "ปิดทับ" ข้อความเท่านั้น ไม่ได้ลบข้อมูลจริง\n\n' +
+                    '- ข้อความเดิมยังอยู่ในไฟล์ PDF และยังค้นหาคัดลอกได้\n' +
+                    '- พื้นหลังเอกสารที่ไม่ขาวสนิทจะเห็นรอยปิดทับ\n' +
+                    '- เอกสารราชการควรแก้ไขที่ต้นฉบับก่อนนำมาเซ็น\n\n' +
+                    'หากต้องการลบลายเส้นที่เขียนเอง ให้ใช้ยางลบ\n\n' +
+                    'ยืนยันเปิดใช้ปากกาสีขาว?'
+                );
+                if (!accepted) return;
+                whiteoutWarningAccepted = true;
+                showToast('ปากกาสีขาว: ปิดทับข้อความเท่านั้น ไม่ได้ลบข้อความจริง', 'info');
+            }
+
             currentTool = toolName;
 
             document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
@@ -488,7 +508,7 @@ const CONFIG = {
                     canvas.style.cursor = 'copy';
                 } else if (toolName === 'eraser') {
                     canvas.style.cursor = 'cell';
-                } else if (toolName === 'pen') {
+                } else if (toolName === 'pen' || toolName === 'whiteout') {
                     canvas.style.cursor = 'crosshair';
                 } else {
                     canvas.style.cursor = 'default';
@@ -582,14 +602,19 @@ const CONFIG = {
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
 
-                // Adjust Pen/Eraser width based on Scale
+                // Adjust Pen/Eraser/Whiteout width based on Scale
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.lineWidth = 20 * (scale / 1.5);
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
-                    ctx.lineWidth = 2 * (scale / 1.5);
-                    ctx.strokeStyle = '#000000'; // Black Pen
+                    if (currentTool === 'whiteout') {
+                        ctx.lineWidth = 12 * (scale / 1.5);
+                        ctx.strokeStyle = '#ffffff'; // Whiteout: paint over, does not erase PDF text
+                    } else {
+                        ctx.lineWidth = 2 * (scale / 1.5);
+                        ctx.strokeStyle = '#000000'; // Black Pen
+                    }
                 }
             };
 
@@ -613,11 +638,14 @@ const CONFIG = {
                 ctx.closePath();
 
                 if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
+                const isWhiteout = currentTool === 'whiteout';
                 documentHistory[pageNum].push({
                     tool: currentTool,
                     points: [...points],
-                    color: '#000000',
-                    width: currentTool === 'eraser' ? (20 * (scale / 1.5)) : (2 * (scale / 1.5))
+                    color: isWhiteout ? '#ffffff' : '#000000',
+                    width: currentTool === 'eraser'
+                        ? (20 * (scale / 1.5))
+                        : ((isWhiteout ? 12 : 2) * (scale / 1.5))
                 });
             };
 
@@ -722,10 +750,19 @@ const CONFIG = {
             return match ? decodeURIComponent(match[1]) : '';
         }
 
+        // Whiteout pixels are opaque white and must never count as a signature.
+        // Only visible, non-white pixels represent real ink or stamp content.
+        function hasVisibleNonWhitePixel(pixels) {
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i + 3] > 0 && (pixels[i] < 251 || pixels[i + 1] < 251 || pixels[i + 2] < 251)) return true;
+            }
+            return false;
+        }
+
         function hasVisibleSignature() {
-            // History alone is insufficient: Undo or the eraser may leave an
-            // empty overlay. Inspect only the current user's drawing layer,
-            // never the original PDF (which may contain someone else's ink).
+            // History alone is insufficient: Undo, the eraser, or whiteout may
+            // leave an empty overlay. Inspect only the current user's drawing
+            // layer, never the original PDF (which may contain someone else's ink).
             return Object.entries(documentHistory).some(([page, actions]) => {
                 const hasInkAction = actions.some(action => action.tool === 'stamp' ||
                     (action.tool === 'pen' && action.points?.some(point =>
@@ -734,8 +771,7 @@ const CONFIG = {
                 const canvas = document.getElementById(`draw-layer-${page}`);
                 if (!canvas) return false;
                 const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-                for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) return true;
-                return false;
+                return hasVisibleNonWhitePixel(pixels);
             });
         }
 
@@ -744,13 +780,14 @@ const CONFIG = {
                 if (!actions.some(action => action.tool === 'pen' && action.points?.some(point => point.x !== action.points[0].x || point.y !== action.points[0].y))) return false;
                 const visible = document.getElementById(`draw-layer-${page}`);
                 if (!visible) return false;
-                // Replay only pen/eraser actions: a surviving stamp must not
-                // turn fully erased pen marks into an all-department send.
+                // Replay pen/eraser/whiteout actions: a surviving stamp must not
+                // turn fully erased pen marks into an all-department send, and
+                // whiteout must be able to cover pen ink.
                 const layer = document.createElement('canvas');
                 layer.width = visible.width; layer.height = visible.height;
                 const ctx = layer.getContext('2d');
                 for (const action of actions) {
-                    if (!['pen', 'eraser'].includes(action.tool) || !action.points?.length) continue;
+                    if (!['pen', 'eraser', 'whiteout'].includes(action.tool) || !action.points?.length) continue;
                     ctx.beginPath(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = action.width;
                     ctx.globalCompositeOperation = action.tool === 'eraser' ? 'destination-out' : 'source-over';
                     ctx.strokeStyle = action.color || '#000000';
@@ -762,8 +799,7 @@ const CONFIG = {
                     ctx.stroke(); ctx.closePath();
                 }
                 const pixels = ctx.getImageData(0, 0, layer.width, layer.height).data;
-                for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 0) return true;
-                return false;
+                return hasVisibleNonWhitePixel(pixels);
             });
         }
 
