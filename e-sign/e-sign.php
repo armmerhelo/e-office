@@ -678,6 +678,24 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         </div>
     </div>
 
+    <!-- Stamp-only signing intent -->
+    <div id="stamp-intent-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stamp-intent-title">
+        <div class="modal-card modal-card--confirm">
+            <div class="modal-card__head">
+                <h2 id="stamp-intent-title">ยืนยันการใช้ตราประทับ</h2>
+                <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="resolveStampIntent(false)" aria-label="ปิด">×</button>
+            </div>
+            <div class="modal-card__body">
+                <p>เอกสารนี้ยังไม่มีลายมือชื่อด้วยปากกา ระบบจะใช้ตราประทับเป็นลายเซ็นของคุณ</p>
+                <p class="muted">การยืนยันนี้เป็นเจตนาลงนาม ไม่ได้ยืนยันว่าตราเป็นลายมือชื่อจริง และจะถูกบันทึกในประวัติการลงนาม</p>
+            </div>
+            <div class="modal-card__foot">
+                <button type="button" class="eo-btn eo-btn--secondary" onclick="resolveStampIntent(false)">ยกเลิก</button>
+                <button id="stamp-intent-accept" type="button" class="eo-btn eo-btn--primary" onclick="resolveStampIntent(true)">ใช้ตราเป็นลายเซ็น</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Conflict recovery -->
     <div id="conflict-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
         <div class="modal-card">

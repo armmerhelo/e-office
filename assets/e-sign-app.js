@@ -35,6 +35,10 @@ let currentPage = 1;
 let zoomLevel = 1;
 let currentStampDepartment = '';
 let stampOpener = null;
+let stampIntentConfirmed = false;
+let stampIntentResolver = null;
+let stampIntentOpener = null;
+const dialogOpeners = new Map();
 let savingDocument = false;
 let loadingDocument = false;
 let dirty = false;
@@ -105,6 +109,7 @@ function pendingReceiptCount() {
 
 function markDirty() {
     dirty = true;
+    stampIntentConfirmed = false;
     byId('save-success')?.classList.add('hidden');
     updateSaveState();
 }
@@ -199,6 +204,31 @@ function startApp() {
     loadServerDocument();
 }
 
+function visibleDialogs() {
+    return [...document.querySelectorAll('[role="dialog"]')].filter(dialog => !dialog.classList.contains('hidden'));
+}
+
+function focusableElements(container) {
+    return [...container.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.hidden && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden');
+}
+
+function rememberDialogOpener(id) {
+    if (!dialogOpeners.has(id)) dialogOpeners.set(id, document.activeElement);
+}
+
+function restoreDialogFocus(id) {
+    const opener = dialogOpeners.get(id);
+    dialogOpeners.delete(id);
+    if (opener && typeof opener.focus === 'function') opener.focus();
+}
+
+function focusFirstDialogControl(dialog) {
+    if (!dialog || dialog.classList.contains('hidden')) return;
+    const first = focusableElements(dialog)[0];
+    if (first) first.focus();
+}
+
 function bindUi() {
     const stampSelect = byId('stamp-text-1');
     if (stampSelect) {
@@ -211,12 +241,31 @@ function bindUi() {
         byId(id)?.addEventListener('input', generateStampPreview);
     });
     document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            if (!byId('stamp-modal')?.classList.contains('hidden')) closeStampModal();
-            if (!byId('conflict-modal')?.classList.contains('hidden')) hideConflictModal();
-            if (!byId('audit-overlay')?.classList.contains('hidden')) closeAuditDrawer();
+        const dialogs = visibleDialogs();
+        if (dialogs.length && event.key === 'Tab') {
+            const dialog = dialogs.at(-1);
+            const items = focusableElements(dialog);
+            if (!items.length) { event.preventDefault(); return; }
+            const first = items[0];
+            const last = items.at(-1);
+            const active = document.activeElement;
+            if (event.shiftKey) {
+                if (active === first || !dialog.contains(active)) { event.preventDefault(); last.focus(); }
+            } else if (active === last || !dialog.contains(active)) {
+                event.preventDefault();
+                first.focus();
+            }
         }
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.target.matches('input,textarea,select')) {
+        if (event.key === 'Escape') {
+            const dialog = dialogs.at(-1);
+            if (!dialog) return;
+            event.preventDefault();
+            if (dialog.id === 'stamp-intent-modal') resolveStampIntent(false);
+            else if (dialog.id === 'stamp-modal') closeStampModal();
+            else if (dialog.id === 'conflict-modal') hideConflictModal();
+            else if (dialog.id === 'audit-overlay') closeAuditDrawer();
+        }
+        if (!dialogs.length && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !event.target.matches('input,textarea,select')) {
             event.preventDefault();
             undoLastAction();
         }
@@ -336,6 +385,7 @@ async function renderPDF(data) {
     byId('document-container')?.scrollTo({top: 0, left: 0});
     documentHistory = {};
     dirty = false;
+    stampIntentConfirmed = false;
     savedAt = null;
     savedRevision = null;
     receiptScopes = null;
@@ -551,6 +601,33 @@ function setupDrawingEvents(canvas, pageNum) {
     const ctx = canvas.getContext('2d');
     let points = [];
     let penActive = false;
+    let gesture = null;
+    let pendingStamp = null;
+
+    const touchDistance = touches => Math.hypot(
+        (touches[0]?.clientX || 0) - (touches[1]?.clientX || 0),
+        (touches[0]?.clientY || 0) - (touches[1]?.clientY || 0)
+    );
+    const touchCenter = touches => ({
+        x: ((touches[0]?.clientX || 0) + (touches[1]?.clientX || 0)) / 2,
+        y: ((touches[0]?.clientY || 0) + (touches[1]?.clientY || 0)) / 2
+    });
+    const beginGesture = event => {
+        pendingStamp = null;
+        if (isDrawing) {
+            isDrawing = false;
+            redrawCanvas(pageNum, documentHistory[pageNum] || []).catch(error => showToast(error.message, 'error'));
+        }
+        const center = touchCenter(event.touches);
+        const container = typeof byId === 'function' ? byId('document-container') : null;
+        gesture = {
+            distance: Math.max(1, touchDistance(event.touches)),
+            zoom: zoomLevel,
+            center,
+            scrollLeft: container?.scrollLeft || 0,
+            scrollTop: container?.scrollTop || 0
+        };
+    };
 
     const getPos = (e) => {
         const rect = canvas.getBoundingClientRect();
@@ -587,6 +664,7 @@ function setupDrawingEvents(canvas, pageNum) {
                     try {
                         if (pageHistory !== documentHistory) { resolve(); return; }
                         const pageWidth = (typeof pageMetrics !== 'undefined' && pageMetrics[pageNum]?.width) || canvas.width || 1488;
+                        const pageHeight = (typeof pageMetrics !== 'undefined' && pageMetrics[pageNum]?.height) || canvas.height || 2105;
                         const natW = stampToDraw.naturalWidth || 100;
                         const natH = stampToDraw.naturalHeight || 50;
                         const aspectRatio = natH / natW;
@@ -598,7 +676,7 @@ function setupDrawingEvents(canvas, pageNum) {
                         ctx.drawImage(stampToDraw, drawX, drawY, stampW, stampH);
                         if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
                         documentHistory[pageNum].push({
-                            tool: 'stamp', x: drawX, y: drawY, w: stampW, h: stampH,
+                            tool: 'stamp', x: drawX / pageWidth, y: drawY / pageHeight, w: stampW / pageWidth, h: stampH / pageHeight,
                             src: stampSource, department: stampDepartment,
                             saved: false, receiptRegistered: false
                         });
@@ -648,11 +726,13 @@ function setupDrawingEvents(canvas, pageNum) {
         isDrawing = false;
         ctx.closePath();
         if (!documentHistory[pageNum]) documentHistory[pageNum] = [];
+        const pageWidth = canvas.width || 1;
+        const pageHeight = canvas.height || 1;
         documentHistory[pageNum].push({
             tool: currentTool,
-            points: [...points],
+            points: points.map(point => ({x: point.x / pageWidth, y: point.y / pageHeight})),
             color: TOOL_COLORS[currentTool] || TOOL_COLORS.pen,
-            width: (TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5)
+            width: ((TOOL_WIDTHS[currentTool] || TOOL_WIDTHS.pen) * (scale / 1.5)) / pageWidth
         });
         if (typeof markDirty === 'function') markDirty();
     };
@@ -661,10 +741,55 @@ function setupDrawingEvents(canvas, pageNum) {
     canvas.addEventListener('mousemove', event => { if (!penActive) draw(event); });
     canvas.addEventListener('mouseup', event => { if (!penActive) stopDraw(event); });
     canvas.addEventListener('mouseout', stopDraw);
-    canvas.addEventListener('touchstart', event => { if (!penActive && (event.touches?.length ?? 1) <= 1) startDraw(event); }, {passive: false});
-    canvas.addEventListener('touchmove', event => { if (event.touches?.length <= 1) draw(event); }, {passive: false});
-    canvas.addEventListener('touchend', stopDraw);
-    canvas.addEventListener('touchcancel', stopDraw);
+    canvas.addEventListener('touchstart', event => {
+        if (penActive) return;
+        if ((event.touches?.length || 0) >= 2) {
+            event.preventDefault();
+            if (!gesture) beginGesture(event);
+            return;
+        }
+        if ((event.touches?.length || 0) === 1) {
+            if (currentTool === 'stamp') pendingStamp = {clientX: event.touches[0].clientX, clientY: event.touches[0].clientY};
+            else startDraw(event);
+        }
+    }, {passive: false});
+    canvas.addEventListener('touchmove', event => {
+        const count = event.touches?.length || 0;
+        if (count >= 2) {
+            event.preventDefault();
+            if (!gesture) beginGesture(event);
+            if (!gesture) return;
+            const ratio = touchDistance(event.touches) / gesture.distance;
+            setZoom(gesture.zoom * ratio);
+            const center = touchCenter(event.touches);
+            const container = typeof byId === 'function' ? byId('document-container') : null;
+            if (container) {
+                container.scrollLeft = gesture.scrollLeft - (center.x - gesture.center.x);
+                container.scrollTop = gesture.scrollTop - (center.y - gesture.center.y);
+            }
+            return;
+        }
+        if (gesture) return;
+        if (count === 1) draw(event);
+    }, {passive: false});
+    canvas.addEventListener('touchend', event => {
+        if (gesture) {
+            if ((event.touches?.length || 0) < 2) gesture = null;
+            return;
+        }
+        if (pendingStamp) {
+            const stamp = pendingStamp;
+            pendingStamp = null;
+            startDraw({clientX: stamp.clientX, clientY: stamp.clientY, cancelable: false});
+            return;
+        }
+        stopDraw();
+    });
+    canvas.addEventListener('touchcancel', event => {
+        gesture = null;
+        pendingStamp = null;
+        stopDraw();
+    });
     // Stylus support without duplicating compatibility mouse events.
     canvas.addEventListener('pointerdown', event => {
         if (event.pointerType !== 'pen') return;
@@ -716,6 +841,8 @@ function redrawCanvas(pageNum, actions = (documentHistory[pageNum] || []).slice(
         layer.width = canvas.width;
         layer.height = canvas.height;
         const ctx = layer.getContext('2d');
+        const pageWidth = canvas.width || 1;
+        const pageHeight = canvas.height || 1;
         for (const action of actions) {
             if (action.tool === 'stamp') {
                 const img = await new Promise((resolve, reject) => {
@@ -730,26 +857,30 @@ function redrawCanvas(pageNum, actions = (documentHistory[pageNum] || []).slice(
                     image.src = action.src;
                 });
                 ctx.globalCompositeOperation = 'source-over';
-                ctx.drawImage(img, action.x, action.y, action.w, action.h);
+                ctx.drawImage(img, action.x * pageWidth, action.y * pageHeight, action.w * pageWidth, action.h * pageHeight);
             } else {
                 ctx.beginPath();
                 ctx.lineCap = 'round';
                 ctx.lineJoin = 'round';
-                ctx.lineWidth = action.width;
+                ctx.lineWidth = (action.width || 0.001) * pageWidth;
                 if (action.tool === 'eraser') ctx.globalCompositeOperation = 'destination-out';
                 else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.strokeStyle = action.color;
                 }
                 if (action.points.length > 0) {
-                    ctx.moveTo(action.points[0].x, action.points[0].y);
-                    let pLastX = action.points[0].x;
-                    let pLastY = action.points[0].y;
+                    const firstX = action.points[0].x * pageWidth;
+                    const firstY = action.points[0].y * pageHeight;
+                    ctx.moveTo(firstX, firstY);
+                    let pLastX = firstX;
+                    let pLastY = firstY;
                     for (let i = 1; i < action.points.length; i++) {
                         const p = action.points[i];
-                        ctx.quadraticCurveTo(pLastX, pLastY, (pLastX + p.x) / 2, (pLastY + p.y) / 2);
-                        pLastX = p.x;
-                        pLastY = p.y;
+                        const px = p.x * pageWidth;
+                        const py = p.y * pageHeight;
+                        ctx.quadraticCurveTo(pLastX, pLastY, (pLastX + px) / 2, (pLastY + py) / 2);
+                        pLastX = px;
+                        pLastY = py;
                     }
                     ctx.stroke();
                 }
@@ -799,20 +930,24 @@ function hasVisiblePenSignature() {
         const layer = document.createElement('canvas');
         layer.width = visible.width;
         layer.height = visible.height;
+        const pageWidth = layer.width || 1;
+        const pageHeight = layer.height || 1;
         const ctx = layer.getContext('2d');
         for (const action of actions) {
             if (!['pen', 'eraser', 'whiteout'].includes(action.tool) || !action.points?.length) continue;
             ctx.beginPath();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.lineWidth = action.width;
+            ctx.lineWidth = (action.width || 0.001) * pageWidth;
             ctx.globalCompositeOperation = action.tool === 'eraser' ? 'destination-out' : 'source-over';
             ctx.strokeStyle = action.color || '#000000';
-            let last = action.points[0];
+            let last = {x: action.points[0].x * pageWidth, y: action.points[0].y * pageHeight};
             ctx.moveTo(last.x, last.y);
             for (const point of action.points.slice(1)) {
-                ctx.quadraticCurveTo(last.x, last.y, (last.x + point.x) / 2, (last.y + point.y) / 2);
-                last = point;
+                const px = point.x * pageWidth;
+                const py = point.y * pageHeight;
+                ctx.quadraticCurveTo(last.x, last.y, (last.x + px) / 2, (last.y + py) / 2);
+                last = {x: px, y: py};
             }
             ctx.stroke();
             ctx.closePath();
@@ -848,6 +983,12 @@ async function saveToServer() {
     try {
         await stampRenderQueue.wait();
         if (!hasVisibleSignature()) throw new Error('กรุณาลงนามหรือประทับตราก่อนบันทึก');
+        const penSignature = hasVisiblePenSignature();
+        const hasStampInk = Object.values(documentHistory).flat().some(action => action.tool === 'stamp');
+        if (hasStampInk && !penSignature && typeof requestStampOnlyConfirmation === 'function') {
+            const accepted = await requestStampOnlyConfirmation();
+            if (!accepted) return;
+        }
         const stamps = Object.values(documentHistory).flat().filter(action => action.tool === 'stamp' && action.department);
         const pendingReceipts = stamps.filter(action => !action.receiptRegistered);
         let registeredDepartments = [];
@@ -869,7 +1010,6 @@ async function saveToServer() {
         formData.append('expected_user_id', String(doc.userId || 0));
         formData.append('revision', documentRevision || '');
         formData.append('confirm_signature', '1');
-        const penSignature = hasVisiblePenSignature();
         if (penSignature) formData.append('confirm_pen_signature', '1');
         formData.append('receipt_departments', JSON.stringify(registeredDepartments));
         if (registeredDepartments.length) formData.append('confirm_receipt', '1');
@@ -1003,24 +1143,28 @@ async function canvasToPngBytes(canvas) {
     return bytes;
 }
 
-function actionBounds(action) {
+function actionBounds(action, metrics) {
+    const pageWidth = metrics?.width || 1;
+    const pageHeight = metrics?.height || 1;
     if (action.tool === 'stamp') {
-        return {x: action.x, y: action.y, w: action.w, h: action.h};
+        return {x: action.x * pageWidth, y: action.y * pageHeight, w: action.w * pageWidth, h: action.h * pageHeight};
     }
     if (!action.points?.length) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const point of action.points) {
-        minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
+        const x = point.x * pageWidth;
+        const y = point.y * pageHeight;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
     }
-    const pad = Math.max(2, (action.width || 2) / 2 + 2);
+    const pad = Math.max(2, ((action.width || 0.001) * pageWidth) / 2 + 2);
     return {x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2};
 }
 
 function overlayBounds(actions, metrics) {
     let box = null;
     for (const action of actions) {
-        const bounds = actionBounds(action);
+        const bounds = actionBounds(action, metrics);
         if (!bounds) continue;
         if (!box) box = {...bounds};
         else {
@@ -1041,7 +1185,9 @@ function overlayBounds(actions, metrics) {
     return {x, y, w: Math.max(1, right - x), h: Math.max(1, bottom - y)};
 }
 
-async function drawActionsToContext(ctx, actions) {
+async function drawActionsToContext(ctx, actions, metrics) {
+    const pageWidth = metrics?.width || 1;
+    const pageHeight = metrics?.height || 1;
     for (const action of actions) {
         if (action.tool === 'stamp') {
             const image = await new Promise((resolve, reject) => {
@@ -1052,19 +1198,21 @@ async function drawActionsToContext(ctx, actions) {
                 stamp.src = action.src;
             });
             ctx.globalCompositeOperation = 'source-over';
-            ctx.drawImage(image, action.x, action.y, action.w, action.h);
+            ctx.drawImage(image, action.x * pageWidth, action.y * pageHeight, action.w * pageWidth, action.h * pageHeight);
         } else if (action.points?.length) {
             ctx.beginPath();
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
-            ctx.lineWidth = action.width || 2;
+            ctx.lineWidth = (action.width || 0.001) * pageWidth;
             ctx.globalCompositeOperation = action.tool === 'eraser' ? 'destination-out' : 'source-over';
             ctx.strokeStyle = action.color || (action.tool === 'whiteout' ? '#ffffff' : '#000000');
-            ctx.moveTo(action.points[0].x, action.points[0].y);
-            let last = action.points[0];
+            let last = {x: action.points[0].x * pageWidth, y: action.points[0].y * pageHeight};
+            ctx.moveTo(last.x, last.y);
             for (const point of action.points.slice(1)) {
-                ctx.quadraticCurveTo(last.x, last.y, (last.x + point.x) / 2, (last.y + point.y) / 2);
-                last = point;
+                const px = point.x * pageWidth;
+                const py = point.y * pageHeight;
+                ctx.quadraticCurveTo(last.x, last.y, (last.x + px) / 2, (last.y + py) / 2);
+                last = {x: px, y: py};
             }
             ctx.stroke();
             ctx.closePath();
@@ -1081,7 +1229,7 @@ async function buildOverlay(pageNum, actions, metrics, crop = true) {
     canvas.height = box.h;
     const ctx = canvas.getContext('2d', {alpha: true});
     ctx.translate(-box.x, -box.y);
-    await drawActionsToContext(ctx, actions);
+    await drawActionsToContext(ctx, actions, metrics);
     const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     if (!hasVisibleNonWhitePixel(pixels)) return null;
     return {bytes: await canvasToPngBytes(canvas), bbox: box};
@@ -1199,8 +1347,39 @@ function retryLastAction() {
 function showSessionBanner() { byId('session-banner')?.classList.remove('hidden'); }
 function hideSessionBanner() { byId('session-banner')?.classList.add('hidden'); }
 
-function showConflictModal() { byId('conflict-modal')?.classList.remove('hidden'); }
-function hideConflictModal() { byId('conflict-modal')?.classList.add('hidden'); }
+function requestStampOnlyConfirmation() {
+    if (stampIntentConfirmed) return Promise.resolve(true);
+    const modal = byId('stamp-intent-modal');
+    if (!modal) return Promise.resolve(false);
+    stampIntentOpener = document.activeElement;
+    if (typeof showLoading === 'function') showLoading(false);
+    modal.classList.remove('hidden');
+    byId('stamp-intent-accept')?.focus();
+    return new Promise(resolve => { stampIntentResolver = resolve; });
+}
+
+function resolveStampIntent(accepted) {
+    byId('stamp-intent-modal')?.classList.add('hidden');
+    const resolve = stampIntentResolver;
+    stampIntentResolver = null;
+    if (accepted) stampIntentConfirmed = true;
+    if (stampIntentOpener && typeof stampIntentOpener.focus === 'function') stampIntentOpener.focus();
+    stampIntentOpener = null;
+    if (resolve) resolve(Boolean(accepted));
+}
+
+function showConflictModal() {
+    const modal = byId('conflict-modal');
+    if (!modal) return;
+    rememberDialogOpener('conflict-modal');
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => focusFirstDialogControl(modal));
+}
+
+function hideConflictModal() {
+    byId('conflict-modal')?.classList.add('hidden');
+    restoreDialogFocus('conflict-modal');
+}
 
 function reloadLatestDocument() {
     dirty = false;
@@ -1212,12 +1391,15 @@ function reloadLatestDocument() {
 async function openAuditDrawer() {
     const overlay = byId('audit-overlay');
     if (!overlay) return;
+    rememberDialogOpener('audit-overlay');
     overlay.classList.remove('hidden');
+    requestAnimationFrame(() => focusFirstDialogControl(overlay));
     await loadSignStatus();
 }
 
 function closeAuditDrawer() {
     byId('audit-overlay')?.classList.add('hidden');
+    restoreDialogFocus('audit-overlay');
 }
 
 async function loadSignStatus() {
@@ -1273,10 +1455,17 @@ function openStampModal() {
     if (!modal) return;
     stampOpener = document.activeElement;
     modal.classList.remove('hidden');
+    let last = {};
+    try { last = JSON.parse(sessionStorage.getItem(`eoffice-stamp-last:${ESIGN_DOC_ID}`) || '{}') || {}; } catch (error) { last = {}; }
     const dateField = byId('stamp-text-3');
     const timeField = byId('stamp-text-4');
-    if (dateField && !dateField.value) dateField.value = formatThaiDate();
-    if (timeField && !timeField.value) timeField.value = formatClock();
+    const receiptField = byId('stamp-text-2');
+    const departmentField = byId('stamp-text-1');
+    const today = formatThaiDate();
+    if (departmentField && !departmentField.value && last.department && [...departmentField.options].some(option => option.value === last.department)) departmentField.value = last.department;
+    if (dateField && !dateField.value) dateField.value = last.date === today ? last.date : today;
+    if (timeField && !timeField.value) timeField.value = (last.date === today && last.time) ? last.time : formatClock();
+    if (receiptField && !receiptField.value && last.receipt) receiptField.value = last.receipt;
     byId('stamp-department-error')?.classList.add('hidden');
     generateStampPreview();
     document.fonts?.load('22px "Sarabun"').then(() => {
@@ -1406,6 +1595,14 @@ function confirmStampData() {
     if (!canvas) return;
     CONFIG.STAMP_URL = canvas.toDataURL('image/png');
     currentStampDepartment = department;
+    try {
+        sessionStorage.setItem(`eoffice-stamp-last:${ESIGN_DOC_ID}`, JSON.stringify({
+            department: byId('stamp-text-1')?.value || '',
+            receipt: byId('stamp-text-2')?.value || '',
+            date: byId('stamp-text-3')?.value || '',
+            time: byId('stamp-text-4')?.value || ''
+        }));
+    } catch (error) { /* private mode or storage disabled */ }
     closeStampModal();
     setTool('stamp');
     showToast('เลือกจุดที่ต้องการประทับตรา', 'info');
@@ -1414,7 +1611,7 @@ function confirmStampData() {
 Object.assign(window, {
     setTool, openStampModal, closeStampModal, confirmStampData, undoLastAction,
     saveToServer, downloadDocument, loadServerDocument, openAuditDrawer,
-    closeAuditDrawer, showConflictModal, hideConflictModal, reloadLatestDocument, showErrorBanner,
+    closeAuditDrawer, showConflictModal, hideConflictModal, reloadLatestDocument, showErrorBanner, resolveStampIntent,
     hideErrorBanner, retryLastAction, goToRelativePage, goToLastPage,
     changeZoom, resetZoom, loadSignStatus
 });
