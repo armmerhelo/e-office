@@ -86,8 +86,9 @@ function hideError() {
 
 function updateSaveState() {
     const hasInk = annotations && annotations.hasVisibleSignature();
+    const canSave = Boolean(sourceBytes && annotations && !saving && hasInk && !savedOnce);
     if (els.save) {
-        els.save.disabled = saving || !sourceBytes;
+        els.save.disabled = !canSave;
         els.save.setAttribute('aria-busy', saving ? 'true' : 'false');
     }
     if (els.download) els.download.disabled = saving || !sourceBytes;
@@ -95,6 +96,11 @@ function updateSaveState() {
     if (!els.saveState) return;
     if (saving) {
         els.saveState.textContent = 'กำลังบันทึก...';
+        els.saveState.className = 'save-state';
+        return;
+    }
+    if (!sourceBytes) {
+        els.saveState.textContent = 'กำลังโหลดเอกสาร...';
         els.saveState.className = 'save-state';
         return;
     }
@@ -127,7 +133,7 @@ function updatePenMode(penSeen) {
 
 function updateToolButtons(tool) {
     document.querySelectorAll('.tool-btn').forEach((button) => {
-        button.classList.toggle('is-active', button.id === `btn-${tool}`);
+        button.classList.toggle('active', button.id === `btn-${tool}`);
     });
 }
 
@@ -213,7 +219,7 @@ async function loadDocument() {
                 els.next.disabled = num >= total;
             },
             onZoom: (zoom, fit) => {
-                els.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+                if (els.zoomLabel) els.zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
                 els.zoomFit.classList.toggle('is-active', fit);
                 updateZoomControls();
             },
@@ -377,14 +383,14 @@ async function downloadDocument() {
 }
 
 function bindUi() {
-    const toolbar = document.querySelector('.app-toolbar');
-    const syncToolbarHeight = () => {
-        if (!toolbar) return;
-        document.documentElement.style.setProperty('--toolbar-height', `${Math.round(toolbar.getBoundingClientRect().height)}px`);
+    const bottomUi = document.querySelector('.page-zoom-pill');
+    const syncBottomUiHeight = () => {
+        if (!bottomUi) return;
+        document.documentElement.style.setProperty('--bottom-ui-height', `${Math.round(bottomUi.getBoundingClientRect().height)}px`);
     };
-    syncToolbarHeight();
-    if (window.ResizeObserver) new ResizeObserver(syncToolbarHeight).observe(toolbar);
-    window.addEventListener('resize', syncToolbarHeight);
+    syncBottomUiHeight();
+    if (window.ResizeObserver) new ResizeObserver(syncBottomUiHeight).observe(bottomUi);
+    window.addEventListener('resize', syncBottomUiHeight);
 
     document.querySelectorAll('.tool-btn').forEach((button) => {
         button.addEventListener('click', () => {

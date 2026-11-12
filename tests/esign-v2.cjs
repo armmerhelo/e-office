@@ -106,16 +106,27 @@ check('responsive layout has mobile toolbar rules', () => {
 });
 
 check('UI layout fixes are present', () => {
-    assert.ok(css.includes('--toolbar-height'));
+    assert.ok(css.includes('--bottom-ui-height'));
     assert.ok(css.includes('#stamp-close'));
     assert.ok(css.includes('safe-area-inset-top'));
     assert.ok(css.includes('font-size: 16px'));
     assert.ok(app.includes('ResizeObserver'));
     assert.ok(app.includes('updateZoomControls'));
-    assert.ok(app.includes("els.save.disabled = saving || !sourceBytes"));
+    assert.ok(app.includes("els.save.disabled = !canSave"));
     assert.ok(app.includes("els.save.setAttribute('aria-busy'"));
     assert.ok(stamp.includes('this.lastFocus'));
     assert.ok(stamp.includes('this.select.focus()'));
+});
+
+check('v2 uses the compact V1 signing shell', () => {
+    assert.ok(php.includes('signing-header'));
+    assert.ok(php.includes('signing-brand'));
+    assert.ok(php.includes('signing-tools'));
+    assert.ok(php.includes('signing-actions'));
+    assert.ok(php.includes('page-zoom-pill'));
+    assert.ok(php.includes('signing-doc__name'));
+    assert.ok(php.includes('signing-signer'));
+    assert.ok(!php.includes('class="app-toolbar"'));
 });
 
 check('RDP simplification keeps endpoints', () => {

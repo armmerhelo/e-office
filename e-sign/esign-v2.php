@@ -141,24 +141,59 @@ $configJson = json_encode([
 </head>
 <body>
 <div class="app">
-    <header class="app-header">
-        <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <img class="app-brand" src="../img/icon_app_xl.png" width="42" height="42" alt="">
-        </a>
-        <div class="app-doc">
-            <div class="app-doc__eyebrow">
-                <span class="app-doc__number"><?= htmlspecialchars((string)($doc['Doc_Number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
-                <span id="doc-status" class="status-badge <?= $mySigned ? 'status-badge--signed' : '' ?>"><?= $mySigned ? 'ลงนามแล้ว' : 'รอลงนาม' ?></span>
-                <span class="status-badge status-badge--v2">เวอร์ชันทดลอง</span>
+    <header class="signing-header-wrap">
+        <div class="signing-header">
+            <div class="signing-brand">
+                <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+                <img class="signing-logo" src="../img/icon_app_xl.png" width="50" height="50" alt="">
+                <div class="signing-brand__text">
+                    <h1 class="signing-title">ระบบหนังสือราชการ</h1>
+                    <p class="signing-subtitle">E-Office</p>
+                    <p class="signing-doc" title="<?= htmlspecialchars(implode(' • ', array_merge([(string)($doc['Doc_Number'] ?? '')], $docMeta)), ENT_QUOTES, 'UTF-8') ?>">
+                        <span id="doc-name" class="signing-doc__name"><?= htmlspecialchars((string)($doc['Doc_Name'] ?? 'เอกสาร'), ENT_QUOTES, 'UTF-8') ?></span>
+                        <span id="doc-number" class="signing-doc__number"><?= htmlspecialchars((string)($doc['Doc_Number'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                        <span id="doc-status" class="status-badge <?= $mySigned ? 'status-badge--signed' : '' ?>"><?= $mySigned ? 'ลงนามแล้ว' : 'รอลงนาม' ?></span>
+                        <span class="signing-signer">ผู้ลงนาม: <?= htmlspecialchars((string)($user['User_Name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+                    </p>
+                </div>
             </div>
-            <h1 class="app-doc__title"><?= htmlspecialchars((string)($doc['Doc_Name'] ?? 'เอกสาร'), ENT_QUOTES, 'UTF-8') ?></h1>
-            <p class="app-doc__meta"><?= htmlspecialchars(implode(' • ', $docMeta), ENT_QUOTES, 'UTF-8') ?></p>
-        </div>
-        <div class="app-header__actions">
-            <span id="save-state" class="save-state" role="status">พร้อมลงนาม</span>
-            <button type="button" id="btn-finger" class="eo-btn eo-btn--ghost eo-btn--sm hidden" title="สลับการรับนิ้วเมื่อตรวจพบปากกา">รับเฉพาะปากกา</button>
-            <span class="app-user" title="<?= htmlspecialchars((string)($user['User_Name'] ?? ''), ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars((string)($user['User_Name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></span>
+
+            <div class="signing-tools" role="group" aria-label="เครื่องมือลงนาม">
+                <button type="button" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn active" title="เลื่อนดู" aria-label="เลื่อนดู">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12m0-6.5a1.5 1.5 0 0 1 3 0V12m0-5.5a1.5 1.5 0 0 1 3 0V13m0-3.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-4.8-2.4L4 14.7a1.7 1.7 0 0 1 2.7-2L8 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกา" aria-label="ปากกา">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4.5 19.5 1.2-4.2L16.8 4.2a2.2 2.2 0 0 1 3.1 3.1L9 18.4l-4.5 1.1Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 15 6-6 6 6-3 3H8l-3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m11 9 4-4 5 5-4 4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <button type="button" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ยางลบ (ลบทั้งเส้น)" aria-label="ยางลบ">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 16 6-9 6 4-4 7-5 1-3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m11 9 6 4" stroke="currentColor" stroke-width="1.8"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <button type="button" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ประทับตรา" aria-label="ประทับตรา">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 14.5c0-2 1.4-3.4 3-4.2V7a3 3 0 0 1 6 0v3.3c1.6.8 3 2.2 3 4.2V17H6v-2.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 7 4 12l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a6 6 0 0 1 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+            </div>
+
+            <div class="signing-actions">
+                <span id="save-state" class="save-state" role="status" aria-live="polite">พร้อมลงนาม</span>
+                <button type="button" id="btn-finger" class="eo-btn eo-btn--ghost eo-btn--sm hidden" title="สลับการรับนิ้วเมื่อตรวจพบปากกา">รับเฉพาะปากกา</button>
+                <button type="button" id="btn-download" class="eo-btn eo-btn--secondary eo-btn--icon" title="ดาวน์โหลดเอกสาร" aria-label="ดาวน์โหลดเอกสาร">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <button type="button" id="btn-save" class="eo-btn eo-btn--primary" aria-label="ลงนามและบันทึก" aria-busy="false">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17h10a3 3 0 0 0 .4-6 5 5 0 0 0-9.6-1.3A4 4 0 0 0 7 17Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 12v5m0-5-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>บันทึก</span>
+                </button>
+            </div>
         </div>
     </header>
 
@@ -181,54 +216,19 @@ $configJson = json_encode([
         </div>
     </main>
 
-    <footer class="app-toolbar">
-        <div class="tool-group" role="group" aria-label="เครื่องมือลงนาม">
-            <button type="button" id="btn-hand" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn is-active" title="เลื่อนดู" aria-label="เลื่อนดู">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12m0-6.5a1.5 1.5 0 0 1 3 0V12m0-5.5a1.5 1.5 0 0 1 3 0V13m0-3.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-4.8-2.4L4 14.7a1.7 1.7 0 0 1 2.7-2L8 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <span class="tool-sep" aria-hidden="true"></span>
-            <button type="button" id="btn-pen" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกา" aria-label="ปากกา">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4.5 19.5 1.2-4.2L16.8 4.2a2.2 2.2 0 0 1 3.1 3.1L9 18.4l-4.5 1.1Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <button type="button" id="btn-whiteout" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ปากกาสีขาว (ปิดทับข้อความ)" aria-label="ปากกาสีขาว">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 15 6-6 6 6-3 3H8l-3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m11 9 4-4 5 5-4 4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </button>
-            <button type="button" id="btn-eraser" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ยางลบ (ลบทั้งเส้น)" aria-label="ยางลบ">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m7 16 6-9 6 4-4 7-5 1-3-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m11 9 6 4" stroke="currentColor" stroke-width="1.8"/><path d="M4 21h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </button>
-            <button type="button" id="btn-stamp" class="eo-btn eo-btn--ghost eo-btn--icon tool-btn" title="ประทับตรา" aria-label="ประทับตรา">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 14.5c0-2 1.4-3.4 3-4.2V7a3 3 0 0 1 6 0v3.3c1.6.8 3 2.2 3 4.2V17H6v-2.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </button>
-            <span class="tool-sep" aria-hidden="true"></span>
-            <button type="button" id="btn-undo" class="eo-btn eo-btn--ghost eo-btn--icon" title="ย้อนกลับ" aria-label="ย้อนกลับ" disabled>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 7 4 12l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 12h9a6 6 0 0 1 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </button>
-        </div>
-
+    <div class="page-zoom-pill" role="group" aria-label="นำทางและซูม">
         <div class="page-group" role="group" aria-label="นำทางหน้า">
             <button type="button" id="btn-prev" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" aria-label="หน้าก่อน">‹</button>
             <span id="page-indicator" class="page-indicator" aria-live="polite">หน้า 1 / 1</span>
             <button type="button" id="btn-next" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" aria-label="หน้าถัดไป">›</button>
         </div>
-
+        <span class="tool-sep" aria-hidden="true"></span>
         <div class="zoom-group" role="group" aria-label="ซูม">
             <button type="button" id="btn-zoom-out" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" aria-label="ซูมออก">−</button>
-            <span id="zoom-label" class="zoom-label" aria-live="polite">100%</span>
             <button type="button" id="btn-zoom-fit" class="eo-btn eo-btn--ghost eo-btn--sm" aria-label="พอดีความกว้าง">พอดี</button>
             <button type="button" id="btn-zoom-in" class="eo-btn eo-btn--ghost eo-btn--icon eo-btn--sm" aria-label="ซูมเข้า">+</button>
         </div>
-
-        <div class="action-group">
-            <button type="button" id="btn-download" class="eo-btn eo-btn--secondary" aria-label="ดาวน์โหลดเอกสาร">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                <span>ดาวน์โหลด</span>
-            </button>
-            <button type="button" id="btn-save" class="eo-btn eo-btn--primary" aria-label="ลงนามและบันทึก" aria-busy="false">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17h10a3 3 0 0 0 .4-6 5 5 0 0 0-9.6-1.3A4 4 0 0 0 7 17Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 12v5m0-5-2 2m2-2 2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span>ลงนามและบันทึก</span>
-            </button>
-        </div>
-    </footer>
+    </div>
 </div>
 
 <div id="loading" class="loading hidden" role="status" aria-live="polite">

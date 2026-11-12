@@ -841,3 +841,386 @@ input {
         break-after: page;
     }
 }
+
+/* --- V1-compatible signing shell --- */
+.signing-header-wrap {
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    box-shadow: 0 2px 10px rgb(15 23 42 / 0.05);
+    flex: none;
+    z-index: 20;
+}
+
+.signing-header {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: max(10px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.signing-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.signing-header .app-back {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    border-radius: 12px;
+    background: #eef2ff;
+    color: #4338ca;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.signing-header .app-back:hover {
+    background: #e0e7ff;
+}
+
+.signing-header .app-back svg {
+    width: 22px;
+    height: 22px;
+}
+
+.signing-logo {
+    width: 50px;
+    height: 50px;
+    object-fit: contain;
+    flex: none;
+}
+
+.signing-brand__text {
+    min-width: 0;
+}
+
+.signing-title {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.signing-subtitle {
+    margin: 1px 0 0;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #64748b;
+}
+
+.signing-doc {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    margin: 2px 0 0;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #64748b;
+}
+
+.signing-doc__number {
+    flex: none;
+    max-width: 80px;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.signing-doc__name {
+    flex: 1 0 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.signing-doc .status-badge {
+    flex: none;
+    min-height: 20px;
+    padding: 0 7px;
+    font-size: 10px;
+}
+
+.signing-signer {
+    margin: 1px 0 0;
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    line-height: 1.3;
+    color: #64748b;
+}
+
+.signing-doc .signing-signer {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+}
+
+.signing-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+    box-shadow: inset 0 1px 3px rgb(15 23 42 / 0.06);
+    min-width: 0;
+}
+
+.signing-tools .eo-btn.eo-btn--icon {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 10px;
+}
+
+.signing-tools .tool-sep {
+    height: 26px;
+    margin: 0 3px;
+}
+
+.signing-tools .tool-btn {
+    position: relative;
+}
+
+.tool-btn.active {
+    background: #eff6ff !important;
+    color: #2563eb !important;
+    border-color: #2563eb !important;
+    box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.06);
+}
+
+.signing-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    min-width: 0;
+}
+
+.signing-actions .save-state {
+    max-width: 250px;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.signing-actions .save-state::before {
+    display: none;
+}
+
+.signing-actions .save-state.is-dirty,
+.signing-actions .save-state.save-state--dirty {
+    color: #b45309;
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+.signing-actions .save-state.is-saved,
+.signing-actions .save-state.save-state--saved {
+    color: #047857;
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+
+.signing-actions .eo-btn.eo-btn--icon {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 10px;
+}
+
+.signing-actions #btn-save {
+    min-width: 96px;
+}
+
+.page-zoom-pill {
+    position: fixed;
+    left: 50%;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 18;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: calc(100vw - 16px);
+    padding: 5px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.96);
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.16);
+    backdrop-filter: blur(4px);
+}
+
+.page-zoom-pill .page-group,
+.page-zoom-pill .zoom-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: none;
+    order: initial;
+    margin-left: 0;
+    justify-content: flex-start;
+}
+
+.page-zoom-pill .eo-btn.eo-btn--icon {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 6px;
+}
+
+.page-zoom-pill .eo-btn.eo-btn--sm {
+    min-height: 32px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.page-zoom-pill .page-indicator {
+    min-width: 64px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.page-zoom-pill .tool-sep {
+    height: 20px;
+    margin: 0 2px;
+}
+
+.viewer-scroll {
+    padding-bottom: 76px;
+    scrollbar-gutter: stable;
+}
+
+.toast {
+    bottom: calc(var(--bottom-ui-height, 44px) + 20px);
+}
+
+@media (max-width: 900px) {
+    .signing-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .signing-brand {
+        width: 100%;
+    }
+
+    .signing-tools {
+        order: 2;
+    }
+
+    .signing-actions {
+        order: 3;
+        margin-left: auto;
+    }
+}
+
+@media (max-width: 1100px) {
+    .signing-actions .save-state {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    .signing-header {
+        padding-top: max(8px, env(safe-area-inset-top));
+        padding-bottom: 8px;
+    }
+
+    .signing-logo {
+        width: 42px;
+        height: 42px;
+    }
+
+    .signing-title {
+        font-size: 16px;
+    }
+
+    .signing-tools {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+    }
+
+    .signing-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .signing-doc__name {
+        max-width: 100%;
+    }
+
+    .signing-signer {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 420px) {
+    #btn-save {
+        flex: 1;
+    }
+
+    .signing-tools .eo-btn.eo-btn--icon {
+        width: 40px;
+        min-width: 40px;
+        height: 40px;
+        min-height: 40px;
+        padding: 8px;
+    }
+
+    .signing-tools .tool-sep {
+        display: none;
+    }
+}
+
+@media (max-width: 340px) {
+    .signing-doc .signing-signer {
+        display: none;
+    }
+}
+
+@media print {
+    .signing-header-wrap,
+    .page-zoom-pill {
+        display: none !important;
+    }
+}
