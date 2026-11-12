@@ -40,6 +40,7 @@
         .pagination { padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
         .message { padding: 12px 16px; background: #eef2ff; color: #3730a3; border-radius: 8px; margin-bottom: 16px; }
         .error { background: #fef2f2; color: #b91c1c; }
+        .warning { background: #fff7ed; color: #9a3412; }
         [hidden] { display: none !important; }
         .overlay { position: fixed; inset: 0; z-index: 50; background: #11182780; display: flex; align-items: center; justify-content: center; padding: 16px; }
         .dialog { background: white; width: 100%; max-width: 680px; max-height: 92vh; border-radius: 14px; display: flex; flex-direction: column; box-shadow: 0 20px 60px #0003; }
@@ -115,7 +116,8 @@
                 <form id="form_sign_routes">
                     <div class="table-scroll"><table class="sign-route-table"><thead><tr><th>ฝ่าย / ตราประทับ</th><th>เลขาฝ่าย (ผู้ลงนาม/ประทับตรา)</th><th>รองฝ่าย (ผู้รับอัตโนมัติ)</th><th>จัดการ</th></tr></thead><tbody id="sign-route-rows"></tbody></table></div>
                     <p id="sign-route-empty" class="muted" hidden>ยังไม่มี Auto send กดเพิ่มคู่เลขา / รองฝ่ายเพื่อเริ่มตั้งค่า</p>
-                    <p class="muted" style="margin:14px 0">ประทับตรา: ส่งตามฝ่ายที่ยืนยันรับเอกสาร • เซ็นด้วยปากกา: ส่งให้รองทุกฝ่ายที่ตั้งค่าไว้กับเลขาคนนั้น เมื่อบันทึกสำเร็จ การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
+                    <p id="sign-route-warning" class="message warning" role="status" hidden></p>
+                    <p class="muted" style="margin:14px 0">ประทับตรา: ส่งตามฝ่ายที่ยืนยันรับเอกสาร • เซ็นด้วยปากกา: ส่งให้รองทุกฝ่ายที่ตั้งค่าไว้กับเลขาคนนั้น เมื่อบันทึกสำเร็จ • เลขาฝ่ายที่เป็นรองฝ่ายด้วยจะส่งต่อเมื่อประทับตรายืนยันฝ่ายเท่านั้น และต้องระบุฝ่ายของเลขาฝ่าย ไม่ใช้ “ทุกฝ่าย (คู่เดิม)” การลบคู่จะหยุด Auto send หลังบันทึก และไม่ถอนผู้รับจากเอกสารที่ส่งไปแล้ว</p>
                 </form>
             </div>
             <footer class="dialog-foot actions"><button class="btn" type="button" data-sign-routes-close>ปิด</button><button id="save-sign-routes" class="btn primary" type="submit" form="form_sign_routes" disabled>บันทึก Auto send</button></footer>

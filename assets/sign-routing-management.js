@@ -14,7 +14,7 @@
     function closeDialog() {
         if (state.busy || (state.dirty && !confirm('มีการตั้งค่า Auto send ที่ยังไม่ได้บันทึก ต้องการปิดและยกเลิกการเปลี่ยนแปลงหรือไม่?'))) return;
         if (state.dirty) {
-            el('sign-route-rows').replaceChildren(); state.routes.forEach(addRow); emptyHint();
+            el('sign-route-rows').replaceChildren(); state.routes.forEach(addRow); emptyHint(); updateRoutingWarning();
             setDirty(false); message('');
         }
         modal.hidden = true;
@@ -54,6 +54,27 @@
         el('sign-route-rows').querySelectorAll('select, button').forEach(node => { node.disabled = !ready; });
     }
     function emptyHint() { el('sign-route-empty').hidden = !!el('sign-route-rows').children.length; }
+    function routingWarning() {
+        const secretaries = new Map(), deputies = new Map();
+        for (const row of el('sign-route-rows').children) {
+            const values = Object.fromEntries([...row.querySelectorAll('select')].map(select => [select.dataset.field, select.value]));
+            const secretary = Number(values.secretary_id), deputy = Number(values.deputy_id);
+            if (!secretary || !deputy) continue;
+            if (!secretaries.has(secretary)) secretaries.set(secretary, new Set());
+            secretaries.get(secretary).add(values.department);
+            if (!deputies.has(deputy)) deputies.set(deputy, new Set());
+            deputies.get(deputy).add(values.department);
+        }
+        const dual = [...secretaries.keys()].filter(id => deputies.has(id));
+        if (!dual.length) return '';
+        const names = dual.map(id => (state.users || []).find(user => Number(user.User_Id) === id)?.User_Name || `#${id}`).join(', ');
+        const wildcard = dual.some(id => secretaries.get(id).has(''));
+        return `${names} เป็นทั้งเลขาฝ่ายและรองฝ่าย — การเซ็นด้วยปากกาจะไม่ส่งต่ออัตโนมัติ ต้องประทับตรายืนยันฝ่าย${wildcard ? ' และต้องระบุฝ่ายของเลขาฝ่ายแทน “ทุกฝ่าย (คู่เดิม)”' : ''}`;
+    }
+    function updateRoutingWarning() {
+        const node = el('sign-route-warning'), text = routingWarning();
+        node.textContent = text; node.hidden = !text;
+    }
     function addRow(route = {}) {
         const row = document.createElement('tr');
         for (const [key, label] of [['department','ฝ่าย / ตราประทับ'], ['secretary_id','เลขาฝ่าย'], ['deputy_id','รองฝ่าย']]) {
@@ -69,12 +90,12 @@
                 state.users.forEach(user => select.add(new Option(`${user.User_Name} (${user.User_Email})`, user.User_Id)));
                 select.value = route[key] ?? '';
             }
-            select.addEventListener('change', () => { setDirty(true); });
+            select.addEventListener('change', () => { setDirty(true); updateRoutingWarning(); });
             cell.append(select); row.append(cell);
         }
         const cell = document.createElement('td'), remove = document.createElement('button');
         remove.type = 'button'; remove.className = 'btn small danger'; remove.textContent = 'ลบคู่';
-        remove.addEventListener('click', () => { if (state.busy) return; row.remove(); setDirty(true); emptyHint(); });
+        remove.addEventListener('click', () => { if (state.busy) return; row.remove(); setDirty(true); emptyHint(); updateRoutingWarning(); });
         cell.append(remove); row.append(cell); el('sign-route-rows').append(row); emptyHint();
     }
     async function load() {
@@ -85,11 +106,11 @@
             const data = await api('get_sign_routes_api.php');
             if (request !== state.request) return;
             state.users = data.users; state.departments = data.departments; state.version = data.route_version; state.routes = data.routes;
-            el('sign-route-rows').replaceChildren(); data.routes.forEach(addRow); emptyHint();
+            el('sign-route-rows').replaceChildren(); data.routes.forEach(addRow); emptyHint(); updateRoutingWarning();
             setDirty(false); controls(true); message('');
         } catch (error) { if (request === state.request) message(error.message, true); }
     }
-    el('add-sign-route').addEventListener('click', () => { if (state.busy || !state.version) return; addRow(); setDirty(true); });
+    el('add-sign-route').addEventListener('click', () => { if (state.busy || !state.version) return; addRow(); setDirty(true); updateRoutingWarning(); });
     el('reload-sign-routes').addEventListener('click', load);
     el('form_sign_routes').addEventListener('submit', async event => {
         event.preventDefault(); if (state.busy || !state.version) return;
@@ -98,6 +119,10 @@
             return {department:values.department, secretary_id:Number(values.secretary_id), deputy_id:Number(values.deputy_id)};
         });
         if (routes.some(route => route.department === '__choose__' || !route.secretary_id || !route.deputy_id)) { message('กรุณาเลือกฝ่าย เลขาฝ่าย และรองฝ่ายให้ครบ', true); return; }
+        const deputyIds = new Set(routes.map(route => route.deputy_id));
+        if (routes.some(route => route.department === '' && deputyIds.has(route.secretary_id))) {
+            message('เลขาฝ่ายที่เป็นรองฝ่ายด้วยต้องระบุฝ่ายของเลขาฝ่าย ไม่ใช้ “ทุกฝ่าย (คู่เดิม)”', true); return;
+        }
         state.busy = true; controls(false); message('กำลังบันทึก Auto send...');
         try {
             const data = await api('save_sign_routes_api.php', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({routes, route_version:state.version})});

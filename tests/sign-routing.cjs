@@ -151,6 +151,21 @@ async function run() {
         assert.deepEqual(inspect().receipts,before.receipts);assert.equal(inspect().notifications.length,before.notifications.length+2);
         assert.deepEqual((await sign('manager',[],{pen:true})).auto_sent_user_ids,[]);
     });
+    await test('dual-role secretaries cannot save a wildcard secretary route',async()=>{
+        const before=await read();
+        await save([route('','manager','staff'),route(department,'admin','manager')],{status:400});
+        assert.deepEqual((await read()).routes,before.routes);
+    });
+    await test('dual-role secretaries must stamp a receipt before pen routing',async()=>{
+        fixture('reset-deputy-access');
+        await save([route(department,'manager','staff'),route('','admin','manager')]);
+        const pen=await sign('manager',[],{pen:true});
+        assert.deepEqual(pen.auto_sent_user_ids,[]);
+        assert.equal(inspect().access.some(row=>row.User_Id===users.staff.id),false);
+        const stamped=await sign('manager',[department]);
+        assert.deepEqual(stamped.auto_sent_user_ids,[users.staff.id]);
+        assert.equal(inspect().receipts.at(-1).department,department);
+    });
     await test('removing all routes stops future sends and migration never restores old pairs',async()=>{
         await save([]); fixture('migrate'); assert.deepEqual((await read()).routes,[]);
         await sign('manager',[department],{status:403});

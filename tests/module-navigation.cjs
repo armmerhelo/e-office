@@ -898,7 +898,7 @@ async function signRoutingFormChecks() {
     const nodes=new Map(),notifications=[],requests=[];
     const el=id=>{if(!nodes.has(id)){const node=new Node(id==='form_sign_routes'?'form':'div');node.id=id;nodes.set(id,node);}return nodes.get(id);};
     let confirmed=true;
-    const fixture={users:[{User_Id:1,User_Name:'Secretary',User_Email:'s@example.test'},{User_Id:2,User_Name:'Deputy',User_Email:'d@example.test'}],departments:['Test department'],route_version:'v1',routes:[{department:'Test department',secretary_id:1,deputy_id:2}]};
+    const fixture={users:[{User_Id:1,User_Name:'Secretary',User_Email:'s@example.test'},{User_Id:2,User_Name:'Deputy',User_Email:'d@example.test'}],departments:['Test department','Second department'],route_version:'v1',routes:[{department:'Test department',secretary_id:1,deputy_id:2},{department:'Second department',secretary_id:2,deputy_id:1}]};
     const tick=()=>new Promise(resolve=>setImmediate(resolve));
     vm.runInNewContext(fs.readFileSync('assets/sign-routing-management.js','utf8'),{
         document:{getElementById:el,createElement:tag=>new Node(tag)},window:{sessionReady:Promise.resolve({status:'Admin'}),dispatchEvent(){}},
@@ -907,10 +907,18 @@ async function signRoutingFormChecks() {
     });
     await tick();requests.shift()({ok:true,json:async()=>fixture});await tick();
     assert.equal(notifications.at(-1).type,'eoffice:form-saved','initial loading establishes a clean shared state');
+    const routingWarning=el('sign-route-warning');
+    assert.equal(routingWarning.hidden,false,'dual-role configuration shows the routing warning');
+    assert.ok(routingWarning.textContent.includes('Secretary')&&routingWarning.textContent.includes('Deputy'));
     el('add-sign-route').events.click();assert.equal(notifications.at(-1).type,'eoffice:form-dirty');
     el('sign-route-rows').children.at(-1).querySelectorAll('button')[0].events.click();assert.equal(notifications.at(-1).type,'eoffice:form-dirty');
     const select=el('sign-route-rows').children[0].querySelectorAll('select')[0];select.events.change();
     assert.equal(notifications.at(-1).type,'eoffice:form-dirty');
+    select.value='';select.events.change();
+    const blocked=el('form_sign_routes').events.submit({preventDefault(){}});
+    assert.equal(requests.length,0,'wildcard dual-role save must not reach the server');
+    assert.match(el('sign-routing-message').textContent,/ต้องระบุฝ่าย/);
+    select.value='Test department';select.events.change();
     let saving=el('form_sign_routes').events.submit({preventDefault(){}});
     requests.shift()({ok:false,json:async()=>({status:'error',message:'failed save'})});await saving;
     assert.equal(notifications.at(-1).type,'eoffice:form-dirty','failed save must retain navigation warning');

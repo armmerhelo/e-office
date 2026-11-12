@@ -69,6 +69,12 @@ function app_has_sign_role(PDO $pdo, int $id): bool {
     return (bool)$q->fetchColumn();
 }
 
+function app_sign_is_deputy(PDO $pdo, int $id): bool {
+    $q=$pdo->prepare('SELECT 1 FROM eoffice_sign_routes WHERE deputy_id=? LIMIT 1 LOCK IN SHARE MODE');
+    $q->execute([$id]);
+    return (bool)$q->fetchColumn();
+}
+
 function app_has_document_receipts(PDO $pdo, int $id): bool {
     $q=$pdo->prepare('SELECT 1 FROM eoffice_document_receipts WHERE secretary_id=? LIMIT 1');
     $q->execute([$id]);
@@ -108,6 +114,12 @@ function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, ?array $depart
     // NULL is an explicit pen-signature declaration: use all server-assigned
     // routes, without claiming the user stamped/registered any department.
     if ($departments===[]) return [];
+    // A member can be both a secretary and a deputy. Pen signing in the deputy
+    // role must not re-enter that member's secretary route (for example, the
+    // finance deputy who is also the director's secretary would otherwise send
+    // the document back to the director). Their secretary role remains
+    // available through an explicit, department-scoped receipt stamp.
+    if ($departments===null && app_sign_is_deputy($pdo,$secretary)) return [];
     $filter='';$params=[$secretary];
     if ($departments!==null) {
         $marks=implode(',',array_fill(0,count($departments),'?'));

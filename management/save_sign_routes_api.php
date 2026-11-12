@@ -15,6 +15,13 @@ foreach ($routes as $route) {
     if (isset($keys[$key])) app_fail('เลขาฝ่ายหนึ่งคนกำหนดรองได้หนึ่งคนต่อฝ่าย กรุณาลบรายการซ้ำ');
     $keys[$key]=true;
 }
+$deputyIds=[];
+foreach ($routes as $route) $deputyIds[$route->deputy_id]=true;
+foreach ($routes as $route) {
+    if ($route->department==='' && isset($deputyIds[$route->secretary_id])) {
+        app_fail("เลขาฝ่ายที่เป็นรองฝ่ายด้วยต้องระบุฝ่ายของเลขาฝ่าย ไม่ใช้ 'ทุกฝ่าย (คู่เดิม)' เพื่อให้ Auto send ตรงกับตราที่ประทับ");
+    }
+}
 $pdo=app_pdo();$pdo->beginTransaction();
 try {
     $locked=app_lock_member($pdo,$actor,(int)$actor['User_Id']);
