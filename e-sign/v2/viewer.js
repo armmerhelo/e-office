@@ -160,7 +160,7 @@ export class PdfViewer {
     }
 
     pixelScale(state) {
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
         const hardCap = Math.min(
             4096 / state.baseW,
             4096 / state.baseH,
