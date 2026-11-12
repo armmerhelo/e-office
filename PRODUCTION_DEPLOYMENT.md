@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## SIYA NEWS Studio, บันทึกข้อความ และคู่มือ — 12 พฤศจิกายน 2569
+
+- เผยแพร่ **53 runtime paths** จาก `d55273798585c0db8cf567e31dbfefd2860420f8`, `288648037083ab43ed2469233e31eb3495a89e02`, `a418b842f804ce4cd9571b48b51e57ddcadeb9a1` และ `0cb8b5e58ca63903304029c96296754668b7a23f` เวลา **2026-11-12 09:39:11 +07:00** ภายใต้ maintenance gate สำรองไฟล์เดิมครบ 22 paths ที่มีอยู่และสำรองฐานข้อมูลแบบเข้ารหัสครบ 45 ตาราง/104,156 แถว
+- เพิ่มหน้าจัดหน้าข่าว SIYA NEWS สำหรับผู้จัดทำวารสาร หน้าสร้างบันทึกข้อความ A4 ฟอนต์และตราครุฑ พร้อมคู่มือภาษาไทย โดยซ่อนเมนู Studio และบันทึกข้อความตามที่กำหนด แต่คงหน้าและเส้นทางตรงไว้
+- สร้างตาราง Studio แบบ additive และตรวจว่าทั้งสองตารางว่าง จำนวนข่าวเดิมคงเดิมที่ 2 รายการ; OPcache ปิดอยู่บน production จึงไม่ต้อง invalidate
+- คืน `.htaccess` เดิมและตรวจ checksum ตรงทั้ง **269 paths** ใน production manifest โดยไม่มี mismatch, temporary helper หรือ staged upload ค้าง หน้าแรก หน้า updates คู่มือ HTML/PDF หน้าบันทึกข้อความ หน้า Studio และฟอนต์ที่ใช้ตอบ HTTP 200
+- ชุด regression ด้านเมนู/ไวยากรณ์/updates/Studio และ deployment payload ผ่าน; `npm.cmd test` ในเครื่องหยุดที่ pretest เพราะ MySQL `127.0.0.1` ไม่พร้อมใช้งาน
+
 ## ถังขยะและกู้คืนข่าว SIYA NEWS — 5 พฤศจิกายน 2026
 
 - เผยแพร่ **8 runtime paths** จาก `1f3b3b8c2e285c9dc1c3461d15dbba3bc9c050f4` เวลา **2026-11-05 11:06:23 +07:00** หลังตรวจ production เทียบ parent และ dependencies 10 paths สำรองซอร์สและฐานข้อมูลครบ **45 ตาราง** พร้อมตรวจ SHA-256 และจำนวนแถว ติดตั้งแบบ atomic replacement ภายใต้ maintenance gate คืน `.htaccess` และ invalidate opcache แล้ว ไม่เปลี่ยน private configuration หรือเปิด Drive bridge
