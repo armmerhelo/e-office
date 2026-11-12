@@ -116,8 +116,9 @@ function app_register_document_receipts(PDO $pdo, int $secretary, int $docId, st
 
 // Called inside the same transaction as the PDF revision and signer access.
 function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, ?array $departments): array {
-    // NULL is an explicit pen-signature declaration: use all server-assigned
-    // routes, without claiming the user stamped/registered any department.
+    // NULL is an explicit pen-signature declaration: use the server-assigned
+    // routes without claiming a stamped department. A signer who is also a
+    // deputy is handled below and must use an explicit receipt instead.
     if ($departments===[]) return [];
     // A member can be both a secretary and a deputy. Pen signing in the deputy
     // role must not re-enter that member's secretary route (for example, the
