@@ -349,8 +349,6 @@ async function loadServerDocument() {
         await renderPDF(data);
         if (!documentRevision) {
             showErrorBanner('ไม่พบ revision ของเอกสาร', 'ระบบแสดงเอกสารได้ แต่จะไม่สามารถบันทึกได้จนกว่าจะโหลดหน้าใหม่สำเร็จ', loadServerDocument);
-        } else {
-            showToast('โหลดเอกสารสำเร็จ', 'success');
         }
     } catch (error) {
         showLoadFailure(error.message, error.status);
