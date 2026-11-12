@@ -27,6 +27,16 @@ if ($action==='seed') {
         'notifications'=>array_map(fn($v)=>json_decode($v,true),$pdo->query('SELECT payload FROM eoffice_outbox ORDER BY id')->fetchAll(PDO::FETCH_COLUMN))],JSON_THROW_ON_ERROR);
 } elseif ($action==='reset-deputy-access') {
     app_pdo()->exec('DELETE FROM t_access_rights WHERE Doc_Id=1 AND User_Id IN (1,3)');
+} elseif ($action==='wildcard-dual-role') {
+    // Simulate a legacy wildcard pair that predates the Admin save validation.
+    $pdo=app_pdo();$pdo->exec('DELETE FROM eoffice_sign_routes');
+    $q=$pdo->prepare('INSERT INTO eoffice_sign_routes (secretary_id,department,deputy_id) VALUES (?,?,?)');
+    $q->execute([2,'',3]);$q->execute([1,'',2]);
+} elseif ($action==='mixed-dual-role') {
+    // An explicit route plus a legacy wildcard route for the same dual-role secretary.
+    $pdo=app_pdo();$pdo->exec('DELETE FROM eoffice_sign_routes');
+    $q=$pdo->prepare('INSERT INTO eoffice_sign_routes (secretary_id,department,deputy_id) VALUES (?,?,?)');
+    $q->execute([2,'กลุ่มบริหารวิชาการ',3]);$q->execute([2,'',1]);$q->execute([1,'',2]);
 } elseif ($action==='migrate') {
     app_sign_routes_migrate(app_pdo());
 } elseif ($action==='legacy-receipt-fk') {

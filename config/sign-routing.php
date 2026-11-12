@@ -69,8 +69,8 @@ function app_has_sign_role(PDO $pdo, int $id): bool {
     return (bool)$q->fetchColumn();
 }
 
-function app_sign_is_deputy(PDO $pdo, int $id): bool {
-    $q=$pdo->prepare('SELECT 1 FROM eoffice_sign_routes WHERE deputy_id=? LIMIT 1 LOCK IN SHARE MODE');
+function app_sign_is_deputy(PDO $pdo, int $id, bool $locking=false): bool {
+    $q=$pdo->prepare('SELECT 1 FROM eoffice_sign_routes WHERE deputy_id=? LIMIT 1'.($locking?' LOCK IN SHARE MODE':''));
     $q->execute([$id]);
     return (bool)$q->fetchColumn();
 }
@@ -94,8 +94,13 @@ function app_validate_document_receipts(PDO $pdo, int $secretary, array $departm
     if (!$departments) return;
     $q=$pdo->prepare('SELECT department FROM eoffice_sign_routes WHERE secretary_id=? LOCK IN SHARE MODE');
     $q->execute([$secretary]);$scopes=$q->fetchAll(PDO::FETCH_COLUMN);
+    $dual=app_sign_is_deputy($pdo,$secretary,true);
     foreach ($departments as $department) {
-        if (!in_array('', $scopes, true) && !in_array($department, $scopes, true)) throw new DomainException('คุณไม่ได้รับมอบหมายเป็นเลขาของฝ่ายที่ยืนยันรับเอกสาร');
+        if (in_array($department, $scopes, true)) continue;
+        // A dual-role member must name the stamped department explicitly; a
+        // legacy wildcard route cannot authorize every department.
+        if (!$dual && in_array('', $scopes, true)) continue;
+        throw new DomainException('คุณไม่ได้รับมอบหมายเป็นเลขาของฝ่ายที่ยืนยันรับเอกสาร');
     }
 }
 
@@ -119,11 +124,14 @@ function app_sign_auto_send(PDO $pdo, int $secretary, int $docId, ?array $depart
     // finance deputy who is also the director's secretary would otherwise send
     // the document back to the director). Their secretary role remains
     // available through an explicit, department-scoped receipt stamp.
-    if ($departments===null && app_sign_is_deputy($pdo,$secretary)) return [];
+    $dual=app_sign_is_deputy($pdo,$secretary,true);
+    if ($departments===null && $dual) return [];
     $filter='';$params=[$secretary];
     if ($departments!==null) {
         $marks=implode(',',array_fill(0,count($departments),'?'));
-        $filter=" AND (department='' OR department IN ($marks))";
+        // Legacy wildcard routes must not add recipients for a dual-role member;
+        // only their explicit department routes may fire.
+        $filter=$dual?" AND department IN ($marks)":" AND (department='' OR department IN ($marks))";
         array_push($params,...$departments);
     }
     $q=$pdo->prepare("SELECT deputy_id FROM eoffice_sign_routes WHERE secretary_id=? $filter ORDER BY deputy_id LOCK IN SHARE MODE");

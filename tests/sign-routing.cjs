@@ -166,6 +166,19 @@ async function run() {
         assert.deepEqual(stamped.auto_sent_user_ids,[users.staff.id]);
         assert.equal(inspect().receipts.at(-1).department,department);
     });
+    await test('legacy wildcard dual-role routes cannot authorize stamp receipts',async()=>{
+        fixture('wildcard-dual-role');
+        assert.deepEqual((await request('/e-sign/receipt_scopes.php?Doc_Id=1',{as:'manager'})).departments,[]);
+        const before=inspect().receipts.length;
+        await sign('manager',[department],{status:403});
+        assert.equal(inspect().receipts.length,before);
+    });
+    await test('legacy wildcard dual-role routes do not add recipients to an explicit receipt',async()=>{
+        fixture('mixed-dual-role');fixture('reset-deputy-access');
+        const result=await sign('manager',[department]);
+        assert.deepEqual(result.auto_sent_user_ids,[users.staff.id]);
+        assert.equal(inspect().access.some(row=>row.User_Id===users.admin.id),false);
+    });
     await test('removing all routes stops future sends and migration never restores old pairs',async()=>{
         await save([]); fixture('migrate'); assert.deepEqual((await read()).routes,[]);
         await sign('manager',[department],{status:403});
