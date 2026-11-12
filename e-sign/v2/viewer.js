@@ -20,11 +20,29 @@ export class PdfViewer {
         this.scrollFrame = null;
         this.maxBaseWidth = 595;
         this.renderGeneration = 0;
+        this.resolutionTimer = null;
+        this.dprMedia = null;
+        this.dprHandler = () => {
+            this.watchDpr();
+            this.scheduleResolutionRefresh();
+        };
+        this.visualViewportHandler = () => this.scheduleResolutionRefresh();
+        this.watchDpr();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', this.visualViewportHandler);
+        }
         this.resizeHandler = () => {
             if (this.fitMode) this.fitWidth({ silent: true });
+            this.scheduleResolutionRefresh();
         };
         window.addEventListener('resize', this.resizeHandler);
         this.scrollEl.addEventListener('scroll', () => this.scheduleScrollUpdate(), { passive: true });
+    }
+
+    watchDpr() {
+        if (this.dprMedia) this.dprMedia.removeEventListener('change', this.dprHandler);
+        this.dprMedia = window.matchMedia ? window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`) : null;
+        if (this.dprMedia) this.dprMedia.addEventListener('change', this.dprHandler);
     }
 
     async load(bytes) {
@@ -51,6 +69,7 @@ export class PdfViewer {
                 placeholder: null,
                 rendered: false,
                 renderScale: 0,
+                inkRenderScale: 0,
                 renderTask: null,
             });
         }
@@ -126,7 +145,7 @@ export class PdfViewer {
             const height = Math.round(state.baseH * this.zoom);
             state.el.style.width = `${width}px`;
             state.el.style.height = `${height}px`;
-            if (state.rendered && state.renderScale !== this.pixelScale(state)) {
+            if (state.rendered && (state.renderScale !== this.pixelScale(state) || state.inkRenderScale !== this.inkPixelScale(state))) {
                 state.rendered = false;
                 state.el.classList.remove('is-rendered');
                 if (this.isNear(state)) this.renderPage(state);
@@ -150,6 +169,35 @@ export class PdfViewer {
         return Math.max(0.25, Math.min(this.zoom * dpr, hardCap));
     }
 
+    // The ink layer is redrawn from vectors, so it can use a higher bitmap
+    // density than the PDF page. This keeps handwritten strokes sharp at page
+    // zoom, browser zoom (devicePixelRatio) and pinch zoom (visualViewport).
+    inkPixelScale(state) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 4);
+        const visual = Math.min(window.visualViewport?.scale || 1, 3);
+        const wanted = Math.max(2, this.zoom * dpr) * visual;
+        const hardCap = Math.min(
+            4096 / state.baseW,
+            4096 / state.baseH,
+            Math.sqrt((window.ESIGN_V2_CONFIG?.maxCanvasPixels || 12000000) / (state.baseW * state.baseH))
+        );
+        return Math.max(0.25, Math.min(wanted, 4, hardCap));
+    }
+
+    scheduleResolutionRefresh() {
+        clearTimeout(this.resolutionTimer);
+        this.resolutionTimer = setTimeout(() => {
+            this.resolutionTimer = null;
+            this.pages.forEach((state) => {
+                if (!state || !state.rendered) return;
+                if (state.renderScale === this.pixelScale(state) && state.inkRenderScale === this.inkPixelScale(state)) return;
+                state.rendered = false;
+                state.el.classList.remove('is-rendered');
+                if (this.isNear(state)) this.renderPage(state);
+            });
+        }, 120);
+    }
+
     async renderPage(state) {
         if (!this.pdf || !state) return;
         if (state.renderTask) {
@@ -158,14 +206,18 @@ export class PdfViewer {
         }
         const generation = this.renderGeneration;
         const scale = this.pixelScale(state);
+        const inkScale = this.inkPixelScale(state);
         const width = Math.max(1, Math.round(state.baseW * scale));
         const height = Math.max(1, Math.round(state.baseH * scale));
+        const inkWidth = Math.max(1, Math.round(state.baseW * inkScale));
+        const inkHeight = Math.max(1, Math.round(state.baseH * inkScale));
 
         state.pdfCanvas.width = width;
         state.pdfCanvas.height = height;
-        state.inkCanvas.width = width;
-        state.inkCanvas.height = height;
+        state.inkCanvas.width = inkWidth;
+        state.inkCanvas.height = inkHeight;
         state.renderScale = scale;
+        state.inkRenderScale = inkScale;
 
         const viewport = state.pdfPage.getViewport({ scale });
         const context = state.pdfCanvas.getContext('2d', { alpha: false });
@@ -181,7 +233,7 @@ export class PdfViewer {
             state.rendered = true;
             state.el.classList.add('is-rendered');
             state.renderTask = null;
-            this.onPageReady(state, scale);
+            this.onPageReady(state, inkScale);
         } catch (error) {
             if (error && (error.name === 'RenderingCancelledException' || /cancel/i.test(error.message || ''))) return;
             console.error('PDF render failed', state.num, error);
@@ -198,6 +250,7 @@ export class PdfViewer {
         }
         state.rendered = false;
         state.renderScale = 0;
+        state.inkRenderScale = 0;
         state.el.classList.remove('is-rendered');
         state.pdfCanvas.width = 0;
         state.pdfCanvas.height = 0;
@@ -278,7 +331,13 @@ export class PdfViewer {
 
     destroy() {
         this.destroyPages();
+        clearTimeout(this.resolutionTimer);
+        this.resolutionTimer = null;
         window.removeEventListener('resize', this.resizeHandler);
+        if (window.visualViewport) {
+            window.visualViewport.removeEventListener('resize', this.visualViewportHandler);
+        }
+        if (this.dprMedia) this.dprMedia.removeEventListener('change', this.dprHandler);
         if (this.pdf) {
             try { this.pdf.destroy(); } catch (_) {}
             this.pdf = null;

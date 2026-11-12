@@ -78,6 +78,8 @@ check('viewer is lazy and DPR aware', () => {
     assert.ok(viewer.includes('IntersectionObserver'));
     assert.ok(viewer.includes('unloadPage'));
     assert.ok(viewer.includes('pixelScale'));
+    assert.ok(viewer.includes('inkPixelScale'));
+    assert.ok(viewer.includes('visualViewport'));
     assert.ok(viewer.includes('devicePixelRatio'));
     assert.ok(viewer.includes('maxCanvasPixels'));
 });

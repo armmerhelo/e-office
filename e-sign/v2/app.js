@@ -1,8 +1,8 @@
 import * as pdfjs from './vendor/pdf.min.js';
-import { PdfViewer } from './viewer.js';
-import { AnnotationLayer } from './annotations.js';
-import { StampComposer } from './stamp.js';
-import { buildSignedPdf } from './export-pdf.js';
+import { PdfViewer } from './viewer.js?v=20261112-2';
+import { AnnotationLayer } from './annotations.js?v=20261112-2';
+import { StampComposer } from './stamp.js?v=20261112-2';
+import { buildSignedPdf } from './export-pdf.js?v=20261112-2';
 
 const config = window.ESIGN_V2_CONFIG || {};
 window.pdfjsLib = pdfjs;

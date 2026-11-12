@@ -96,6 +96,9 @@ $myAccess = $q->fetch() ?: [];
 $mySigned = ($myAccess['Is_Signed'] ?? 'false') === 'true';
 
 $jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
+header('Content-Type: text/html; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
 $assetVersion = static function (string $relative): string {
     $path = __DIR__.'/'.$relative;
     return (string)(@filemtime($path) ?: '1');
