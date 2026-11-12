@@ -1,5 +1,14 @@
 # Production deployment — E-Office
 
+## การลงนาม ทะเบียนประทับตรา และ Auto send — 12 พฤศจิกายน 2569
+
+- เผยแพร่ **7 runtime paths** จาก `754a3a7b5f9c19313f2f216ddd089f104ce63940`, `ae221ed2af57fd8222f94a0a7e9bededdb42151f`, `630d4f3a2e75ffc6211f4024523c1e6d8078d61e`, `dd73d94fdb9b981911ca1d3c33d1166372f23366` และ `2aa0540d3cb6a2efa8fd460ffa6abf1ce7d62824` ด้วย targeted FTPS atomic replacement; runtime เสร็จเวลา **2026-11-12 10:46:53 +07:00** และเผยแพร่ feed เวลา **10:52:00 +07:00**
+- เพิ่มปากกาขาวบนชั้นลายเซ็น ปรับความสม่ำเสมอของเส้นตอนย้อนวาด เรียง/ค้นหาเลขทะเบียนรับฝ่าย และป้องกัน Auto send วนกลับหรือรับเอกสารเกินฝ่ายเมื่อเลขาฝ่ายเป็นรองฝ่ายด้วย รวมถึงไม่ใช้ wildcard route เก่าที่ตกค้างเพื่ออนุญาตการรับหรือส่งต่อ
+- สำรองไฟล์ก่อนเผยแพร่ 7 paths และสำรองซ้ำ 2 paths ก่อนแก้ routing compatibility; ไม่ต้องเปลี่ยน schema ตารางเส้นทางมีอยู่แล้ว (5 routes และไม่พบ wildcard route ในบัญชีสองบทบาท) OPcache ปิดอยู่จึงไม่ต้อง invalidate
+- `npm.cmd test` ผ่านครบที่ HEAD ล่าสุด; sign-routing **24**, integration **55** และ concurrency **8** groups ผ่าน พร้อม PHP/JS syntax checks
+- Production HTTP smoke: หน้า `/`, `index.php?view=updates`, หน้า e-sign, หน้าจัดการสมาชิก และ routing JavaScript ตอบ **200**; API/receipt scope ที่ไม่ส่ง session ถูกปฏิเสธ **401** ตามคาด หน้า updates ส่ง `system-updates.js`; feed JSON ตอบ **200** และมี commit ที่ปล่อยครบ 5 hashes
+- ตรวจ checksum ครบ **269 paths** ใน production manifest ไม่มี mismatch หรือ temporary helper เหลือ; Release ID **`deploy-20261112T034653000Z`** และตรวจ `data/system-updates.json` ตรงกับ production manifest
+
 ## SIYA NEWS Studio, บันทึกข้อความ และคู่มือ — 12 พฤศจิกายน 2569
 
 - เผยแพร่ **53 runtime paths** จาก `d55273798585c0db8cf567e31dbfefd2860420f8`, `288648037083ab43ed2469233e31eb3495a89e02`, `a418b842f804ce4cd9571b48b51e57ddcadeb9a1` และ `0cb8b5e58ca63903304029c96296754668b7a23f` เวลา **2026-11-12 09:39:11 +07:00** ภายใต้ maintenance gate สำรองไฟล์เดิมครบ 22 paths ที่มีอยู่และสำรองฐานข้อมูลแบบเข้ารหัสครบ 45 ตาราง/104,156 แถว
