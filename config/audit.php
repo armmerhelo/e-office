@@ -82,7 +82,7 @@ function app_audit(string $event, ?array $actor, ?int $target = null, array $met
     // Only explicitly safe, bounded fields may enter the log, even if a caller
     // accidentally supplies a full user/POST record later.
     $safe=[];
-    foreach (['method','action','from','to','permissions','department_ids','reset_password','receipt_departments','auto_sent_user_ids','count','year','number'] as $key) {
+    foreach (['method','action','from','to','permissions','department_ids','reset_password','receipt_departments','signature_method','signature_departments','auto_sent_user_ids','count','year','number'] as $key) {
         if (!array_key_exists($key,$metadata)) continue;
         $value=$metadata[$key];
         $clean=static fn($v)=>is_string($v)?mb_substr($v,0,255):(is_int($v)||is_bool($v)||$v===null?$v:null);

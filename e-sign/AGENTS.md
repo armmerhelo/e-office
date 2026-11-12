@@ -2,18 +2,20 @@
 
 ## Project Shape
 - This folder is a standalone PHP/browser tool, not a packaged app: there is no `package.json`, Composer file, CI config, or local test runner here.
-- `e-sign.php` is the main UI and contains the PHP parameter handling plus all HTML/CSS/JS for PDF viewing, drawing, stamping, saving, and downloading.
+- `e-sign.php` is the main page and contains the PHP authorization/metadata handling plus all HTML/CSS. The browser behavior lives in `assets/e-sign-app.js`; keep both in sync when changing the signing contract.
 - `upload_pdf.php` is the save endpoint; it requires `../config/config.php` and assumes the parent app provides `$conn`, `get_name_from_id()`, `get_target_from_id()`, and `mail_sender()`.
+- `sign_status.php` is the authenticated signing-history endpoint used by the in-page history drawer.
 
 ## Runtime Coupling
-- `e-sign.php` expects query params `Doc_Id`, `File_Path`, `Year`, and optional `url`.
-- PDFs load first from `../api/view_file.php?Type=signed&Year=...&File_Path=...`, then fall back to `../api/cors.php?url=...`, then a built-in demo PDF.
-- Browser dependencies include PDF.js `4.10.38` (module), PDF-lib `1.17.1`, Lucide and Google Font `Sarabun`. PDF-lib preserves original page dimensions and text while adding drawing overlays.
+- `e-sign.php` expects query params `Doc_Id`, `File_Path`, and optional `Year`; the year is taken from the authorized document row. It validates the session, document access, and file binding before rendering the editor.
+- PDFs load from `../api/view_file.php?Type=signed&Year=...&File_Path=...`; the retired `api/cors.php` fallback is not used.
+- Browser dependencies are self-hosted under `assets/vendor`: PDF.js `4.10.38`, PDF-lib `1.17.1`, and Lucide `0.468.0`. Tailwind is the compiled `assets/tailwind.css`; Sarabun fonts are local. PDF.js and Lucide retain a CDN fallback, but the page must remain usable from local assets alone.
 - The default stamp image is `e-stamp/template_stamp.png`; custom stamp previews are generated client-side on a canvas.
 
 ## Save/Upload Behavior
-- `saveToServer()` posts a generated PDF blob to `upload_pdf.php` with `file`, `year`, and `Doc_Id` form fields.
-- Uploaded PDFs use `EOFFICE_STORAGE/e-sign/$Year/signed_{Doc_Id}_{original-basename}`. A mandatory SHA-256 revision from `view_file.php` prevents stale uploads; bytes are validated before file or DB changes.
+- `saveToServer()` posts a generated PDF blob to `upload_pdf.php` with `file`, `year`, `Doc_Id`, `revision`, and signing metadata. Uploaded PDFs use `EOFFICE_STORAGE/e-sign/$Year/signed_{Doc_Id}_{original-basename}`. A mandatory SHA-256 revision from `view_file.php` prevents stale uploads; bytes are validated before file or DB changes.
+- The client also sends `client_sha256`; when a save committed but its HTTP response was lost, the endpoint can return that already-published revision idempotently only if the uploaded bytes equal the current signed revision and the user is already marked signed. Changed bytes still receive `409`.
+- `signature_method` (`pen`, `stamp`, `mixed`) and `signature_departments` are audit-only metadata. They never replace `receipt_departments`, which remains the authority for receipt routing and Auto send.
 - Saving requires visible pen/stamp ink on the current user's overlay (checked after pending rendering/Undo). The client declares `confirm_signature=1`; the endpoint requires that declaration and rejects unchanged PDF bytes from an unsigned recipient before publication or signed-state updates. Already-signed users may retry registering saved receipts without changing PDF bytes. This is authenticated signing intent, not server verification of handwriting pixels. Clients must reload after this contract changes. Inbox completion uses the recipient's `Is_Signed`, never read status.
 - `upload_pdf.php` requires an unexpired HttpOnly session in `eoffice_sessions`, authorizes the document/file, and updates `t_access_rights` after installing the validated file in a transaction.
 - Stamp Auto send uses an explicit receipt declaration: `receipt_departments` plus `confirm_receipt=1`. The UI waits for queued stamp image rendering and asks the assigned secretary to confirm registering receipt before saving. `config/sign-routing.php` revalidates secretary scopes, records `eoffice_document_receipts` against the saved revision, adds deputy access and queues notifications in the save transaction. Nonempty legacy `stamp_departments` is rejected. This records an authorized receipt declaration, not server verification of stamp pixels. Pen signing declares `confirm_pen_signature=1` only for surviving pen ink and, after a successful changed-PDF save, routes to all server-assigned deputies without fabricating stamp receipts. A member who is also a deputy never routes from a pen signature: the deputy role must not re-enter that member's secretary route (for example, a finance deputy who is also the director's secretary). Only an explicit, department-scoped receipt stamp routes for that member, and the Admin save rejects a wildcard secretary route for such a member. Legacy wildcard secretary routes do not expose receipt scopes for a dual-role member; `receipt_scopes.php` and receipt validation require explicit departments. Both paths preserve existing deputy read/sign state and avoid duplicate notifications.
@@ -27,6 +29,7 @@
 - Credentials are configured externally. Notifications use `eoffice_outbox` and `scripts/notifications.php`; see `DEPLOYMENT.md` at the project root.
 
 ## Verification
-- Focused PHP syntax checks: `php -l e-sign.php` and `php -l upload_pdf.php`.
+- Focused PHP syntax checks: `php -l e-sign.php`, `php -l upload_pdf.php`, and `php -l sign_status.php`.
+- Browser logic syntax: `node --check assets/e-sign-app.js`; signing regressions: `node tests/signature-presence.cjs`, `node tests/sign-stamp-ui.cjs`, `node tests/sign-concurrency.cjs`, and, with real Chromium, `node tests/sign-inbox-browser.cjs`.
 - Full behavior requires serving this folder from within the parent E-Office app so `../api`, `../config`, and `../file_document` paths resolve.
 - PHP variables are case-sensitive; check the existing `Doc_Id`/`doc_id` naming carefully when editing notification or access-right logic.

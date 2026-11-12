@@ -51,6 +51,20 @@ async function run(){
     servers=[0,1,2].map(worker=>cp.spawn(php,['-S',`localhost:${port+worker}`,'scripts/router.php'],{env:{...env,APP_URL:`http://localhost:${port+worker}`},stdio:'ignore'}));
     for(let i=0;i<60;i++){try{await fetch(base+'/api/me.php');break;}catch{await sleep(50);}}
     await signed();const department='กลุ่มบริหารวิชาการ';
+    await test('a lost save response is idempotently recovered only for the exact published bytes',async()=>{
+        const snapshot=await view();
+        const bytes=Buffer.concat([snapshot.bytes,Buffer.from('\n% idempotent-recovery\n')]);
+        const hash=crypto.createHash('sha256').update(bytes).digest('hex');
+        const firstBody=upload(bytes,snapshot.revision);firstBody.append('client_sha256',hash);
+        const first=await request('/e-sign/upload_pdf.php',{body:firstBody});
+        const retryBody=upload(bytes,snapshot.revision);retryBody.append('client_sha256',hash);
+        const retry=await request('/e-sign/upload_pdf.php',{body:retryBody});
+        assert.equal(retry.status,'success');assert.equal(retry.idempotent,true);assert.equal(retry.revision,first.revision);
+        const wrong=Buffer.concat([bytes,Buffer.from('tampered')]);
+        const wrongBody=upload(wrong,snapshot.revision);wrongBody.append('client_sha256',crypto.createHash('sha256').update(wrong).digest('hex'));
+        await request('/e-sign/upload_pdf.php',{body:wrongBody,status:409});
+        assert.deepEqual((await view()).bytes,bytes);
+    });
     await request('/management/save_sign_routes_api.php',{as:'admin',data:await routes()});
     await test('new Admin deputy FK and concurrent route save use gate -> users -> routes, without a deadlock',async()=>{
         const update=await routes();const release=await hold('receipt-before-admin','RECEIPT_GATE_HELD');

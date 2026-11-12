@@ -1,11 +1,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const StampRenderQueue=require('../assets/stamp-render-queue.js');
-const source=fs.readFileSync('e-sign/e-sign.php','utf8');
-const save=source.slice(source.indexOf('        async function saveToServer() {'),source.indexOf('        async function downloadDocument() {')).replace(/<\?=.*?\?>/g,'1');
-const undo=source.slice(source.indexOf('        function undoLastAction() {'),source.indexOf('        function redrawCanvas(pageNum'));
-const drawing=source.slice(source.indexOf('        function setupDrawingEvents(canvas, pageNum) {'),source.indexOf('        function undoLastAction() {'));
-const redraw=source.slice(source.indexOf('        function redrawCanvas(pageNum'),source.indexOf('        // --- 5. SAVE & DOWNLOAD ---'));
-const scopesSource=source.slice(source.indexOf('        async function loadReceiptScopes() {'),source.indexOf('        // --- 2. INITIALIZATION ---')).replace(/<\?=.*?\?>/g,'1');
+const source=fs.readFileSync('assets/e-sign-app.js','utf8');
+const save=source.slice(source.indexOf('async function saveToServer() {'),source.indexOf('async function downloadDocument() {')).replace(/<\?=.*?\?>/g,'1');
+const undo=source.slice(source.indexOf('function undoLastAction() {'),source.indexOf('function redrawCanvas(pageNum'));
+const drawing=source.slice(source.indexOf('function setupDrawingEvents(canvas, pageNum) {'),source.indexOf('function undoLastAction() {'));
+const redraw=source.slice(source.indexOf('function redrawCanvas(pageNum'),source.indexOf('// --- 5. SAVE & DOWNLOAD ---'));
+const scopesSource=source.slice(source.indexOf('async function loadReceiptScopes() {'),source.indexOf('// --- 2. INITIALIZATION ---')).replace(/<\?=.*?\?>/g,'1');
 const history={};let writes=[],fail=false,release,delay=false,consent=true,scopes=['กลุ่มบริหารวิชาการ'],scopeFailure=false,scopeReads=0,acknowledge=true;
 const context={history,console:{log(){},error(){}},FormData:class {constructor(){this.data={};}append(key,value){this.data[key]=value;}},
     generatePDFBlob:async()=>{if(delay)await new Promise(resolve=>{release=resolve;});return 'pdf';},

@@ -2,9 +2,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const StampRenderQueue = require('../assets/stamp-render-queue.js');
-const source = fs.readFileSync('e-sign/e-sign.php', 'utf8');
-const validation = source.slice(source.indexOf('        function hasVisibleNonWhitePixel(pixels) {'), source.indexOf('        // UPDATE: Function to Save to Server'));
-const save = source.slice(source.indexOf('        async function saveToServer() {'), source.indexOf('        async function downloadDocument() {')).replace(/<\?=.*?\?>/g, '1');
+const source = fs.readFileSync('assets/e-sign-app.js', 'utf8');
+const validation = source.slice(source.indexOf('function hasVisibleNonWhitePixel(pixels) {'), source.indexOf('// UPDATE: Function to Save to Server'));
+const save = source.slice(source.indexOf('async function saveToServer() {'), source.indexOf('async function downloadDocument() {')).replace(/<\?=.*?\?>/g, '1');
 const pen = {tool:'pen', points:[{x:1,y:1},{x:2,y:2}]};
 
 (async () => {
