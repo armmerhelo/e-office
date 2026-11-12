@@ -1,5 +1,16 @@
 # Production deployment — E-Office
 
+## ซิงก์ production ให้ตรงกับซอร์สและชี้แจง Auto send — 12 พฤศจิกายน 2569
+
+- ตรวจ SHA-256 จาก FTPS เทียบซอร์ส deployment พบไฟล์ต่าง 32 paths; สำรองไฟล์เดิมก่อน แล้วติดตั้งแบบ atomic โดยพักหน้าเว็บระหว่างซิงก์และคืน `.htaccess` หลังตรวจครบ ไม่แตะฐานข้อมูล เอกสาร หรือไฟล์ตั้งค่าส่วนตัว
+- หลังติดตั้งตรวจซ้ำ deployable source **264 paths ตรงกับ production และ manifest ทุกไฟล์**; manifest รวม **269 paths** ไม่มี checksum mismatch หรือไฟล์ช่วย deploy ค้าง เผยแพร่ประวัติ Release ID **`deploy-20261112T051506000Z`** สำหรับ commit `388c9ad9d605b4325bfe807a3dac94717aa0b7b5` ซึ่งชี้แจงเงื่อนไข Auto send ของผู้ใช้ที่เป็นทั้งเลขาและรองฝ่าย โดยไม่เปลี่ยนกติกาที่เปิดใช้แล้ว
+
+## แก้หน้าอัปเดตไม่โหลด feed — 12 พฤศจิกายน 2569
+
+- เพิ่ม shared feed script ใน `updates/index.html` ก่อนตัวแสดงผล และ regression test ป้องกันหน้า standalone ขาดโมดูล; `npm.cmd test` ผ่านครบ รวม system-updates และ signing/routing suites
+- เผยแพร่ `updates/index.html` จาก commit `812a0cdb66d9b5be2d20b222a95bf216337d7643` แบบ atomic หลังสำรองไฟล์ ตรวจ SHA-256 ตรงกับ source และ manifest
+- Chromium production เปิด `/updates/` แล้วเห็นรายการล่าสุดและประวัติเดิม โหลด `/data/system-updates.json` ได้ HTTP 200 ไม่มี console error; Release ID **`deploy-20261112T053115000Z`** แสดงบนหน้าอัปเดตแล้ว
+
 ## การลงนาม ทะเบียนประทับตรา และ Auto send — 12 พฤศจิกายน 2569
 
 - เผยแพร่ **7 runtime paths** จาก `754a3a7b5f9c19313f2f216ddd089f104ce63940`, `ae221ed2af57fd8222f94a0a7e9bededdb42151f`, `630d4f3a2e75ffc6211f4024523c1e6d8078d61e`, `dd73d94fdb9b981911ca1d3c33d1166372f23366` และ `2aa0540d3cb6a2efa8fd460ffa6abf1ce7d62824` ด้วย targeted FTPS atomic replacement; runtime เสร็จเวลา **2026-11-12 10:46:53 +07:00** และเผยแพร่ feed เวลา **10:52:00 +07:00**
