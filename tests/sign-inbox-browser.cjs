@@ -58,7 +58,19 @@ async function request(route,body,auth=''){
   assert.equal(await evaluate("document.getElementById('stamp-modal').classList.contains('hidden')"),false,'modal stays open without a department');
   await evaluate("document.getElementById('stamp-text-1').value='กลุ่มบริหารวิชาการ';document.getElementById('stamp-text-1').dispatchEvent(new Event('change',{bubbles:true}));confirmStampData();");
   assert.equal(await evaluate("document.getElementById('stamp-modal').classList.contains('hidden')"),true,'modal closes after a department is selected');
-  await evaluate("{const canvas=document.querySelector('.drawing-canvas'),rect=canvas.getBoundingClientRect();canvas.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2}));}");
+  await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:2});
+  const tapPoint=await evaluate(`(()=>{
+   const canvas=document.querySelector('.drawing-canvas');
+   canvas.scrollIntoView({block:'center'});
+   const rect=canvas.getBoundingClientRect();
+   const x=Math.round((Math.max(0,rect.left)+Math.min(innerWidth,rect.right))/2);
+   const y=Math.round((Math.max(0,rect.top)+Math.min(innerHeight,rect.bottom))/2);
+   if(document.elementFromPoint(x,y)!==canvas)throw Error('stamp canvas is not at the touch point');
+   return {x,y};
+  })()`);
+  await send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[tapPoint]});
+  await send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await until("Object.values(documentHistory).flat().some(action=>action.tool==='stamp')");
  await evaluate("(()=>{window.__esignSaved=null;window.__esignSaveError=null;const original=window.fetch;window.fetch=async(...args)=>{const response=await original(...args);if(String(args[0]).includes('upload_pdf'))window.__esignSaved=await response.clone().json();return response;};saveToServer().catch(error=>{window.__esignSaveError=error.message;});})()");
  await until("!document.getElementById('stamp-intent-modal').classList.contains('hidden')");
  assert.equal(await evaluate("document.getElementById('loading').classList.contains('hidden')"),true,'intent dialog is visible above the loading state');
@@ -71,6 +83,8 @@ async function request(route,body,auth=''){
  await until("window.__esignSaved!==null");
  const saved=await evaluate('window.__esignSaved');
  assert.equal(saved?.status,'success','real stamp-only save must succeed');
+ assert.equal(await evaluate("Object.values(documentHistory).flat().filter(action=>action.tool==='stamp').length"),1,'one Chromium touch places exactly one stamp');
+ await send('Emulation.setTouchEmulationEnabled',{enabled:false});
  assert.equal(await evaluate("document.getElementById('save-success').classList.contains('hidden')"),false,'success panel remains visible');
  const saveFeedback=[];
  await until("getComputedStyle(document.getElementById('toast')).opacity==='1'");

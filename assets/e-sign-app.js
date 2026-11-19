@@ -737,7 +737,10 @@ function setupDrawingEvents(canvas, pageNum) {
         if (typeof markDirty === 'function') markDirty();
     };
 
-    canvas.addEventListener('mousedown', event => { if (!penActive) startDraw(event); });
+    canvas.addEventListener('mousedown', event => {
+        if (penActive || (currentTool === 'stamp' && event.sourceCapabilities?.firesTouchEvents)) return;
+        startDraw(event);
+    });
     canvas.addEventListener('mousemove', event => { if (!penActive) draw(event); });
     canvas.addEventListener('mouseup', event => { if (!penActive) stopDraw(event); });
     canvas.addEventListener('mouseout', stopDraw);
@@ -749,8 +752,11 @@ function setupDrawingEvents(canvas, pageNum) {
             return;
         }
         if ((event.touches?.length || 0) === 1) {
-            if (currentTool === 'stamp') pendingStamp = {clientX: event.touches[0].clientX, clientY: event.touches[0].clientY};
-            else startDraw(event);
+            if (currentTool === 'stamp') {
+                // Suppress compatibility mouse events, but wait for touchend so pinch can cancel placement.
+                if (event.cancelable) event.preventDefault();
+                pendingStamp = {clientX: event.touches[0].clientX, clientY: event.touches[0].clientY};
+            } else startDraw(event);
         }
     }, {passive: false});
     canvas.addEventListener('touchmove', event => {
