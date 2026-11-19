@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## ปฏิทินไปราชการของผู้บริหาร — 19 พฤศจิกายน 2569
+
+- เผยแพร่ 13 runtime paths จาก commit `cb6e5ead5f7145e474f81c6c04130aed4c23a496` เวลา **11:27:37 +07:00** แบบ targeted atomic replacement โดยคง `index.php` และ `assets/main.js` ฉบับปรับแต่งเฉพาะ production แล้วเพิ่มเฉพาะเมนู/route ที่จำเป็น
+- เพิ่มตาราง `eoffice_official_travel` แบบ additive จำนวน 14 คอลัมน์; ตรวจหลัง migration ว่ายังไม่มีรายการและไม่ได้เปลี่ยนตำแหน่งหรือสิทธิ์ของผู้ใช้ สำรองฐานข้อมูล production แบบเข้ารหัสและตรวจยืนยันแล้ว พร้อมสำรองไฟล์ก่อน deploy
+- HTTP smoke ผ่าน 8 เส้นทางที่เกี่ยวข้อง; API ปฏิเสธ GET/POST ที่ไม่มี session ด้วย 401 ตามคาด ตรวจ SHA-256 ครบ 287 paths ตาม production manifest ไม่มี mismatch และ OPcache ปิดอยู่
+- Production มีผู้ใช้ 75 บัญชีและทุกบัญชียังเป็นตำแหน่ง staff; ยังไม่มีสิทธิ์ `official_travel` หรือกำหนดการ ผู้ดูแลต้องกำหนดตำแหน่ง ผอ./รอง ผอ. ตามข้อมูลจริง และมอบสิทธิ์ผู้จัดการปฏิทินก่อนเริ่มบันทึก
+- ทดสอบ `npm.cmd run test:official-travel` และ `node tests/system-updates.cjs` ผ่าน เผยแพร่ Release ID **`deploy-20261119T042737000Z`** และตรวจหน้า `/updates/` ใน Chromium ว่าแสดงประกาศภาษาไทยรายการใหม่โดยไม่มี console error
+
 ## ซิงก์ production ให้ตรงกับซอร์สและชี้แจง Auto send — 12 พฤศจิกายน 2569
 
 - ตรวจ SHA-256 จาก FTPS เทียบซอร์ส deployment พบไฟล์ต่าง 32 paths; สำรองไฟล์เดิมก่อน แล้วติดตั้งแบบ atomic โดยพักหน้าเว็บระหว่างซิงก์และคืน `.htaccess` หลังตรวจครบ ไม่แตะฐานข้อมูล เอกสาร หรือไฟล์ตั้งค่าส่วนตัว
