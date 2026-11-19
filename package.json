@@ -9,6 +9,7 @@
     "test:audit": "node tests/audit-logs.cjs && node tests/audit-keyring.cjs",
     "test:audit-browser": "node tests/audit-browser.cjs",
     "test:updates": "node tests/system-updates.cjs",
+    "test:official-travel": "node tests/official-travel.cjs",
     "test:number-booking": "node tests/number-booking-ui.cjs",
     "test:spa": "node tests/module-router-browser.cjs",
     "test:modules": "node tests/module-navigation.cjs && node tests/create-form-lifecycle.cjs && node tests/form-dates.cjs && node tests/maintenance-admin-ui.cjs && node tests/booking-edit-ui.cjs && node tests/number-booking-ui.cjs && node tests/room-booking-list.cjs",

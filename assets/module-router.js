@@ -10,6 +10,7 @@
         room_booking:'room_booking/index.html', room_booking2:'room_booking/new_room.html',
         edit_room_booking:'room_booking/edit_room_booking.html', maintenance:'maintenance_requests/index.html',
         maintenance_admin:'maintenance_requests/admin.html', updates:'updates/index.html', audit_logs:'management/audit_logs.html',
+        official_travel:'official_travel/index.html',
         siya_news:'siya_news/index.html', siya_news_studio:'siya_news/studio.html',
         memo:'memorandum/index.html'
     });

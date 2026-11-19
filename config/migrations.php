@@ -20,6 +20,8 @@ function app_migrate(PDO $pdo): void {
     app_siya_news_migrate($pdo);
     require_once __DIR__.'/siya-news-studio-schema.php';
     app_siya_news_studio_migrate($pdo);
+    require_once __DIR__.'/official-travel-schema.php';
+    app_official_travel_migrate($pdo);
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_migrations (name VARCHAR(100) PRIMARY KEY, applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB");
     require_once __DIR__.'/sign-routing.php';
     app_sign_routes_migrate($pdo);

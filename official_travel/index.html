@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ปฏิทินไปราชการ — E-Office</title>
+  <link rel="stylesheet" href="../assets/app-navigation.css?v=20261019">
+  <link rel="stylesheet" href="../assets/sidebar.css?v=20261019">
+  <link rel="stylesheet" href="../assets/ui-buttons.css">
+  <link rel="stylesheet" href="calendar.css?v=1">
+</head>
+<body class="eoffice-module-page">
+  <div class="eoffice-module-content"><div class="eoffice-module-view">
+    <script src="../assets/app-navigation.js?v=20261112-hidden-tabs&amp;module=official-travel"></script>
+    <main class="travel-page" aria-labelledby="travel-title">
+      <header class="travel-header">
+        <div>
+          <h1 id="travel-title">ปฏิทินไปราชการ</h1>
+          <p>กำหนดการของผู้อำนวยการและรองผู้อำนวยการ · เวลาไทย</p>
+        </div>
+        <button id="travel-new" class="eo-btn eo-btn--primary" type="button" hidden>+ เพิ่มกำหนดการ</button>
+      </header>
+      <p id="travel-feedback" class="travel-feedback" role="status">กำลังโหลดปฏิทิน…</p>
+      <button id="travel-retry" class="eo-btn eo-btn--secondary" type="button" hidden>โหลดปฏิทินใหม่</button>
+      <section class="travel-panel travel-today" aria-labelledby="travel-today-title">
+        <h2 id="travel-today-title">วันนี้ใครไปราชการ</h2>
+        <p id="travel-today-date" class="travel-muted"></p>
+        <div id="travel-today-items" class="travel-card-list"></div>
+      </section>
+      <section class="travel-panel" aria-labelledby="travel-month">
+        <div class="travel-toolbar">
+          <h2 id="travel-month">กำหนดการรายเดือน</h2>
+          <div class="travel-controls">
+            <button id="travel-prev" class="eo-btn eo-btn--secondary" type="button" aria-label="เดือนก่อน">‹</button>
+            <button id="travel-current" class="eo-btn eo-btn--secondary" type="button">เดือนนี้</button>
+            <button id="travel-next" class="eo-btn eo-btn--secondary" type="button" aria-label="เดือนถัดไป">›</button>
+          </div>
+        </div>
+        <div class="travel-filters">
+          <label>ฝ่าย <select id="travel-department"></select></label>
+          <label>ผู้ไปราชการ <select id="travel-person"></select></label>
+        </div>
+        <div id="travel-grid" class="travel-grid" aria-label="ปฏิทินรายเดือน"></div>
+        <div id="travel-agenda" class="travel-agenda travel-card-list" aria-label="รายการในเดือนที่เลือก"></div>
+        <p id="travel-empty" class="travel-muted" hidden>ไม่พบกำหนดการในเดือนที่เลือก</p>
+      </section>
+      <dialog id="travel-detail" class="travel-dialog" aria-labelledby="travel-detail-title">
+        <h2 id="travel-detail-title"></h2>
+        <dl id="travel-detail-items"></dl>
+        <div class="travel-controls">
+          <button id="travel-close-detail" class="eo-btn eo-btn--secondary" type="button">ปิด</button>
+          <button id="travel-edit" class="eo-btn eo-btn--primary" type="button" hidden>แก้ไขกำหนดการ</button>
+        </div>
+      </dialog>
+      <dialog id="travel-editor" class="travel-dialog" aria-labelledby="travel-editor-title">
+        <h2 id="travel-editor-title">เพิ่มกำหนดการ</h2>
+        <form id="travel-form">
+          <div class="travel-form-grid">
+            <label>ผู้ไปราชการ <select name="executive_id" required></select></label>
+            <label>ฝ่าย <select name="department" required></select></label>
+            <label class="travel-wide">เรื่อง / ภารกิจ <input name="subject" required maxlength="200"></label>
+            <label class="travel-wide">สถานที่ <input name="place" required maxlength="200"></label>
+            <label>วันที่ไป <input name="start_date" type="date" required min="1900-01-01" max="2199-12-31"></label>
+            <label>วันที่กลับ <input name="end_date" type="date" required min="1900-01-01" max="2199-12-31"></label>
+            <label class="travel-check travel-wide"><input name="all_day" type="checkbox" checked> ทั้งวัน</label>
+            <label id="travel-start-time">เวลาไป <input name="start_time" type="time"></label>
+            <label id="travel-end-time">เวลากลับ <input name="end_time" type="time"></label>
+            <label>เลขที่หนังสือ (ถ้ามี) <input name="reference_no" maxlength="100"></label>
+            <label id="travel-status">สถานะ <select name="status"><option value="scheduled">มีกำหนดการ</option><option value="postponed">เลื่อน / รอวันใหม่</option><option value="cancelled">ยกเลิก</option></select></label>
+            <label class="travel-wide">หมายเหตุภายใน (เฉพาะผู้จัดการปฏิทิน) <textarea name="private_note" rows="3" maxlength="1000"></textarea></label>
+          </div>
+          <p id="travel-form-message" class="travel-feedback" role="status"></p>
+          <div class="travel-controls">
+            <button id="travel-close-editor" class="eo-btn eo-btn--secondary" type="button">ปิดฟอร์ม</button>
+            <button id="travel-save" class="eo-btn eo-btn--primary" type="submit">บันทึกกำหนดการ</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+  </div></div>
+  <script src="calendar.js?v=1"></script>
+</body>
+</html>

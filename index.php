@@ -217,6 +217,12 @@ window.addEventListener('load', function() {
 
 
           <li id="other_menu_group" class="eoffice-app-navigation__group">อื่น ๆ</li>
+          <li id="group_menu_official_travel" hidden>
+            <a href="official_travel/index.html" id="menu-official-travel" onclick="return navigateView(event, 'official_travel');" class="menu-item">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 3v4m8-4v4M4 10h16M6 5h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z"></path></svg>
+              ปฏิทินไปราชการ
+            </a>
+          </li>
 
           <li id="group_menu_bookingroom">
             <a href="room_booking/index.html" id="menu-bookingroom" onclick="showView('room_booking','','1'); return false;" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">

@@ -26,6 +26,8 @@ function app_audit_catalog(): array {
         'booking.status'=>['bookings','เปลี่ยนสถานะการจองห้อง','booking'],
         'maintenance.create'=>['maintenance','สร้างใบแจ้งซ่อม','maintenance'],
         'maintenance.update'=>['maintenance','บันทึกผล / สถานะแจ้งซ่อม','maintenance'],
+        'official_travel.create'=>['official_travel','เพิ่มกำหนดการไปราชการ','official_travel'],
+        'official_travel.update'=>['official_travel','แก้ไขกำหนดการไปราชการ','official_travel'],
         'siya_news.create'=>['siya_news','สร้างข่าว SIYA NEWS','news'],
         'siya_news.update'=>['siya_news','แก้ไขข่าว SIYA NEWS','news'],
         'siya_news.submit'=>['siya_news','ส่งข่าวตรวจคำ','news'],
@@ -52,7 +54,7 @@ function app_audit_catalog(): array {
 }
 function app_audit_categories(): array {
     return ['auth'=>'เข้าสู่ระบบ','documents'=>'เอกสาร','members'=>'สมาชิกและสิทธิ์','departments'=>'กลุ่มงาน','siya_news'=>'SIYA NEWS',
-        'bookings'=>'จองห้อง','maintenance'=>'แจ้งซ่อม','numbers'=>'เลขคำสั่ง','email'=>'อีเมลและ AI'];
+        'bookings'=>'จองห้อง','maintenance'=>'แจ้งซ่อม','official_travel'=>'ไปราชการ','numbers'=>'เลขคำสั่ง','email'=>'อีเมลและ AI'];
 }
 function app_audit_migrate(PDO $pdo): void {
     // Snapshots deliberately have no FK: deleting a user/document must preserve history.

@@ -62,6 +62,7 @@ const routes = {
     maintenance: ['menu-maintenance', 'maintenance_requests/index.html'],
     maintenance_admin: ['menu-maintenance-admin', 'maintenance_requests/admin.html'],
     updates: ['menu-updates', 'updates/index.html'],
+    official_travel: ['menu-official-travel', 'official_travel/index.html'],
     audit_logs: ['menu-audit-logs', 'management/audit_logs.html'],
     siya_news: ['menu-siya-news', 'siya_news/index.html'],
     siya_news_studio: ['menu-siya-news-studio', 'siya_news/studio.html'],
@@ -78,7 +79,7 @@ for (const [view, [menuId, path]] of Object.entries(routes)) {
     const anchor = index.match(new RegExp(`<a\\b[^>]*\\bid="${menuId}"[^>]*>`));
     assert.ok(anchor, `main menu should include ${menuId}`);
     assert.ok(anchor[0].includes(`href="${path}"`), `${menuId} should link to ${path}`);
-    assert.ok(anchor[0].includes(`showView('${view}'`), `${menuId} should retain its view handler`);
+    assert.ok(anchor[0].includes(`showView('${view}'`) || anchor[0].includes(`navigateView(event, '${view}')`), `${menuId} should retain its view handler`);
 }
 
 const pages = [
@@ -183,6 +184,7 @@ function sidebarParityChecks() {
         assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_audit_logs').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
+        assert.equal(el('group_menu_official_travel').hidden,!user);
         for(const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
             assert.equal(el(id).style.display,'none',`${id} should stay hidden for every role`);
         }
@@ -390,7 +392,8 @@ async function navigationChecks() {
     assert.equal(window.eofficeSessionState.user,verifiedState.user,'failed checks retain only the old owner boundary, not permission to write');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     const links=list.children.filter(link=>link.tag==='a');
-    assert.equal(links.filter(link=>!link.hidden).length,15);
+    assert.equal(links.filter(link=>!link.hidden).length,16);
+    assert.ok(links.some(link=>!link.hidden && link.href.endsWith('/official_travel/index.html')));
     assert.equal(links[0].attributes['aria-current'],'page');
     assert.equal(links[0].href,'http://localhost/eoffice/management/user_manage.html');
     toggle.events.click();assert.equal(nav.inert,false);assert.equal(content.inert,true);assert.equal(toggle.attributes['aria-expanded'],'true');
@@ -429,7 +432,8 @@ async function navigationChecks() {
     assert.ok(restoredWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'an untouched restored draft must still warn before logout');
     restored.hidden=true;
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,9,'basic users must not see staff/admin links or temporarily hidden tabs');
+    assert.equal(links.filter(link=>!link.hidden).length,10,'basic users must not see staff/admin links or temporarily hidden tabs');
+    assert.ok(links.some(link=>!link.hidden && link.href.endsWith('/official_travel/index.html')));
     console.log('PASS sidebar: document shortcuts, subdirectory URLs, mobile inert/Escape, dirty-form guards and stale session responses');
 }
 navigationChecks().catch(error=>{console.error(error);process.exitCode=1;});

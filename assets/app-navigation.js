@@ -13,6 +13,7 @@
         'room_booking/index.html':'room_booking','room_booking/new_room.html':'room_booking2',
         'room_booking/edit_room_booking.html':'edit_room_booking','maintenance_requests/index.html':'maintenance',
         'maintenance_requests/admin.html':'maintenance_admin', 'updates/index.html':'updates',
+        'official_travel/index.html':'official_travel',
         'siya_news/index.html':'siya_news', 'siya_news/studio.html':'siya_news_studio',
         'memorandum/index.html':'memo'
     };
@@ -28,6 +29,7 @@
         {label:'คำสั่งของฉัน', path:'email_send/my_dashboard.html', login:true, group:'ทะเบียนเอกสาร', icon:'▤'},
         {label:'หนังสือส่งถึง', path:'index.php?view=received', login:true, group:'ทะเบียนเอกสาร', icon:'inbox'},
         {label:'ทะเบียนหนังสือรับ', path:'index.php?view=send_table', login:true, group:'ทะเบียนเอกสาร', icon:'▥'},
+        {label:'ปฏิทินไปราชการ', path:'official_travel/index.html', login:true, group:'อื่น ๆ', icon:'calendar'},
         {label:'จองห้องประชุม', path:'room_booking/index.html', login:true, group:'อื่น ๆ', icon:'▦'},
         {label:'ขอใช้สถานที่', path:'room_booking/new_room.html', login:true, group:'อื่น ๆ', icon:'+'},
         {label:'รายการจองห้องของฉัน', path:'room_booking/edit_room_booking.html', login:true, group:'อื่น ๆ', icon:'edit'},
@@ -54,6 +56,7 @@
         '▤':'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
         '▥':'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
         '▦':'M8 7V3m8 4V3m-9 8h.01M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z',
+        'calendar':'M8 3v4m8-4v4M4 10h16M6 5h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2z',
         'edit':'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
         'report':'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z',
         '+':'M12 4v16m8-8H4',

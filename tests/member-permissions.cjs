@@ -72,7 +72,7 @@ async function run() {
     });
     await test('Admin gets the complete permission catalog', async()=>{
         const me=await request('/api/me.php');
-        assert.deepEqual(new Set(me.user.permissions),new Set(['members','departments','external_numbers','email','room_booking','maintenance','news_submit','news_editor','news_producer']));
+        assert.deepEqual(new Set(me.user.permissions),new Set(['members','departments','external_numbers','email','room_booking','maintenance','official_travel','news_submit','news_editor','news_producer']));
     });
     await test('multiple grants immediately affect the existing session', async()=>{
         await grant('manager',['members','departments','members']);
