@@ -79,14 +79,15 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'travel secretary sees the calendar link');
         assert.equal(await evalPage(`${el('grid')}.checkVisibility()`),true);
         const todayCell = `${el('grid')}.querySelector('[data-date="${today}"]')`;
+        const todayCount = today === `${month}-01` ? 4 : 3;
         assert.equal(await evalPage(`${el('selected-date')}.dateTime`),today);
         assert.equal(await evalPage(`${el('selected-today')}.checkVisibility()`),true);
         assert.equal(await evalPage(`(() => {const count=${el('grid')}.querySelector('.travel-day-count[data-count="0"]');return !!count && getComputedStyle(count).visibility==='hidden';})()`),true);
         const selectedSummary = await evalPage(`${el('selected-items')}.textContent`);
         assert.match(selectedSummary,/QA timed venue.*09:00–16:30 น\./);
         assert.match(selectedSummary,/QA cancelled meeting.*ยกเลิก/);
-        assert.equal(await evalPage(`${el('selected-count')}.textContent`),'3 กำหนดการ');
-        assert.equal(await evalPage(`${todayCell}.dataset.count`),'3');
+        assert.equal(await evalPage(`${el('selected-count')}.textContent`),`${todayCount} กำหนดการ`);
+        assert.equal(await evalPage(`${todayCell}.dataset.count`),String(todayCount));
         assert.equal(await evalPage(`${todayCell}.getAttribute('aria-pressed')`),'true');
         assert.equal(await evalPage(`!${el('day-dialog')}`),true,'date selection must not open an overflow dialog');
         const firstDate = `${month}-01`;
