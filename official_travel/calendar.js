@@ -67,10 +67,11 @@
     async function load(target = month, successMessage = '', requestedSelection = null) {
         const ticket = ++sequence;
         const previousSelection = selectedDate;
+        const showLoading = !snapshot;
         loading = true;
         controls();
         get('retry').hidden = true;
-        message(get('feedback'), 'กำลังโหลดปฏิทิน…');
+        message(get('feedback'), showLoading ? 'กำลังโหลดปฏิทิน…' : '');
         try {
             const data = await request(endpoint + (target ? '?month=' + encodeURIComponent(target) : ''));
             if (ticket !== sequence) return;

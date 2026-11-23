@@ -115,16 +115,27 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.equal(await evalPage(`${todayCell}.dataset.count`),'0');
         await evalPage(`${el('clear')}.click()`);
         assert.equal(await evalPage(`${el('clear')}.hidden && ${el('department')}.value==='' && ${el('person')}.value==='' && ${root}.activeElement===${el('department')}`),true);
+        await evalPage(`(() => {
+            window.__travelLoadingTexts=[];
+            const feedback=${el('feedback')};
+            new MutationObserver(() => {
+                if (feedback.textContent.includes('กำลังโหลด')) window.__travelLoadingTexts.push(feedback.textContent);
+            }).observe(feedback,{childList:true,characterData:true,subtree:true});
+        })()`);
         for (const offset of [1,2]) {
             const target = new Date(`${month}-01T00:00:00Z`);
             target.setUTCMonth(target.getUTCMonth() - offset);
             await evalPage(`${el('prev')}.click()`);
             await until(`!${el('prev')}.disabled && !!${el('grid')}.querySelector('time[datetime="${target.toISOString().slice(0,10)}"]')`);
         }
+        assert.equal(await evalPage(`window.__travelLoadingTexts.length`),0,'changing months must not announce a loading message');
+        assert.equal(await evalPage(`${el('feedback')}.textContent`),'');
         await evalPage(`${el('view-list')}.click()`);
         assert.equal(await evalPage(`!${el('empty')}.hidden && ${el('empty')}.textContent==='เดือนนี้ยังไม่มีกำหนดการ'`),true);
         await evalPage(`${el('current')}.click()`);
         await until(`${el('current')}.disabled && ${el('selected-date')}.dateTime === '${today}'`);
+        assert.equal(await evalPage(`window.__travelLoadingTexts.length`),0,'returning to the current month must not announce a loading message');
+        assert.equal(await evalPage(`${el('feedback')}.textContent`),'');
         await evalPage(`${el('view-grid')}.click()`);
         console.log('PASS selected-day panel, compact date selection, unique cross-month agenda and scoped filters');
         assert.equal(await evalPage(`Array.from(${el('selected-items')}.querySelectorAll('.travel-entry')).every(button => !button.hasAttribute('aria-label') && button.innerText.trim().length>0)`),true,'entry names must come from their visible button text');
