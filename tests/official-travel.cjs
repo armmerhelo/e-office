@@ -19,6 +19,11 @@ async function request(as, status, {query='', data, origin}={}) {
     return JSON.parse(text);
 }
 async function check(name, fn) { await fn(); passed++; console.log('PASS '+name); }
+async function me(as) {
+    const response = await fetch(base+'/api/me.php',{headers:{Cookie:`User_Token=${tokens[as]}`}});
+    assert.equal(response.status,200);
+    return (await response.json()).user;
+}
 async function run() {
     tokens = JSON.parse(fixture('seed'));
     seeded = true;
@@ -35,19 +40,27 @@ async function run() {
     const data = {_expected_owner:2, executive_id:3, department:'academic', subject:'<img src=x> ทดสอบ', place:'สถานที่ทดสอบ',
         start_date:initial.today,end_date:initial.today,all_day:true,status:'scheduled',reference_no:'เลขภายใน',private_note:'ข้อความภายใน'};
     let travelId, old;
-    await check('authenticated users read; only grant holders or Admin may write', async () => {
-        assert.deepEqual(initial.executives.map(row => Number(row.id)).sort(),[1,3]);
+    await check('only travel secretaries, deputy directors, directors and Admin can read; writes require permission', async () => {
+        assert.deepEqual(initial.executives.map(row => Number(row.id)).sort(),[1,3,5]);
         assert.equal((await request('admin',200)).can_manage,true);
-        const reader = await request('reader',200);
-        assert.equal(reader.can_manage,false);
-        assert.deepEqual(reader.executives,[]);
+        assert.equal((await me('deputy')).position,'deputy_director');
+        assert.equal((await me('director')).position,'director');
+        for (const role of ['deputy','director']) {
+            const viewer = await request(role,200);
+            assert.equal(viewer.can_manage,false);
+            assert.deepEqual(viewer.executives,[]);
+            await request(role,403,{data});
+        }
+        assert.equal((await request('admin_staff',200)).can_manage,true,'Admins can view without an executive position');
+        await request('reader',403);
+        await request(null,401);
         await request('reader',403,{data});
         await request(null,401,{data});
         await request('secretary',403,{data,origin:'https://example.test'});
         await request('secretary',409,{data:{...data,_expected_owner:1}});
     });
     await check('validates month, dates, clock, executive and role at the API', async () => {
-        for (const query of ['?month=2026-13','?month[]=2026-11']) await request('reader',400,{query});
+        for (const query of ['?month=2026-13','?month[]=2026-11']) await request('secretary',400,{query});
         for (const change of [{start_date:'2026-02-30'},{end_date:'1900-01-01'},{status:'cancelled'},
             {all_day:false,start_time:'16:00',end_time:'08:00'},{all_day:false,start_time:'09:00',end_time:'24:00'}]) {
             await request('secretary',400,{data:{...data,...change}});
@@ -64,17 +77,17 @@ async function run() {
         assert.equal(old.private_note,data.private_note);
         assert.equal(old.reference_no,data.reference_no);
         assert.equal(old.revision,1);
-        const {entries,today_entries} = await request('reader',200);
+        const {entries,today_entries} = await request('deputy',200);
         assert.ok(today_entries.some(row => row.id === travelId));
         const row = entries.find(row => row.id === travelId);
         assert.equal(row.subject,data.subject);
         for (const key of ['private_note','reference_no','revision']) assert.equal(Object.hasOwn(row,key),false);
         for (const month of [`${nextYear}-01`,`${nextYear}-02`]) {
-            const data = await request('reader',200,{query:'?month='+month});
+            const data = await request('deputy',200,{query:'?month='+month});
             assert.equal(data.entries.find(row => row.department === 'director').end_time,'16:45');
             assert.ok(data.today_entries.some(row => row.id === travelId));
         }
-        assert.equal((await request('reader',200,{query:`?month=${nextYear}-03`})).entries.length,0);
+        assert.equal((await request('deputy',200,{query:`?month=${nextYear}-03`})).entries.length,0);
     });
     if (process.env.OFFICIAL_TRAVEL_BROWSER === '1') {
         await check('real browser: login-protected menu, form save, filters, safe text and mobile agenda', () =>
@@ -84,12 +97,13 @@ async function run() {
         const edit = {...data,id:travelId,revision:1,status:'postponed'};
         await request('secretary',200,{data:edit});
         await request('secretary',409,{data:edit});
-        assert.ok(!(await request('reader',200)).today_entries.some(row => row.id === travelId));
+        assert.ok(!(await request('deputy',200)).today_entries.some(row => row.id === travelId));
         fixture('revoke');
+        await request('secretary',403);
         await request('secretary',403,{data:{...edit,revision:2,status:'cancelled'}});
         fixture('departed');
         await request('admin',200,{data:{...edit,_expected_owner:1,revision:2,status:'cancelled'}});
-        const row = (await request('reader',200)).entries.find(row => row.id === travelId);
+        const row = (await request('director',200)).entries.find(row => row.id === travelId);
         assert.equal(row.status,'cancelled');
         assert.equal(row.executive_name,old.executive_name);
         const audit = JSON.parse(fixture('audit')).filter(row => Number(row.target_id) === travelId);

@@ -4,6 +4,11 @@ function eofficeCan(permission) {
     return !!window.eofficeUser?.permissions?.includes(permission);
 }
 
+function eofficeCanViewOfficialTravel(user = window.eofficeUser) {
+    return !!user && (user.status === 'Admin' || user.permissions?.includes('official_travel') ||
+        ['director','deputy_director'].includes(user.position));
+}
+
 function applyPermissionMenus() {
     for (const [permission, ids] of Object.entries({
         members: ['menu-members', 'group_menu_members'],
@@ -27,7 +32,7 @@ function applyPermissionMenus() {
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
     const travelMenu = document.getElementById('group_menu_official_travel');
-    if (travelMenu) travelMenu.hidden = !window.eofficeUser;
+    if (travelMenu) travelMenu.hidden = !eofficeCanViewOfficialTravel();
     for (const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
         const node = document.getElementById(id);
         if (node) node.style.display = 'none';
@@ -72,6 +77,10 @@ async function refreshPermissionMenus() {
         publishMainSession(data.user?.id ? 'authenticated' : 'guest', data.user || null);
         applyPermissionMenus();
         const current = localStorage.getItem('currentPage');
+        if (current === 'official_travel' && !eofficeCanViewOfficialTravel(data.user)) {
+            showView(data.user ? 'received' : 'public', 'load');
+            return;
+        }
         if (receivedRefreshAfterSession) {
             receivedRefreshAfterSession = false;
             if (data.user?.id && current === 'received') {
@@ -573,6 +582,7 @@ function showView(showViews, page , page_number) {
     }
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
+    if (showViews === 'official_travel' && !eofficeCanViewOfficialTravel()) showViews = window.eofficeUser ? 'received' : 'public';
     if (['ai_settings','audit_logs'].includes(showViews) && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
 
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;

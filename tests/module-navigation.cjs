@@ -179,12 +179,15 @@ function sidebarParityChecks() {
     const runtime={window:{},document:{getElementById:el},display_style:(id,display)=>{el(id).style.display=display;}};
     vm.createContext(runtime);
     vm.runInContext(main.slice(main.indexOf('function eofficeCan('),main.indexOf('let permissionRefreshSequence')),runtime);
-    for(const user of [null,{status:'User',permissions:[]},{status:'User',permissions:['email']},{status:'Admin',permissions:['email','members','departments','maintenance','news_producer']}]) {
+    for(const user of [null,{status:'User',permissions:[]},{status:'User',permissions:['email']},
+        {status:'User',position:'deputy_director',permissions:[]},{status:'User',position:'director',permissions:[]},
+        {status:'User',permissions:['official_travel']},{status:'Admin',permissions:['email','members','departments','maintenance','news_producer']}]) {
         runtime.window.eofficeUser=user;runtime.applyPermissionMenus();
         assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_audit_logs').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
-        assert.equal(el('group_menu_official_travel').hidden,!user);
+        assert.equal(el('group_menu_official_travel').hidden,!(user && (user.status==='Admin' ||
+            user.permissions?.includes('official_travel') || ['director','deputy_director'].includes(user.position))));
         for(const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
             assert.equal(el(id).style.display,'none',`${id} should stay hidden for every role`);
         }
@@ -217,6 +220,7 @@ const context = {
     MODULE_ROUTES: Object.freeze(Object.fromEntries([...Object.entries(routes).map(([key,[,path]]) => [key,path]), ['room_booking2','room_booking/new_room.html']])),
     restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance',siya_news:'siya_news',siya_news_studio:'news_producer'})[view],
     eofficeCan:permission => permission==='siya_news'?Boolean(context.window.eofficeUser?.permissions.some(role=>['news_submit','news_editor','news_producer'].includes(role))):Boolean(context.window.eofficeUser?.permissions.includes(permission)),
+    eofficeCanViewOfficialTravel:()=>{const user=context.window.eofficeUser;return !!user&&(user.status==='Admin'||user.permissions?.includes('official_travel')||['director','deputy_director'].includes(user.position));},
     getCookie:() => context.window.eofficeUser ? 'session' : null,
     setSidebarOpen(){}, display_style:(id,display) => { el(id).style.display = display; },
     localStorage:{getItem:key => values.get(key),setItem:(key,value) => values.set(key,value)},
@@ -247,6 +251,18 @@ for (const view of ['constructor','toString','__proto__','missing','received','s
 context.window.eofficeUser={permissions:[]};
 context.showView('members','load');
 assert.equal(context.loaded,'received');
+context.window.eofficeUser={status:'User',position:'staff',permissions:[]};
+context.showView('official_travel','load');
+assert.equal(context.loaded,'received','staff without the travel grant cannot open the calendar');
+context.window.eofficeUser={status:'User',position:'deputy_director',permissions:[]};
+context.navigated=null;context.showView('official_travel','load');
+assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'deputy directors may open the calendar without manage permission');
+context.window.eofficeUser={status:'User',position:'director',permissions:[]};
+context.navigated=null;context.showView('official_travel','load');
+assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'directors may open the calendar without manage permission');
+context.window.eofficeUser={status:'User',position:'staff',permissions:['official_travel']};
+context.navigated=null;context.showView('official_travel','load');
+assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'authorized travel secretaries may open the calendar');
 context.window.eofficeUser={permissions:['news_submit','news_editor']};
 context.showView('siya_news_studio','load');
 assert.equal(context.loaded,'received','Studio requires news_producer');
@@ -432,8 +448,11 @@ async function navigationChecks() {
     assert.ok(restoredWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'an untouched restored draft must still warn before logout');
     restored.hidden=true;
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,10,'basic users must not see staff/admin links or temporarily hidden tabs');
-    assert.ok(links.some(link=>!link.hidden && link.href.endsWith('/official_travel/index.html')));
+    assert.equal(links.filter(link=>!link.hidden).length,9,'basic users must not see staff/admin links or the restricted calendar');
+    assert.ok(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden);
+    events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',position:'deputy_director',permissions:[]}})});await tick();
+    assert.equal(links.filter(link=>!link.hidden).length,10,'deputy directors may see the calendar link');
+    assert.equal(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden,false);
     console.log('PASS sidebar: document shortcuts, subdirectory URLs, mobile inert/Escape, dirty-form guards and stale session responses');
 }
 navigationChecks().catch(error=>{console.error(error);process.exitCode=1;});

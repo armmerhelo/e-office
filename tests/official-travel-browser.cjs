@@ -76,6 +76,7 @@ module.exports = async ({base,tokens,month,today}) => {
         await press('Tab',9);
         await until("window.eofficeSessionState?.status === 'authenticated' && window.eofficeUser?.id === 2");
         await until(`${el('new')}?.checkVisibility() && !${el('new')}.disabled`);
+        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'travel secretary sees the calendar link');
         assert.equal(await evalPage(`${el('grid')}.checkVisibility()`),true);
         const todayCell = `${el('grid')}.querySelector('[data-date="${today}"]')`;
         assert.equal(await evalPage(`${el('selected-date')}.dateTime`),today);
@@ -311,9 +312,15 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.equal(await evalPage(`${el('selected-items')}.checkVisibility() && document.documentElement.scrollWidth<=innerWidth`),true);
         await session('reader');
         await send('Page.navigate',{url:base+'/official_travel/index.html'});
-        await until(`window.eofficeUser?.id === 4 && location.search === '?view=official_travel' && !!${el('selected-items')}?.querySelector('button[data-department=academic]')`);
+        await until(`window.eofficeUser?.id === 4 && location.search === '?view=received'`);
+        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),true,'staff without calendar access cannot see the navigation link');
+        assert.equal(await evalPage(`fetch('/api/official-travel.php?month=${month}').then(r=>r.status===403)`),true,'staff without calendar access cannot read the API');
+        await session('deputy');
+        await send('Page.navigate',{url:base+'/official_travel/index.html'});
+        await until(`window.eofficeUser?.id === 3 && location.search === '?view=official_travel' && !!${el('selected-items')}?.querySelector('button[data-department=academic]')`);
         assert.equal(await evalPage(`${el('new')}.hidden`),true);
         assert.equal(await evalPage(`${el('selected-items')}.checkVisibility() && ${el('grid')}.checkVisibility() && !${el('agenda')}.checkVisibility()`),true,'reader uses the compact calendar with the selected-day agenda on mobile');
+        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'deputy director sees the calendar link');
         await evalPage(`${el('selected-items')}.querySelector('button[data-department=academic]').focus()`);
         await press('Enter',13);
         await until(`${el('detail')}?.open === true`);

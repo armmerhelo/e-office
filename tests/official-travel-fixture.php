@@ -24,13 +24,14 @@ switch ($action) {
         $pdo->exec("CREATE TABLE eoffice_sessions (token_hash CHAR(64) PRIMARY KEY, User_Id INT, expires_at DATETIME) ENGINE=InnoDB");
         $pdo->exec("CREATE TABLE eoffice_permissions (User_Id INT, permission VARCHAR(50), PRIMARY KEY(User_Id,permission)) ENGINE=InnoDB");
         $pdo->exec("INSERT INTO t_user VALUES (1,'ผู้บริหารทดสอบ','Admin','director'), (2,'เลขานุการทดสอบ','User','staff'),
-            (3,'รองทดสอบ','User','deputy_director'), (4,'บุคลากรทดสอบ','User','staff')");
+            (3,'รองทดสอบ','User','deputy_director'), (4,'บุคลากรทดสอบ','User','staff'),
+            (5,'ผู้อำนวยการทดสอบ','User','director'), (6,'Admin ทดสอบ','Admin','staff')");
         $pdo->exec("INSERT INTO eoffice_permissions VALUES (2, 'official_travel')");
         app_official_travel_migrate($pdo);
         app_audit_migrate($pdo);
         $insert = $pdo->prepare('INSERT INTO eoffice_sessions VALUES (?,?,DATE_ADD(NOW(), INTERVAL 1 HOUR))');
         $tokens = [];
-        foreach (['admin'=>1,'secretary'=>2,'reader'=>4] as $name=>$id) {
+        foreach (['admin'=>1,'secretary'=>2,'deputy'=>3,'reader'=>4,'director'=>5,'admin_staff'=>6] as $name=>$id) {
             $tokens[$name] = bin2hex(random_bytes(32));
             $insert->execute([hash('sha256', $tokens[$name]), $id]);
         }

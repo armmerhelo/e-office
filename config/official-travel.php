@@ -11,7 +11,13 @@ function app_official_travel_departments(): array {
     ];
 }
 
+function app_official_travel_can_view(array $user): bool {
+    return app_can($user, 'official_travel')
+        || in_array($user['User_Position'] ?? '', ['director','deputy_director'], true);
+}
+
 function app_official_travel_read(PDO $pdo, array $user): never {
+    if (!app_official_travel_can_view($user)) app_fail('คุณไม่มีสิทธิ์เข้าถึงปฏิทินไปราชการ', 403);
     $today = date('Y-m-d');
     $month = $_GET['month'] ?? substr($today, 0, 7);
     if (!is_string($month) || !preg_match('/^(?:19|20|21)\d{2}-(?:0[1-9]|1[0-2])$/D', $month)) {

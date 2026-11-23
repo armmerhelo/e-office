@@ -17,7 +17,7 @@
     const cache = new Map(), libraries = new Map();
     const roleIndependent=new Set(['room_booking','room_booking2','maintenance']);
     const accessStamp=()=>JSON.stringify([String(window.eofficeUser?.id),window.eofficeUser?.status,
-        window.eofficeUser?.email,window.eofficeUser?.name,[...(window.eofficeUser?.permissions||[])].sort()]);
+        window.eofficeUser?.email,window.eofficeUser?.name,window.eofficeUser?.position,[...(window.eofficeUser?.permissions||[])].sort()]);
     let dataRevision=0;
     let popupOwner=null;
     let moduleUtilities;
@@ -313,6 +313,7 @@
         } catch(error) {ctx.dispose();throw error;}
     }
     const allowed=view=>window.eofficeUser && !window.eofficeFormOwner?.hasConflict() && window.eofficeSessionState?.status==='authenticated' && (['ai_settings','audit_logs'].includes(view)?window.eofficeUser.status==='Admin':
+        view==='official_travel' ? window.eofficeUser.status==='Admin' || window.eofficeUser.permissions?.includes('official_travel') || ['director','deputy_director'].includes(window.eofficeUser.position) :
         view==='siya_news' ? ['news_submit','news_editor','news_producer'].some(permission=>window.eofficeUser.permissions?.includes(permission)) :
         view==='siya_news_studio' ? window.eofficeUser.permissions?.includes('news_producer') :
         !({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]) ||
