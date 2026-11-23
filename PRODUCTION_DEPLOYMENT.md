@@ -1,5 +1,15 @@
 # Production deployment — E-Office
 
+## จำกัดผู้เข้าดูปฏิทินไปราชการและปรับหน้าจอ — 23 พฤศจิกายน 2569
+
+- เผยแพร่ **8 runtime paths** จาก `ca66597f8763abb710f73d3628cfae41f6800dc1` และ `fd3c0b9c25d4b5e1256d024e0e5ce24f90bd814f` เวลา **11:55:32 +07:00** ด้วย targeted atomic replacement; ตรวจชุดทดสอบที่ tree `a41b2167894278906a55524346e236cfa471deda` (commit ทดสอบสองรายการหลังไม่ถูกเผยแพร่) สำรองไฟล์เดิม 8 paths พร้อม manifest และ `.htaccess` แบบ private ก่อนติดตั้ง SHA-256 `7e162f4e88b9c40454626196a3ba3ac02293278f6b29f5f31aabf476cf27aff1`
+- จำกัดการอ่านปฏิทินให้เฉพาะ **Admin ผู้ได้รับสิทธิ์จัดการปฏิทิน รอง ผอ. และ ผอ.**; ผู้ใช้ทั่วไปไม่เห็นเมนู เปิดหน้า/โมดูลไม่ได้ และ API ตอบ 403 (ผู้ไม่ล็อกอิน 401) ส่วนรอง ผอ./ผอ. ที่ไม่มีสิทธิ์จัดการอ่านได้อย่างเดียวและไม่ได้รับรายชื่อผู้บริหารหรือฟิลด์ภายใน การเขียนยังต้องมีสิทธิ์จัดการเดิม
+- ปรับหน้าจอเดสก์ท็อปให้ใช้พื้นที่ด้านล่าง เลือกวันที่แล้วดูกำหนดการของวันนั้น พร้อมฟอนต์ Prompt และคงมุมมองมือถือ; เปลี่ยนเวอร์ชันแคชเป็น `calendar.css?v=14` และ `calendar.js?v=8`
+- ไม่เปลี่ยน schema หรือข้อมูล; production ยังมี **75 บัญชี, 33 สิทธิ์, 0 กำหนดการ** ทุกบัญชียังเป็นตำแหน่ง staff และไม่มีสิทธิ์ `official_travel` — Admin ต้องกำหนดตำแหน่ง ผอ./รอง ผอ. และมอบสิทธิ์จัดการตามข้อมูลจริงก่อนเริ่มใช้งาน
+- ตรวจ SHA-256 ตรงครบ **8 paths** และ manifest; HTTP smoke หน้าแรก `/`, `/updates/`, `/index.php?view=updates`, `/index.php?view=official_travel` และหน้าโมดูลตอบ **200**; `/api/me.php` ผู้ไม่ล็อกอินคืน user null; `/api/official-travel.php` ผู้ไม่ล็อกอินถูกปฏิเสธ **401** และไฟล์ที่ให้บริการตรง hash ที่เผยแพร่
+- Production smoke ด้วยบัญชีสังเคราะห์ 5 บทบาทผ่าน API **10 checks** (guest 401, staff 403, เลขาฯ จัดการได้, รอง/ผอ. อ่านอย่างเดียว, Admin ดูได้, เขียนโดยไม่มีสิทธิ์ 403, ตรวจ validation โดยไม่เขียน, cross-origin 403) และ Chromium ผ่าน guest/staff redirect, เมนูและสิทธิ์จัดการของทั้ง 4 บทบาท, desktop/mobile ไม่ล้น และไม่มี uncaught JavaScript exception; ลบบัญชี/session/permissions สังเคราะห์ครบแล้ว baseline ผู้ใช้ สิทธิ์ ตำแหน่ง และ audit กลับมาตรงเดิม
+- เผยแพร่ Release ID **`deploy-20261123T045532000Z`**; ตรวจ `data/system-updates.json` บน production ตรงกับไฟล์ที่รีวิว และ Chromium หน้า `/updates/` แสดงประกาศใหม่พร้อม 2 commits บน desktop/mobile โดยไม่มี console error
+
 ## ปฏิทินไปราชการของผู้บริหาร — 19 พฤศจิกายน 2569
 
 - เผยแพร่ 13 runtime paths จาก commit `cb6e5ead5f7145e474f81c6c04130aed4c23a496` เวลา **11:27:37 +07:00** แบบ targeted atomic replacement โดยคง `index.php` และ `assets/main.js` ฉบับปรับแต่งเฉพาะ production แล้วเพิ่มเฉพาะเมนู/route ที่จำเป็น
