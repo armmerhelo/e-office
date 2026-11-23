@@ -90,8 +90,23 @@ async function run() {
         assert.equal((await request('deputy',200,{query:`?month=${nextYear}-03`})).entries.length,0);
     });
     if (process.env.OFFICIAL_TRAVEL_BROWSER === '1') {
-        await check('real browser: login-protected menu, form save, filters, safe text and mobile agenda', () =>
-            require('./official-travel-browser.cjs')({base,tokens,month:initial.month}));
+        await request('admin',201,{data:{...data,_expected_owner:1,executive_id:1,department:'director',
+            subject:'QA timed meeting',place:'QA timed venue',all_day:false,start_time:'09:00',end_time:'16:30'}});
+        const extra = await request('admin',201,{data:{...data,_expected_owner:1,executive_id:1,
+            department:'director',subject:'QA cancelled meeting'}});
+        await request('admin',200,{data:{...data,_expected_owner:1,executive_id:1,department:'director',
+            subject:'QA cancelled meeting',id:extra.id,revision:1,status:'cancelled'}});
+        const first = initial.month + '-01';
+        const prior = new Date(Date.parse(first) - 86400000).toISOString().slice(0,10);
+        await request('admin',201,{data:{...data,_expected_owner:1,executive_id:1,department:'director',
+            subject:'QA continuation',start_date:prior,end_date:first}});
+        const tomorrow = new Date(Date.parse(initial.today) + 86400000).toISOString().slice(0,10);
+        if (tomorrow.startsWith(initial.month)) {
+            await request('admin',201,{data:{...data,_expected_owner:1,executive_id:1,department:'director',
+                subject:'QA upcoming meeting',start_date:tomorrow,end_date:tomorrow}});
+        }
+        await check('real browser: selected-day calendar, agenda grouping, keyboard, role filters and 10 responsive viewports', () =>
+            require('./official-travel-browser.cjs')({base,tokens,month:initial.month,today:initial.today}));
     }
     await check('postpone and cancel in place; stale edits and revoked permissions do not overwrite', async () => {
         const edit = {...data,id:travelId,revision:1,status:'postponed'};
