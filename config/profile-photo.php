@@ -4,6 +4,7 @@ require_once __DIR__.'/bootstrap.php';
 const APP_PROFILE_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const APP_PROFILE_PHOTO_MAX_PIXELS = 12_000_000;
 const APP_PROFILE_PHOTO_SIZE = 512;
+const APP_PROFILE_PHOTO_TOP_BIAS = 0.18;
 
 function app_profile_photo_migrate(PDO $pdo): void {
     $pdo->exec("CREATE TABLE IF NOT EXISTS eoffice_user_photos (
@@ -47,6 +48,19 @@ function app_profile_photo_state(PDO $pdo, int $userId, bool $locking = false): 
     ];
 }
 
+function app_profile_photo_crop(int $width, int $height): array {
+    if ($width < 1 || $height < 1) throw new RuntimeException('Profile photo has no pixels');
+    $side = min($width, $height);
+    // Portrait photos usually keep the face in the upper half. A centered
+    // square can cut off the forehead or hairline, so bias the crop upward
+    // while leaving square and landscape photos centered.
+    return [
+        'x' => (int)(($width - $side) / 2),
+        'y' => (int)round(($height - $side) * APP_PROFILE_PHOTO_TOP_BIAS),
+        'side' => $side,
+    ];
+}
+
 function app_profile_photo_normalize(array $upload): string {
     if (($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'] ?? '')) {
         app_fail('กรุณาเลือกไฟล์รูปโปรไฟล์');
@@ -82,18 +96,13 @@ function app_profile_photo_normalize(array $upload): string {
                 }
             }
         }
-        $width = imagesx($image);
-        $height = imagesy($image);
-        $side = min($width, $height);
-        if ($side < 1) throw new RuntimeException('Profile photo has no pixels');
-        $sourceX = (int)(($width - $side) / 2);
-        $sourceY = (int)(($height - $side) / 2);
+        $crop = app_profile_photo_crop(imagesx($image), imagesy($image));
         $canvas = imagecreatetruecolor(APP_PROFILE_PHOTO_SIZE, APP_PROFILE_PHOTO_SIZE);
         if (!$canvas) throw new RuntimeException('Could not allocate profile photo canvas');
         $white = imagecolorallocate($canvas, 255, 255, 255);
         imagefill($canvas, 0, 0, $white);
-        if (!imagecopyresampled($canvas, $image, 0, 0, $sourceX, $sourceY,
-            APP_PROFILE_PHOTO_SIZE, APP_PROFILE_PHOTO_SIZE, $side, $side)) {
+        if (!imagecopyresampled($canvas, $image, 0, 0, $crop['x'], $crop['y'],
+            APP_PROFILE_PHOTO_SIZE, APP_PROFILE_PHOTO_SIZE, $crop['side'], $crop['side'])) {
             imagedestroy($canvas);
             throw new RuntimeException('Could not resize profile photo');
         }

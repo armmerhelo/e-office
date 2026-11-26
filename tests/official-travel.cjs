@@ -75,6 +75,11 @@ async function run() {
         assert.equal(response.headers.get('content-type'),'image/jpeg');
         assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0,3).toString('hex'),'ffd8ff');
         assert.equal((await fetch(url.replace(/&v=1$/,'&v=2'),{headers:{Cookie:`User_Token=${tokens.deputy}`}})).status,404);
+        const staffUrl = base+'/api/profile-photo.php?user_id=4&v=1';
+        for (const role of ['secretary','deputy']) {
+            assert.equal((await fetch(staffUrl,{headers:{Cookie:`User_Token=${tokens[role]}`}})).status,403,'travel access must not expose ordinary staff photos');
+        }
+        assert.equal((await fetch(staffUrl,{headers:{Cookie:`User_Token=${tokens.admin}`}})).status,200);
     });
     await check('validates month, dates, clock, executive and role at the API', async () => {
         for (const query of ['?month=2026-13','?month[]=2026-11']) await request('secretary',400,{query});

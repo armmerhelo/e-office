@@ -34,7 +34,7 @@ switch ($action) {
         $root = app_profile_photo_root();
         if (!is_dir($root)) mkdir($root, 0700, true);
         $photo = $pdo->prepare('INSERT INTO eoffice_user_photos (User_Id,revision,file_name,mime_type,bytes) VALUES (?,1,?,?,?)');
-        foreach ([1 => [48,93,178], 3 => [62,139,97], 5 => [155,101,56]] as $userId => $color) {
+        foreach ([1 => [48,93,178], 3 => [62,139,97], 4 => [120,126,136], 5 => [155,101,56]] as $userId => $color) {
             $image = imagecreatetruecolor(64, 64);
             imagefill($image, 0, 0, imagecolorallocate($image, ...$color));
             ob_start(); imagejpeg($image, null, 84); $bytes = ob_get_clean(); imagedestroy($image);
@@ -59,6 +59,7 @@ switch ($action) {
         break;
     case 'migrate':
         app_official_travel_migrate($pdo);
+        app_profile_photo_migrate($pdo);
         break;
     case 'audit':
         echo json_encode($pdo->query("SELECT event,actor_id,target_id,metadata FROM eoffice_audit_log ORDER BY id")->fetchAll(), JSON_THROW_ON_ERROR);

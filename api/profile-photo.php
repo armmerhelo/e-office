@@ -13,7 +13,15 @@ $version = $_GET['v'] ?? null;
 if ($version !== null && (!is_string($version) || !preg_match('/^\d{1,10}$/D', $version))) {
     app_fail('เวอร์ชันรูปไม่ถูกต้อง');
 }
-$photo = app_profile_photo_state(app_pdo(), $id);
+$pdo = app_pdo();
+if (!app_can($user, 'members')) {
+    $q = $pdo->prepare('SELECT User_Position FROM t_user WHERE User_Id=?');
+    $q->execute([$id]);
+    if (!in_array($q->fetchColumn(), ['director', 'deputy_director'], true)) {
+        app_fail('คุณไม่มีสิทธิ์ดูรูปโปรไฟล์นี้', 403);
+    }
+}
+$photo = app_profile_photo_state($pdo, $id);
 if (!$photo['file_name'] || ($version !== null && (int)$version !== $photo['revision'])) {
     http_response_code(404);
     exit;
