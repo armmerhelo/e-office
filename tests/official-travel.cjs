@@ -1,9 +1,14 @@
 const assert = require('node:assert/strict');
 const {spawn, execFileSync} = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const php = process.env.PHP_BIN || 'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const port = Number(process.env.OFFICIAL_TRAVEL_TEST_PORT || 8197);
 const base = `http://127.0.0.1:${port}`;
-const env = {...process.env, DB_HOST:'127.0.0.1', DB_DATABASE:`eoffice_travel_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true'};
+fs.mkdirSync(path.join(os.tmpdir(),'opencode'),{recursive:true});
+const storage = fs.mkdtempSync(path.join(os.tmpdir(),'opencode','travel-photo-'));
+const env = {...process.env, DB_HOST:'127.0.0.1', DB_DATABASE:`eoffice_travel_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_STORAGE:storage};
 const fixture = action => execFileSync(php, ['tests/official-travel-fixture.php',action], {env,encoding:'utf8'});
 const endpoint = '/api/official-travel.php';
 let tokens, server, seeded = false, passed = 0;
@@ -42,13 +47,15 @@ async function run() {
     let travelId, old;
     await check('only travel secretaries, deputy directors, directors and Admin can read; writes require permission', async () => {
         assert.deepEqual(initial.executives.map(row => Number(row.id)).sort(),[1,3,5]);
+        assert.ok(initial.executives.every(row => row.photo_revision === 1 && /^api\/profile-photo\.php\?user_id=\d+&v=1$/.test(row.photo_url)));
         assert.equal((await request('admin',200)).can_manage,true);
         assert.equal((await me('deputy')).position,'deputy_director');
         assert.equal((await me('director')).position,'director');
         for (const role of ['deputy','director']) {
             const viewer = await request(role,200);
             assert.equal(viewer.can_manage,false);
-            assert.deepEqual(viewer.executives,[]);
+            assert.deepEqual(viewer.executives.map(row => Number(row.id)).sort(),[1,3,5]);
+            assert.ok(viewer.executives.every(row => !Object.hasOwn(row,'file_name')));
             await request(role,403,{data});
         }
         assert.equal((await request('admin_staff',200)).can_manage,true,'Admins can view without an executive position');
@@ -58,6 +65,16 @@ async function run() {
         await request(null,401,{data});
         await request('secretary',403,{data,origin:'https://example.test'});
         await request('secretary',409,{data:{...data,_expected_owner:1}});
+    });
+    await check('executive photos require travel access and an exact revision', async () => {
+        const url = base+'/'+initial.executives.find(row => Number(row.id) === 3).photo_url;
+        assert.equal((await fetch(url)).status,401);
+        assert.equal((await fetch(url,{headers:{Cookie:`User_Token=${tokens.reader}`}})).status,403);
+        const response = await fetch(url,{headers:{Cookie:`User_Token=${tokens.deputy}`}});
+        assert.equal(response.status,200);
+        assert.equal(response.headers.get('content-type'),'image/jpeg');
+        assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0,3).toString('hex'),'ffd8ff');
+        assert.equal((await fetch(url.replace(/&v=1$/,'&v=2'),{headers:{Cookie:`User_Token=${tokens.deputy}`}})).status,404);
     });
     await check('validates month, dates, clock, executive and role at the API', async () => {
         for (const query of ['?month=2026-13','?month[]=2026-11']) await request('secretary',400,{query});
@@ -130,4 +147,5 @@ async function run() {
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
     server?.kill();
     if (seeded) fixture('drop');
+    try { fs.rmSync(storage,{recursive:true,force:true}); } catch {}
 });

@@ -97,6 +97,22 @@
 .travel-day--today .travel-day-count { background: #dceaff; color: #244f89; }
 .travel-day--selected .travel-day-count { background: #d5e3ff; color: #1e477f; }
 .travel-selected-panel { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--travel-line); border-radius: .9rem; background: #f7f9fd; }
+.travel-presence { flex: 0 0 auto; padding: .42rem .55rem .46rem; border-bottom: 1px solid #dce5f2; background: #fff; }
+.travel-presence-heading { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.travel-presence-title { color: #334d74; font-size: .7rem; font-weight: 750; }
+.travel-presence-summary { flex: 0 0 auto; padding: .1rem .34rem; border-radius: 999px; background: #edf2f9; color: #52677d; font-size: .64rem; font-weight: 650; }
+.travel-presence-list { display: flex; gap: .42rem; overflow-x: auto; margin: .34rem 0 0; padding: 0 0 .12rem; list-style: none; scrollbar-width: thin; overscroll-behavior-x: contain; }
+.travel-presence-person { display: grid; flex: 0 0 3.05rem; justify-items: center; gap: .1rem; min-width: 0; }
+.travel-presence-avatar-wrap { position: relative; display: grid; place-items: center; width: 2.35rem; height: 2.35rem; }
+.travel-presence-avatar { position: relative; display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; border: 2px solid #80b797; border-radius: 50%; background: #e9f7ef; color: #2a6d4b; }
+.travel-presence-fallback { font-size: .72rem; font-weight: 750; line-height: 1; }
+.travel-presence-avatar img { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; opacity: 0; transition: opacity .16s ease; }
+.travel-presence-avatar img.is-loaded { opacity: 1; }
+.travel-presence-mark { position: absolute; inset-block-end: 0; inset-inline-end: 0; z-index: 2; display: grid; place-items: center; width: .92rem; height: .92rem; border: 1px solid #fff; border-radius: 50%; background: #3e8b61; color: #fff; font-size: .68rem; font-weight: 800; line-height: 1; }
+.travel-presence-person[data-presence=away] .travel-presence-avatar { border-color: #aeb8c5; background: #eef1f5; color: #667085; filter: grayscale(1); opacity: .62; }
+.travel-presence-person[data-presence=away] .travel-presence-mark { background: #788494; }
+.travel-presence-name { overflow: hidden; width: 100%; color: #334d74; font-size: .64rem; font-weight: 650; line-height: 1.35; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.travel-presence-person[data-presence=away] .travel-presence-name { color: #747f8d; font-weight: 550; }
 .travel-selected-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .55rem .7rem; background: #243d72; color: #fff; }
 .travel-selected-heading > div { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; min-width: 0; }
 .travel-selected-label { display: block; margin-bottom: .05rem; color: #d8e5ff; font-size: .72rem; font-weight: 600; }
@@ -220,6 +236,14 @@
   .travel-month-navigation .eo-btn { padding-inline: .28rem; }
   .travel-month-arrow { width: 1.8rem; }
   .travel-grid { grid-auto-rows: minmax(2rem, auto); }
+  .travel-presence { padding: .3rem .36rem .34rem; }
+  .travel-presence-heading { gap: .2rem; }
+  .travel-presence-title, .travel-presence-summary { font-size: .6rem; }
+  .travel-presence-list { gap: .28rem; margin-top: .25rem; }
+  .travel-presence-person { flex-basis: 2.7rem; }
+  .travel-presence-avatar-wrap, .travel-presence-avatar { width: 2.05rem; height: 2.05rem; }
+  .travel-presence-fallback { font-size: .64rem; }
+  .travel-presence-name { font-size: .58rem; }
   .travel-selected-heading { padding: .3rem .4rem; gap: .25rem; }
   .travel-selected-heading h3 { font-size: .86rem; white-space: nowrap; }
   .travel-selected-count { padding: .12rem .32rem; font-size: .64rem; }

@@ -1,6 +1,6 @@
 (() => {
     const el = id => document.getElementById(id);
-    const state = {page:1, limit:20, total:0, users:[], catalog:{}, positions:{staff:'บุคลากรทั่วไป',director:'ผู้อำนวยการ',deputy_director:'รองผู้อำนวยการ'}, canManage:false, departments:[], editId:null, permissionId:null, permissionVersion:'', request:0, departmentRequest:0, dialogRequest:0, memberVersion:'', departmentsReady:false, statusUser:null, positionUser:null, busy:false};
+    const state = {page:1, limit:20, total:0, users:[], catalog:{}, positions:{staff:'บุคลากรทั่วไป',director:'ผู้อำนวยการ',deputy_director:'รองผู้อำนวยการ'}, canManage:false, departments:[], editId:null, permissionId:null, permissionVersion:'', request:0, departmentRequest:0, dialogRequest:0, memberVersion:'', departmentsReady:false, statusUser:null, positionUser:null, busy:false, photoRevision:0, photoUrl:null, photoObjectUrl:null};
     let returnFocus;
 
     function message(id, text, error = false) {
@@ -8,6 +8,45 @@
         node.textContent = text;
         node.classList.toggle('error', error);
         node.hidden = !text;
+    }
+    function initials(name) {
+        return Array.from((name || '?').trim()).slice(0, 2).join('').toLocaleUpperCase('th');
+    }
+    function clearPhotoObjectUrl() {
+        if (state.photoObjectUrl && window.URL?.revokeObjectURL) window.URL.revokeObjectURL(state.photoObjectUrl);
+        state.photoObjectUrl = null;
+    }
+    function showPhotoPreview(url, name) {
+        const image = el('profile-photo-image');
+        el('profile-photo-fallback').textContent = initials(name);
+        el('profile-photo-preview').setAttribute('aria-label', `รูปโปรไฟล์ ${name || 'สมาชิก'}`);
+        image.alt = '';
+        image.hidden = true;
+        image.onload = () => { image.hidden = false; };
+        image.onerror = () => { image.hidden = true; image.removeAttribute('src'); };
+        if (url) image.src = url;
+        else image.removeAttribute('src');
+    }
+    function setPhotoState(photo, name) {
+        clearPhotoObjectUrl();
+        state.photoRevision = Number(photo?.revision || 0);
+        state.photoUrl = photo?.url || null;
+        el('profile-photo-file').value = '';
+        el('save-profile-photo').disabled = true;
+        el('remove-profile-photo').hidden = !state.photoUrl;
+        showPhotoPreview(state.photoUrl, name);
+    }
+    function resetPhotoControls() {
+        clearPhotoObjectUrl();
+        state.photoRevision = 0; state.photoUrl = null;
+        el('profile-photo-section').hidden = true;
+        el('profile-photo-file').value = '';
+        el('profile-photo-fallback').textContent = '';
+        const image = el('profile-photo-image');
+        image.hidden = true; image.removeAttribute('src'); image.onload = image.onerror = null;
+        el('save-profile-photo').disabled = true;
+        el('remove-profile-photo').hidden = true;
+        message('profile-photo-message', '');
     }
     async function api(url, options) {
         const response = await fetch(url, options);
@@ -28,6 +67,7 @@
             state.dialogRequest++; state.departmentRequest++; state.departmentsReady = false;
         }
         el(id).hidden = true;
+        if (id === 'modal_user_manage') resetPhotoControls();
         returnFocus?.focus();
     }
     function notifySessionChange() {
@@ -117,6 +157,7 @@
         if (user && !user.can_edit) return;
         state.editId = user ? Number(user.User_Id) : null;
         const dialogRequest = ++state.dialogRequest;
+        resetPhotoControls();
         state.memberVersion = ''; state.departmentsReady = !user;
         state.departmentRequest++; state.departments = [];
         el('form_user_data').reset();
@@ -150,7 +191,10 @@
                 state.memberVersion = data.member_version;
                 state.departments = data.data; state.departmentsReady = true;
                 el('department-search').disabled = false; el('department-loading').hidden = true;
-                renderDepartments(); el('save-member').disabled = false;
+                renderDepartments();
+                el('profile-photo-section').hidden = false;
+                setPhotoState(data.photo, data.user.User_Name);
+                el('save-member').disabled = false;
             } catch (error) {
                 if (dialogRequest === state.dialogRequest) { el('department-loading').hidden = true; message('member-error', error.message, true); }
             }
@@ -302,6 +346,73 @@
         } catch (error) { message('permissions-error', error.message, true); }
         finally { state.busy = false; el('save-permissions').disabled = false; }
     }
+    function previewSelectedPhoto() {
+        const file = el('profile-photo-file').files?.[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024 || (file.type && !['image/jpeg','image/png','image/webp'].includes(file.type))) {
+            el('profile-photo-file').value = '';
+            clearPhotoObjectUrl();
+            showPhotoPreview(state.photoUrl, el('edit_name').value);
+            el('remove-profile-photo').hidden = !state.photoUrl;
+            el('save-profile-photo').disabled = true;
+            message('profile-photo-message', 'รองรับเฉพาะ JPG, PNG หรือ WebP ไม่เกิน 2 MB', true);
+            return;
+        }
+        clearPhotoObjectUrl();
+        state.photoObjectUrl = window.URL?.createObjectURL ? window.URL.createObjectURL(file) : null;
+        showPhotoPreview(state.photoObjectUrl || state.photoUrl, el('edit_name').value);
+        el('remove-profile-photo').hidden = true;
+        el('save-profile-photo').disabled = false;
+        message('profile-photo-message', '');
+    }
+    async function saveProfilePhoto() {
+        if (state.busy || !state.editId) return;
+        const file = el('profile-photo-file').files?.[0];
+        if (!file) { message('profile-photo-message', 'กรุณาเลือกรูปก่อนบันทึก', true); return; }
+        const form = new FormData();
+        form.append('User_Id', state.editId);
+        form.append('member_version', state.memberVersion);
+        form.append('action', 'upload');
+        form.append('photo', file, file.name);
+        state.busy = true;
+        el('save-member').disabled = true; el('profile-photo-pick').disabled = true;
+        el('save-profile-photo').disabled = true; el('remove-profile-photo').disabled = true;
+        try {
+            const data = await api('save_profile_photo.php', {method:'POST', body:form});
+            state.memberVersion = data.member_version;
+            setPhotoState(data.photo, el('edit_name').value);
+            message('profile-photo-message', data.message);
+        } catch (error) { message('profile-photo-message', error.message, true); }
+        finally {
+            state.busy = false;
+            el('save-member').disabled = false; el('profile-photo-pick').disabled = false;
+            el('remove-profile-photo').disabled = false;
+            el('save-profile-photo').disabled = !el('profile-photo-file').files?.length;
+        }
+    }
+    async function removeProfilePhoto() {
+        if (state.busy || !state.editId || !state.photoUrl) return;
+        if (!confirm('ต้องการลบรูปโปรไฟล์นี้หรือไม่?')) return;
+        const form = new FormData();
+        form.append('User_Id', state.editId);
+        form.append('member_version', state.memberVersion);
+        form.append('action', 'remove');
+        state.busy = true;
+        el('save-member').disabled = true; el('profile-photo-pick').disabled = true;
+        el('save-profile-photo').disabled = true; el('remove-profile-photo').disabled = true;
+        try {
+            const data = await api('save_profile_photo.php', {method:'POST', body:form});
+            state.memberVersion = data.member_version;
+            setPhotoState(data.photo, el('edit_name').value);
+            message('profile-photo-message', data.message);
+        } catch (error) { message('profile-photo-message', error.message, true); }
+        finally {
+            state.busy = false;
+            el('save-member').disabled = false; el('profile-photo-pick').disabled = false;
+            el('remove-profile-photo').disabled = false;
+            el('save-profile-photo').disabled = !el('profile-photo-file').files?.length;
+        }
+    }
     async function deleteMember() {
         if (state.busy || !state.editId || !confirm('ต้องการลบสมาชิกนี้อย่างถาวรหรือไม่?')) return;
         state.busy = true; el('btn_delete_user').disabled = true;
@@ -323,6 +434,10 @@
     el('form_status').addEventListener('submit', saveStatus);
     el('form_position').addEventListener('submit', savePosition);
     el('btn_delete_user').addEventListener('click', deleteMember);
+    el('profile-photo-pick').addEventListener('click', () => el('profile-photo-file').click());
+    el('profile-photo-file').addEventListener('change', previewSelectedPhoto);
+    el('save-profile-photo').addEventListener('click', saveProfilePhoto);
+    el('remove-profile-photo').addEventListener('click', removeProfilePhoto);
     document.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => closeDialog(node.dataset.close)));
     document.addEventListener('keydown', event => {
         const overlay = [...document.querySelectorAll('.overlay')].find(node => !node.hidden);

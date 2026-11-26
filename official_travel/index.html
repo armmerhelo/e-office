@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../assets/sidebar.css?v=20261019">
   <link rel="stylesheet" href="../assets/ui-buttons.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;display=swap">
-  <link rel="stylesheet" href="calendar.css?v=14">
+  <link rel="stylesheet" href="calendar.css?v=15">
 </head>
 <body class="eoffice-module-page">
   <div class="eoffice-module-content"><div class="eoffice-module-view">
@@ -61,6 +61,13 @@
         <div id="travel-calendar-layout" class="travel-calendar-layout">
           <div id="travel-grid" class="travel-grid" role="group" aria-label="เลือกวันที่ในปฏิทินรายเดือน"></div>
           <section id="travel-selected-panel" class="travel-selected-panel" aria-labelledby="travel-selected-heading">
+            <section id="travel-presence" class="travel-presence" aria-labelledby="travel-presence-title" hidden>
+              <div class="travel-presence-heading">
+                <span id="travel-presence-title" class="travel-presence-title">ผู้บริหารในวันที่เลือก</span>
+                <span id="travel-presence-summary" class="travel-presence-summary" aria-live="polite"></span>
+              </div>
+              <ul id="travel-presence-list" class="travel-presence-list" aria-label="สถานะผู้บริหารในวันที่เลือก"></ul>
+            </section>
             <div class="travel-selected-heading" aria-live="polite">
               <div>
                 <span class="travel-selected-label">กำหนดการวันที่เลือก</span>
@@ -122,6 +129,6 @@
       </dialog>
     </main>
   </div></div>
-  <script src="calendar.js?v=8"></script>
+  <script src="calendar.js?v=9"></script>
 </body>
 </html>

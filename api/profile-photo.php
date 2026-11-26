@@ -1,0 +1,31 @@
+<?php
+require_once __DIR__.'/../config/bootstrap.php';
+require_once __DIR__.'/../config/profile-photo.php';
+require_once __DIR__.'/../config/official-travel.php';
+app_method('GET');
+$user = app_user();
+if (!app_can($user, 'members') && !app_official_travel_can_view($user)) {
+    app_fail('คุณไม่มีสิทธิ์ดูรูปโปรไฟล์นี้', 403);
+}
+$id = (int)($_GET['user_id'] ?? 0);
+if ($id <= 0) app_fail('ผู้ใช้ไม่ถูกต้อง');
+$version = $_GET['v'] ?? null;
+if ($version !== null && (!is_string($version) || !preg_match('/^\d{1,10}$/D', $version))) {
+    app_fail('เวอร์ชันรูปไม่ถูกต้อง');
+}
+$photo = app_profile_photo_state(app_pdo(), $id);
+if (!$photo['file_name'] || ($version !== null && (int)$version !== $photo['revision'])) {
+    http_response_code(404);
+    exit;
+}
+$path = app_profile_photo_path($photo['file_name']);
+if (!is_file($path) || !is_readable($path)) {
+    http_response_code(404);
+    exit;
+}
+header('Content-Type: image/jpeg');
+header('Content-Length: '.filesize($path));
+header('Cache-Control: no-store');
+header('Content-Disposition: inline; filename="profile-photo.jpg"');
+readfile($path);
+exit;

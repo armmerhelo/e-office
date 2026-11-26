@@ -90,6 +90,23 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.equal(await evalPage(`${todayCell}.dataset.count`),String(todayCount));
         assert.equal(await evalPage(`${todayCell}.getAttribute('aria-pressed')`),'true');
         assert.equal(await evalPage(`!${el('day-dialog')}`),true,'date selection must not open an overflow dialog');
+        await until(`[...${el('presence-list')}.querySelectorAll('img')].every(image => image.complete && image.naturalWidth > 0)`);
+        const presence = await evalPage(`(() => {
+            const items = [...${el('presence-list')}.querySelectorAll('.travel-presence-person')];
+            return {
+                count: items.length,
+                summary: ${el('presence-summary')}.textContent,
+                photos: items.filter(item => item.querySelector('img')?.naturalWidth > 0).length,
+                away: items.filter(item => item.dataset.presence === 'away').map(item => item.querySelector('.travel-presence-name').textContent),
+                awayFilter: getComputedStyle(${el('presence-list')}.querySelector('.travel-presence-person[data-presence=away] .travel-presence-avatar')).filter
+            };
+        })()`);
+        assert.equal(presence.count,3);
+        assert.equal(presence.summary,'อยู่ 1 · ไม่อยู่ 2');
+        assert.equal(presence.photos,3);
+        assert.deepEqual(presence.away.sort(),['รองทดสอบ','ผู้บริหารทดสอบ'].sort());
+        assert.match(presence.awayFilter,/grayscale/);
+        assert.equal(await evalPage(`${el('presence')}.checkVisibility() && ${el('presence')}.nextElementSibling.classList.contains('travel-selected-heading')`),true,'selected-day executives appear above the schedule heading');
         const firstDate = `${month}-01`;
         await evalPage(`${el('grid')}.querySelector('[data-date="${firstDate}"]').focus()`);
         await press('Enter',13);
@@ -202,6 +219,8 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.deepEqual(await evalPage(`[scrollY, ${el('grid')}.getBoundingClientRect().top, ${el('selected-heading')}.getBoundingClientRect().top]`),beforeScroll,'scrolling leaves the page, grid and date heading in place');
         await evalPage(`${emptyCell}.click()`);
         assert.equal(await evalPage(`${el('selected-body')}.scrollTop`),0,'switching dates resets schedule scroll');
+        assert.equal(await evalPage(`${el('presence-summary')}.textContent`),'อยู่ 3 · ไม่อยู่ 0');
+        assert.equal(await evalPage(`${el('presence-list')}.querySelectorAll('[data-presence=away]').length`),0,'a date without scheduled travel marks every executive present');
         for (const control of [el('title'), el('department'), el('next'), todayCell]) {
             assert.match(await evalPage(`getComputedStyle(${control}).fontFamily`),/^["']?Prompt\b/);
         }
@@ -246,6 +265,8 @@ module.exports = async ({base,tokens,month,today}) => {
                     grid:${el('grid')}.checkVisibility(),
                     agenda:${el('agenda')}.checkVisibility(),
                     selected:${el('selected-items')}.checkVisibility(),
+                    presence:${el('presence')}.checkVisibility(),
+                    presenceHeight:${el('presence')}.getBoundingClientRect().height,
                     sideBySide:selected.left>=calendar.right-1 && selected.top<calendar.bottom,
                     stacked:selected.top>=calendar.bottom-1,
                     calendarHeight:calendar.height,
@@ -264,13 +285,15 @@ module.exports = async ({base,tokens,month,today}) => {
             assert.equal(layout.grid,true,`compact date calendar at ${viewport.width}px`);
             assert.equal(layout.agenda,false,`monthly list remains hidden in calendar view at ${viewport.width}px`);
             assert.equal(layout.selected,true,`selected-day agenda at ${viewport.width}px`);
+            assert.equal(layout.presence,true,`selected-day executive photos at ${viewport.width}px`);
             assert.equal(layout.sideBySide,viewport.sideBySide,`calendar/selected-day placement at ${viewport.width}px`);
             if (!viewport.sideBySide) assert.equal(layout.stacked,true,`selected date panel below calendar at ${viewport.width}px`);
             assert.ok(layout.headerHeight <= 46,`page header stays compact at ${viewport.width}px`);
             if (viewport.width <= 390) assert.ok(layout.calendarHeight < 325,`calendar stays compact at ${viewport.width}px: ${JSON.stringify(layout)}`);
             if (viewport.width <= 320) {
                 assert.ok(layout.calendarBottom <= viewport.height,`whole month stays above the fold at ${viewport.width}px: ${JSON.stringify(layout)}`);
-                assert.ok(layout.selectedBottom <= viewport.height,`empty selected-day panel fits above the fold at ${viewport.width}px: ${JSON.stringify(layout)}`);
+                assert.ok(layout.selectedTop < viewport.height && layout.presenceHeight < 100,
+                    `executive photos and the selected-day heading start above the fold on the smallest screen: ${JSON.stringify(layout)}`);
                 assert.ok(layout.monthControlsTop < layout.monthControlsBottom && layout.monthNavigationHeight < 40,
                     `month title and navigation share one compact row at ${viewport.width}px: ${JSON.stringify(layout)}`);
             }

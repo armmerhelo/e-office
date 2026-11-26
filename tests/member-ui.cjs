@@ -7,7 +7,8 @@ class Element {
     append(...nodes){this.children.push(...nodes);}
     replaceChildren(...nodes){this.children=nodes;}
     querySelector(selector){if(selector==='option[value=Editor]')return null;if(selector==='.actions')return this.actions??=new Element();return new Element();}
-    setAttribute(){} focus(){} reset(){} add(node){this.children.push(node);} getClientRects(){return[{}];}
+    setAttribute(){} removeAttribute(){} focus(){} reset(){} add(node){this.children.push(node);} getClientRects(){return[{}];} click(){this.events.click?.();}
+    files=[];
 }
 const elements=new Map();const el=id=>elements.get(id)??(elements.set(id,new Element(id)),elements.get(id));
 const formEvents=[],dirtyForms=new Set();
@@ -20,19 +21,20 @@ const fetch=async (route,options)=>{
     if(route.startsWith('get_users_api'))return response({status:'success',data:[user],total:1,page:1,permission_catalog:{},can_manage_permissions:true});
     if(route.startsWith('get_user_departments_api'))return new Promise(resolve=>membershipRequests.push(resolve));
     if(route.startsWith('search_departments_api')){searches++;return response({status:'success',data:[{Department_Id:2,Department_Name:'Beta'}]});}
+    if(route==='save_profile_photo.php'){writes.push({route,body:options.body});return response({status:'success',message:'บันทึกรูปโปรไฟล์แล้ว',member_version:'a'.repeat(64),photo:{revision:1,url:'api/profile-photo.php?user_id=4&v=1'}});}
     if(route==='update_user_api.php'||route==='save_user_status_api.php'||route==='save_user_permissions_api.php'||route==='save_user_position_api.php'){writes.push({route,body:options.body});if(nextWriteFailure){nextWriteFailure=false;return {ok:false,json:async()=>({status:'error',message:'write failed'})};}return response({status:'success',message:'Saved'});}
     throw Error('Unexpected route: '+route);
 };
 const source=fs.readFileSync('assets/member-management.js','utf8');
 class MockFormData {
-    constructor(form){this.data=new Map();if(form.id==='form_permissions'){this.data.set('permissions',el('permission-options').children.map(label=>label.children[0]).filter(input=>input.checked).map(input=>input.value));return;}for(const[name,id]of Object.entries({User_Id:'edit_id',User_name:'edit_name',User_Email:'edit_email',User_Status:'User_Status',User_password1:'password_1',User_password2:'password_2'}))if(!el(id).disabled)this.data.set(name,[el(id).value]);}
+    constructor(form){this.data=new Map();if(!form)return;if(form.id==='form_permissions'){this.data.set('permissions',el('permission-options').children.map(label=>label.children[0]).filter(input=>input.checked).map(input=>input.value));return;}for(const[name,id]of Object.entries({User_Id:'edit_id',User_name:'edit_name',User_Email:'edit_email',User_Status:'User_Status',User_password1:'password_1',User_password2:'password_2'}))if(!el(id).disabled)this.data.set(name,[el(id).value]);}
     get(key){return this.data.get(key)?.[0]??null;} getAll(key){return this.data.get(key)??[];}
     set(key,value){this.data.set(key,[value]);} append(key,value){this.data.set(key,[...(this.data.get(key)??[]),value]);} delete(key){this.data.delete(key);}
 }
-vm.runInNewContext(source,{document,fetch,window:{sessionReady:Promise.resolve(),eofficeUser:{id:1},dispatchEvent(){},addEventListener(){}},Event,location:{origin:'http://localhost'},URLSearchParams,FormData:MockFormData,confirm:()=>true,Option:class{constructor(text,value){this.text=text;this.value=value;}},escapeHTML:String,setTimeout,clearTimeout,console});
+vm.runInNewContext(source,{document,fetch,window:{sessionReady:Promise.resolve(),eofficeUser:{id:1},dispatchEvent(){},addEventListener(){},URL:{createObjectURL:()=> 'blob:profile-preview',revokeObjectURL(){}}},Event,location:{origin:'http://localhost'},URLSearchParams,FormData:MockFormData,confirm:()=>true,Option:class{constructor(text,value){this.text=text;this.value=value;}},escapeHTML:String,setTimeout,clearTimeout,console});
 const tick=()=>new Promise(resolve=>setTimeout(resolve,10));
 const selected=()=>el('selected-departments').children.map(chip=>chip.children[0]?.textContent);
-const snapshot=dept=>response({status:'success',data:[{Department_Id:dept==='Alpha'?1:3,Department_Name:dept}],user,member_version:'a'.repeat(64),permissions:[],permission_version:'b'.repeat(64)});
+const snapshot=dept=>response({status:'success',data:[{Department_Id:dept==='Alpha'?1:3,Department_Name:dept}],user,member_version:'a'.repeat(64),permissions:[],permission_version:'b'.repeat(64),photo:{revision:0,url:null}});
 async function run(){
     await tick();const edit=el('userTableBody').children[0].actions.children.find(button=>button.textContent==='แก้ไข');
     edit.events.click();await tick();
@@ -42,6 +44,14 @@ async function run(){
     assert.equal(searches,0);assert.equal(el('department-loading').hidden,false);
     membershipRequests.shift()(snapshot('Alpha'));await tick();
     assert.equal(el('department-search').disabled,false);assert.equal(el('save-member').disabled,false);
+    el('profile-photo-file').files=[{size:128,type:'image/png',name:'avatar.png'}];
+    el('profile-photo-file').events.change();
+    assert.equal(el('profile-photo-section').hidden,false);assert.equal(el('save-profile-photo').disabled,false);
+    el('save-profile-photo').events.click();await tick();
+    assert.equal(writes.at(-1).route,'save_profile_photo.php');
+    assert.equal(writes.at(-1).body.get('action'),'upload');
+    assert.equal(el('profile-photo-message').textContent,'บันทึกรูปโปรไฟล์แล้ว');
+    console.log('PASS profile photo preview and upload stay separate from the profile form');
     el('department-search').events.input();await new Promise(resolve=>setTimeout(resolve,300));
     el('txtHint_department').children[0].children[0].events.click();
     assert.deepEqual(selected(),['Alpha','Beta']);

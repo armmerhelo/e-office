@@ -2,6 +2,7 @@
 if (PHP_SAPI !== 'cli') exit;
 require __DIR__.'/../config/bootstrap.php';
 require __DIR__.'/../config/official-travel-schema.php';
+require __DIR__.'/../config/profile-photo.php';
 $settings = app_settings();
 $database = $settings['database'];
 if (!preg_match('/^eoffice_travel_\d+_test$/D', $database) || !$settings['mock']
@@ -28,7 +29,20 @@ switch ($action) {
             (5,'ผู้อำนวยการทดสอบ','User','director'), (6,'Admin ทดสอบ','Admin','staff')");
         $pdo->exec("INSERT INTO eoffice_permissions VALUES (2, 'official_travel')");
         app_official_travel_migrate($pdo);
+        app_profile_photo_migrate($pdo);
         app_audit_migrate($pdo);
+        $root = app_profile_photo_root();
+        if (!is_dir($root)) mkdir($root, 0700, true);
+        $photo = $pdo->prepare('INSERT INTO eoffice_user_photos (User_Id,revision,file_name,mime_type,bytes) VALUES (?,1,?,?,?)');
+        foreach ([1 => [48,93,178], 3 => [62,139,97], 5 => [155,101,56]] as $userId => $color) {
+            $image = imagecreatetruecolor(64, 64);
+            imagefill($image, 0, 0, imagecolorallocate($image, ...$color));
+            ob_start(); imagejpeg($image, null, 84); $bytes = ob_get_clean(); imagedestroy($image);
+            $name = bin2hex(random_bytes(16)).'.jpg';
+            file_put_contents($root.'/'.$name, $bytes);
+            chmod($root.'/'.$name, 0600);
+            $photo->execute([$userId, $name, 'image/jpeg', strlen($bytes)]);
+        }
         $insert = $pdo->prepare('INSERT INTO eoffice_sessions VALUES (?,?,DATE_ADD(NOW(), INTERVAL 1 HOUR))');
         $tokens = [];
         foreach (['admin'=>1,'secretary'=>2,'deputy'=>3,'reader'=>4,'director'=>5,'admin_staff'=>6] as $name=>$id) {

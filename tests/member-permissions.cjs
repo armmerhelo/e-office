@@ -1,10 +1,16 @@
 const assert = require('node:assert/strict');
 const cp = require('node:child_process');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const php = process.env.PHP_BIN || 'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const port = Number(process.env.MEMBER_TEST_PORT || 8091);
 const base = `http://localhost:${port}`;
-const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64')};
+fs.mkdirSync(path.join(os.tmpdir(),'opencode'),{recursive:true});
+const storage = fs.mkdtempSync(path.join(os.tmpdir(),'opencode','member-photo-'));
+const photoRoot = path.join(storage,'profile-photos');
+const env = {...process.env, DB_DATABASE:`eoffice_members_${process.pid}_test`, APP_URL:base, EOFFICE_MOCK_SERVICES:'true', EOFFICE_MEMBER_VERSION_KEY:crypto.randomBytes(32).toString('base64'), EOFFICE_STORAGE:storage};
 let servers = [], users, passed = 0, created = false;
 const lockers = new Set();
 function fixture(action) {
@@ -36,6 +42,18 @@ const grant = async (name, permissions, extra={}) => {
     return request('/management/save_user_permissions_api.php', {data:{user_id:users[name].id,permissions,permission_version:version},...extra});
 };
 const values = (name, User_Status='User') => ({User_Id:users[name].id, User_name:name, User_Email:name+'@example.test', User_Status});
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAFElEQVQImWPUqAhgwAaYsIoOWgkAwIABAEtpG64AAAAASUVORK5CYII=','base64');
+function photoBody(name, version, action='upload', data=png, type='image/png') {
+    const body = new FormData();
+    body.append('User_Id', users[name].id);
+    body.append('member_version', version);
+    body.append('action', action);
+    if (action === 'upload') body.append('photo', new Blob([data],{type}), 'avatar.png');
+    return body;
+}
+function photoCount() {
+    return fs.existsSync(photoRoot) ? fs.readdirSync(photoRoot).filter(name => name.endsWith('.jpg')).length : 0;
+}
 async function profile(name, extra={}) {
     const snapshot=await request('/management/get_user_departments_api.php?User_Id='+users[name].id);
     return {...values(name,snapshot.user.User_Status),member_version:snapshot.member_version,...extra};
@@ -103,6 +121,41 @@ async function run() {
         await request('/management/update_user_api.php',{as:'manager',body:form(await profile('basic'))});
         await request('/management/get_user_departments_api.php?User_Id='+users.basic.id,{as:'manager'});
         await request('/management/delete_user_api.php',{as:'manager',body:form({User_Id:data.user_id})});
+    });
+    await test('profile photos are validated, version checked, private and cleaned up',async()=>{
+        const before=await request('/management/get_user_departments_api.php?User_Id='+users.basic.id);
+        assert.equal(before.photo.revision,0);assert.equal(before.photo.url,null);
+        await request('/management/save_profile_photo.php',{as:'basic',body:photoBody('basic',before.member_version),status:403});
+        await request('/management/save_profile_photo.php',{as:null,body:photoBody('basic',before.member_version),status:401});
+        const first=await request('/management/save_profile_photo.php',{body:photoBody('basic',before.member_version)});
+        assert.equal(first.photo.revision,1);assert.match(first.photo.url,/^api\/profile-photo\.php\?user_id=\d+&v=1$/);
+        assert.notEqual(first.member_version,before.member_version);assert.equal(photoCount(),1);
+        const firstUrl=base+'/'+first.photo.url;
+        assert.equal((await fetch(firstUrl)).status,401);
+        assert.equal((await fetch(firstUrl,{headers:{Cookie:users.basic.cookie}})).status,403);
+        const image=await fetch(firstUrl,{headers:{Cookie:users.admin.cookie}});
+        assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/jpeg');
+        assert.equal(Buffer.from(await image.arrayBuffer()).subarray(0,3).toString('hex'),'ffd8ff');
+        assert.equal((await fetch(firstUrl.replace(/&v=1$/,'&v=2'),{headers:{Cookie:users.admin.cookie}})).status,404);
+        await request('/management/save_profile_photo.php',{body:photoBody('basic',before.member_version),status:409});
+        await request('/management/save_profile_photo.php',{body:new FormData(),status:400});
+        const bad=new FormData();bad.append('User_Id',users.basic.id);bad.append('member_version',first.member_version);bad.append('action','upload');bad.append('photo',new Blob([Buffer.from('not an image')],{type:'image/png'}),'bad.png');
+        await request('/management/save_profile_photo.php',{body:bad,status:400});assert.equal(photoCount(),1);
+        const large=new FormData();large.append('User_Id',users.basic.id);large.append('member_version',first.member_version);large.append('action','upload');large.append('photo',new Blob([Buffer.alloc(2*1024*1024+1)],{type:'image/png'}),'large.png');
+        await request('/management/save_profile_photo.php',{body:large,status:400});assert.equal(photoCount(),1);
+        const second=await request('/management/save_profile_photo.php',{body:photoBody('basic',first.member_version)});
+        assert.equal(second.photo.revision,2);assert.equal(photoCount(),1);
+        assert.equal((await fetch(firstUrl,{headers:{Cookie:users.admin.cookie}})).status,404);
+        const removed=await request('/management/save_profile_photo.php',{body:photoBody('basic',second.member_version,'remove')});
+        assert.equal(removed.photo.revision,3);assert.equal(removed.photo.url,null);assert.equal(photoCount(),0);
+        assert.equal((await fetch(base+'/'+second.photo.url,{headers:{Cookie:users.admin.cookie}})).status,404);
+        const created=await request('/management/new_user_api.php',{body:form({User_name:'Photo cleanup',User_Email:'photo-cleanup@example.test',User_Status:'User',User_password1:'Member-Test-2026!',User_password2:'Member-Test-2026!'})});
+        users.cleanup={id:created.user_id};
+        const cleanupProfile=await request('/management/get_user_departments_api.php?User_Id='+created.user_id);
+        const uploaded=await request('/management/save_profile_photo.php',{body:photoBody('cleanup',cleanupProfile.member_version)});
+        assert.equal(photoCount(),1);
+        await request('/management/delete_user_api.php',{body:form({User_Id:created.user_id})});
+        assert.equal(photoCount(),0);assert.equal((await fetch(base+'/'+uploaded.photo.url,{headers:{Cookie:users.admin.cookie}})).status,404);
     });
     await test('member manager cannot grant or promote any account',async()=>{
         await grant('basic',['email'],{as:'manager',status:403});
@@ -283,4 +336,5 @@ run().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>
     for(const child of lockers)child.kill();
     await Promise.all(servers.map(server=>new Promise(resolve=>{if(server.exitCode!==null) return resolve();server.once('exit',resolve);server.kill();})));
     if (created) try { fixture('drop'); } catch(error) { console.error(error);process.exitCode=1; }
+    try { fs.rmSync(storage,{recursive:true,force:true}); } catch {}
 });

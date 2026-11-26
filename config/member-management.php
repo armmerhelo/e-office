@@ -2,6 +2,7 @@
 require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/sign-routing.php';
 require_once __DIR__ . '/member-position.php';
+require_once __DIR__ . '/profile-photo.php';
 
 // All member mutations lock the routing gate, then the Admin roster. This
 // serializes demotion/deletion and prevents concurrent removal of the last Admin.
@@ -58,13 +59,14 @@ function app_member_version_key(): string {
     return hash_hmac('sha256', 'eoffice:member-version:v1', $master, true);
 }
 
-function app_member_version(array $user, array $departments): string {
+function app_member_version(array $user, array $departments, int $photoRevision = 0): string {
     // Never expose a plain digest of password-bearing data: legacy plaintext
     // passwords would turn it into an offline password-guess verification oracle.
     return hash_hmac('sha256', json_encode([
         (int)$user['User_Id'], $user['User_Name'], $user['User_Email'],
         $user['User_Status'], $user['User_Password'], $user['User_Position']??'staff',
         array_map('intval', array_column($departments, 'Department_Id')),
+        max(0, $photoRevision),
     ], JSON_THROW_ON_ERROR), app_member_version_key());
 }
 
@@ -74,7 +76,8 @@ function app_member_permission_version(array $user, array $permissions): string 
 }
 
 function app_check_member_version(PDO $pdo, array $user, string $expected): void {
-    $current = app_member_version($user, app_member_departments($pdo, (int)$user['User_Id']));
+    $photo = app_profile_photo_state($pdo, (int)$user['User_Id'], true);
+    $current = app_member_version($user, app_member_departments($pdo, (int)$user['User_Id']), $photo['revision']);
     if (!preg_match('/^[a-f0-9]{64}$/D', $expected) || !hash_equals($current, $expected)) {
         $pdo->rollBack();
         app_fail('ข้อมูลสมาชิกเปลี่ยนแล้ว กรุณาปิดหน้าต่างและเปิดข้อมูลใหม่', 409);

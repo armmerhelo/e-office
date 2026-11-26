@@ -21,6 +21,9 @@
         if (className) node.className = className;
         return node;
     }
+    function initials(name) {
+        return Array.from((name || '?').trim()).slice(0, 2).join('').toLocaleUpperCase('th');
+    }
     function options(select, rows, preferred = select.value) {
         select.replaceChildren(...rows.map(([value, text]) => {
             const option = element('option', text);
@@ -92,7 +95,8 @@
         } catch (error) {
             if (ticket !== sequence) return;
             snapshot = null;
-            for (const key of ['grid','agenda','selected-date','selected-count','selected-items','result-count']) get(key).replaceChildren();
+            for (const key of ['grid','agenda','selected-date','selected-count','selected-items','result-count','presence-list','presence-summary']) get(key).replaceChildren();
+            get('presence').hidden = true;
             get('selected-date').removeAttribute('datetime');
             get('selected-empty').hidden = true;
             get('clear').hidden = true;
@@ -199,6 +203,7 @@
         get('selected-empty').textContent = filtered
             ? 'ไม่พบกำหนดการตามตัวกรองในวันที่เลือก'
             : selectedDate === snapshot.today ? 'วันนี้ยังไม่มีกำหนดการไปราชการ' : 'วันที่เลือกยังไม่มีกำหนดการไปราชการ';
+        renderPresence();
         const grid = get('grid'), first = asDate(month + '-01');
         const blanks = (first.getUTCDay() + 6) % 7;
         const dayCount = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
@@ -238,6 +243,50 @@
             items.push(cell);
         }
         grid.replaceChildren(...items);
+    }
+    function renderPresence() {
+        const panel = get('presence');
+        const executives = Array.isArray(snapshot?.executives) ? snapshot.executives : [];
+        if (!executives.length) {
+            panel.hidden = true;
+            get('presence-list').replaceChildren();
+            return;
+        }
+        const present = [], away = [];
+        for (const executive of executives) {
+            const isAway = snapshot.entries.some(row =>
+                Number(row.executive_id) === Number(executive.id)
+                && row.status === 'scheduled'
+                && row.start_date <= selectedDate
+                && row.end_date >= selectedDate);
+            (isAway ? away : present).push({...executive, away: isAway});
+        }
+        get('presence-summary').textContent = `อยู่ ${present.length} · ไม่อยู่ ${away.length}`;
+        get('presence-list').replaceChildren(...[...present, ...away].map(executive => {
+            const item = element('li', '', 'travel-presence-person');
+            item.dataset.presence = executive.away ? 'away' : 'present';
+            item.title = `${executive.name} — ${executive.away ? 'ไม่อยู่: มีกำหนดการไปราชการ' : 'อยู่: ไม่มีกำหนดการไปราชการ'}`;
+            item.setAttribute('aria-label', item.title);
+            const avatarWrap = element('span', '', 'travel-presence-avatar-wrap');
+            const avatar = element('span', '', 'travel-presence-avatar');
+            avatar.append(element('span', initials(executive.name), 'travel-presence-fallback'));
+            if (executive.photo_url) {
+                const image = document.createElement('img');
+                image.src = executive.photo_url;
+                image.alt = '';
+                image.loading = 'lazy';
+                image.decoding = 'async';
+                image.addEventListener('load', () => image.classList.add('is-loaded'));
+                image.addEventListener('error', () => image.remove());
+                avatar.append(image);
+            }
+            const mark = element('span', executive.away ? '–' : '✓', 'travel-presence-mark');
+            mark.setAttribute('aria-hidden', 'true');
+            avatarWrap.append(avatar, mark);
+            item.append(avatarWrap, element('span', executive.name, 'travel-presence-name'));
+            return item;
+        }));
+        panel.hidden = false;
     }
     function move(offset) {
         if (!snapshot || loading) return;

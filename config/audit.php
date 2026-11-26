@@ -17,6 +17,7 @@ function app_audit_catalog(): array {
         'member.role'=>['members','เปลี่ยนระดับสมาชิก','user'],
         'member.permissions'=>['members','เปลี่ยนสิทธิ์สมาชิก','user'],
         'member.position'=>['members','เปลี่ยนตำแหน่งสมาชิก','user'],
+        'member.photo'=>['members','เปลี่ยนรูปโปรไฟล์สมาชิก','user'],
         'department.create'=>['departments','เพิ่มกลุ่มงาน','department'],
         'department.update'=>['departments','แก้ไขกลุ่มงาน','department'],
         'department.delete'=>['departments','ลบกลุ่มงาน','department'],

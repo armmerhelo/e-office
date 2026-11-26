@@ -5,9 +5,11 @@ $pdo=app_pdo();$pdo->beginTransaction();
 try {
     $locked=app_lock_member($pdo,$actor,$id);$user=$locked['target'];
     $departments=app_member_departments($pdo,$id);
-    $version=app_member_version($user,$departments);
+    $photo=app_profile_photo_state($pdo,$id);
+    $version=app_member_version($user,$departments,$photo['revision']);
     $permissions=app_user_permissions($user);$permissionVersion=app_member_permission_version($user,$permissions);
     $pdo->commit();
 } catch (Throwable $e) { if($pdo->inTransaction())$pdo->rollBack();throw $e; }
 app_json(['status'=>'success','data'=>$departments,'member_version'=>$version,'permissions'=>$permissions,'permission_version'=>$permissionVersion,
+    'photo'=>['revision'=>$photo['revision'],'url'=>$photo['url']],
     'user'=>['User_Id'=>(int)$user['User_Id'],'User_Name'=>$user['User_Name'],'User_Email'=>$user['User_Email'],'User_Status'=>$user['User_Status'],'User_Position'=>$user['User_Position']]]);

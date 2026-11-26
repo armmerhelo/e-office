@@ -33,6 +33,7 @@ foreach(['User_Name'=>'Changed name','User_Email'=>'changed@example.test','User_
 $changed=$user;$changed['User_Password']=password_hash($user['User_Password'],PASSWORD_DEFAULT);
 check(app_member_version($changed,$departments)!==$version,'legacy password migration invalidates the snapshot');
 check(app_member_version($user,[['Department_Id'=>8]])!==$version,'group assignments invalidate the snapshot');
+check(app_member_version($user,$departments,1)!==$version,'profile photo changes invalidate the snapshot');
 putenv('EOFFICE_MEMBER_VERSION_KEY='.base64_encode(random_bytes(32)));
 check(app_member_version($user,$departments)!==$version,'key rotation invalidates older tokens');
 putenv('EOFFICE_SETTINGS_KEY='.$key);putenv('EOFFICE_MEMBER_VERSION_KEY=');

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/bootstrap.php';
+require_once __DIR__.'/profile-photo.php';
 
 function app_official_travel_departments(): array {
     return [
@@ -44,8 +45,18 @@ function app_official_travel_read(PDO $pdo, array $user): never {
             $todayEntries[] = $row;
         }
     }
-    $executives = $manageable ? $pdo->query("SELECT User_Id AS id, User_Name AS name, User_Position AS position
-        FROM t_user WHERE User_Position IN ('director','deputy_director') ORDER BY User_Position DESC, User_Name, User_Id")->fetchAll() : [];
+    $executives = $pdo->query("SELECT u.User_Id AS id, u.User_Name AS name, u.User_Position AS position,
+        COALESCE(p.revision,0) AS photo_revision
+        FROM t_user u LEFT JOIN eoffice_user_photos p ON p.User_Id=u.User_Id
+        WHERE u.User_Position IN ('director','deputy_director')
+        ORDER BY u.User_Position DESC, u.User_Name, u.User_Id")->fetchAll();
+    foreach ($executives as &$executive) {
+        $executive['id'] = (int)$executive['id'];
+        $executive['photo_revision'] = (int)$executive['photo_revision'];
+        $executive['photo_url'] = $executive['photo_revision'] > 0
+            ? app_profile_photo_url($executive['id'], $executive['photo_revision']) : null;
+    }
+    unset($executive);
     app_json(['status'=>'success', 'today'=>$today, 'month'=>$month, 'owner'=>(int)$user['User_Id'],
         'can_manage'=>$manageable, 'departments'=>app_official_travel_departments(), 'executives'=>$executives,
         'entries'=>$entries, 'today_entries'=>$todayEntries]);

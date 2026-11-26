@@ -7,6 +7,8 @@ if ($id===(int)$actor['User_Id']) { $pdo->rollBack();app_fail('ไม่สา�
 $q=$pdo->prepare('SELECT COUNT(*) FROM t_document WHERE User_Id=?');$q->execute([$id]);
 if($q->fetchColumn()) { $pdo->rollBack();app_fail('ผู้ใช้มีเอกสารอยู่ กรุณาโอนเอกสารก่อนลบ',409); }
 if(app_has_document_receipts($pdo,$id)) { $pdo->rollBack();app_fail('ผู้ใช้มีประวัติรับเอกสาร ไม่สามารถลบบัญชีได้เพื่อรักษาประวัติการรับ',409); }
+$photo=app_profile_photo_state($pdo,$id);
 try { $pdo->prepare('DELETE FROM t_user WHERE User_Id=?')->execute([$id]);app_audit('member.delete',$locked['actor'],$id);$pdo->commit(); }
 catch (Throwable $e) { $pdo->rollBack();if ($e instanceof PDOException && $e->getCode()==='23000') app_fail('ผู้ใช้มีข้อมูลอ้างอิงอยู่ ไม่สามารถลบได้',409);throw $e; }
+app_profile_photo_delete_file($photo['file_name']);
 app_json(['status'=>'success','message'=>'ลบผู้ใช้สำเร็จ']);
