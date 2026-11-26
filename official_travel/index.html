@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="../assets/sidebar.css?v=20261019">
   <link rel="stylesheet" href="../assets/ui-buttons.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;display=swap">
-  <link rel="stylesheet" href="calendar.css?v=16">
+  <link rel="stylesheet" href="calendar.css?v=17">
 </head>
 <body class="eoffice-module-page">
   <div class="eoffice-module-content"><div class="eoffice-module-view">
@@ -101,8 +101,13 @@
         <form id="travel-form">
           <fieldset class="travel-form-grid">
             <legend>ผู้เดินทางและภารกิจ</legend>
-            <label>ผู้ไปราชการ <select name="executive_id" required></select></label>
-            <label>ฝ่าย <select name="department" required></select></label>
+            <div class="travel-wide travel-travelers">
+              <span class="travel-field-label">ผู้ไปราชการ</span>
+              <div id="travel-executive-checkboxes" class="travel-executive-options" role="group" aria-label="เลือกผู้ไปราชการ"></div>
+              <select id="travel-executive-select" name="executive_id" aria-label="ผู้ไปราชการ" hidden></select>
+              <p id="travel-executive-help" class="travel-field-hint">เลือกได้มากกว่าหนึ่งคนเมื่อไปราชการวันเดียวกัน</p>
+            </div>
+            <label>ฝ่าย <select name="department" required></select><span id="travel-department-hint" class="travel-field-hint" hidden></span></label>
             <label class="travel-wide">เรื่อง / ภารกิจ <input name="subject" required maxlength="200"></label>
             <label class="travel-wide">สถานที่ <input name="place" required maxlength="200"></label>
           </fieldset>
@@ -129,6 +134,6 @@
       </dialog>
     </main>
   </div></div>
-  <script src="calendar.js?v=9"></script>
+  <script src="calendar.js?v=10"></script>
 </body>
 </html>

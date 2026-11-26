@@ -34,7 +34,7 @@ async function run() {
     seeded = true;
     server = spawn(php, ['-S',`127.0.0.1:${port}`,'scripts/router.php'], {env,stdio:'ignore'});
     for (let i=0; i<50; i++) {
-        try { await request(null,401); break; }
+        try { await request(null,200); break; }
         catch (error) {
             if (i === 49 || error.code === 'ERR_ASSERTION') throw error;
             await new Promise(resolve => setTimeout(resolve,100));
@@ -45,41 +45,69 @@ async function run() {
     const data = {_expected_owner:2, executive_id:3, department:'academic', subject:'<img src=x> ทดสอบ', place:'สถานที่ทดสอบ',
         start_date:initial.today,end_date:initial.today,all_day:true,status:'scheduled',reference_no:'เลขภายใน',private_note:'ข้อความภายใน'};
     let travelId, old;
-    await check('only travel secretaries, deputy directors, directors and Admin can read; writes require permission', async () => {
+    await check('calendar is public read-only while writes still require permissions', async () => {
         assert.deepEqual(initial.executives.map(row => Number(row.id)).sort(),[1,3,5]);
         assert.ok(initial.executives.every(row => row.photo_revision === 1 && /^api\/profile-photo\.php\?user_id=\d+&v=1$/.test(row.photo_url)));
         assert.equal((await request('admin',200)).can_manage,true);
         assert.equal((await me('deputy')).position,'deputy_director');
         assert.equal((await me('director')).position,'director');
-        for (const role of ['deputy','director']) {
+        for (const role of ['deputy','director','reader']) {
             const viewer = await request(role,200);
             assert.equal(viewer.can_manage,false);
             assert.deepEqual(viewer.executives.map(row => Number(row.id)).sort(),[1,3,5]);
             assert.ok(viewer.executives.every(row => !Object.hasOwn(row,'file_name')));
-            await request(role,403,{data});
+            if (role !== 'reader') await request(role,403,{data});
         }
+        const guest = await request(null,200);
+        assert.equal(guest.can_manage,false);
+        assert.equal(guest.owner,0);
+        assert.deepEqual(guest.executives.map(row => Number(row.id)).sort(),[1,3,5]);
         assert.equal((await request('admin_staff',200)).can_manage,true,'Admins can view without an executive position');
-        await request('reader',403);
-        await request(null,401);
         await request('reader',403,{data});
         await request(null,401,{data});
         await request('secretary',403,{data,origin:'https://example.test'});
         await request('secretary',409,{data:{...data,_expected_owner:1}});
     });
-    await check('executive photos require travel access and an exact revision', async () => {
+    await check('executive photos are public while ordinary staff photos stay private', async () => {
         const url = base+'/'+initial.executives.find(row => Number(row.id) === 3).photo_url;
-        assert.equal((await fetch(url)).status,401);
-        assert.equal((await fetch(url,{headers:{Cookie:`User_Token=${tokens.reader}`}})).status,403);
-        const response = await fetch(url,{headers:{Cookie:`User_Token=${tokens.deputy}`}});
+        const response = await fetch(url);
         assert.equal(response.status,200);
         assert.equal(response.headers.get('content-type'),'image/jpeg');
         assert.equal(Buffer.from(await response.arrayBuffer()).subarray(0,3).toString('hex'),'ffd8ff');
-        assert.equal((await fetch(url.replace(/&v=1$/,'&v=2'),{headers:{Cookie:`User_Token=${tokens.deputy}`}})).status,404);
+        assert.equal((await fetch(url.replace(/&v=1$/,'&v=2'))).status,404);
         const staffUrl = base+'/api/profile-photo.php?user_id=4&v=1';
+        assert.equal((await fetch(staffUrl)).status,401,'guests must not read ordinary staff photos');
         for (const role of ['secretary','deputy']) {
             assert.equal((await fetch(staffUrl,{headers:{Cookie:`User_Token=${tokens[role]}`}})).status,403,'travel access must not expose ordinary staff photos');
         }
         assert.equal((await fetch(staffUrl,{headers:{Cookie:`User_Token=${tokens.admin}`}})).status,200);
+    });
+    await check('one create request can add several executives to the same schedule', async () => {
+        const month = `${nextYear}-08`;
+        const date = `${month}-12`;
+        const multi = await request('secretary',201,{data:{...data, _expected_owner:2, executive_ids:[1,3,5],
+            department:'academic', subject:'QA multi executive', place:'QA multi venue',
+            start_date:date, end_date:date, status:'scheduled'}});
+        assert.equal(multi.ids.length,3);
+        assert.equal(multi.id,multi.ids[0]);
+        const publicView = await request(null,200,{query:'?month='+month});
+        assert.equal(publicView.can_manage,false);
+        assert.equal(publicView.owner,0);
+        const rows = publicView.entries.filter(row => row.subject === 'QA multi executive');
+        assert.equal(rows.length,3);
+        assert.deepEqual(rows.map(row => row.department).sort(),['academic','director','director']);
+        for (const row of rows) {
+            assert.equal(Object.hasOwn(row,'private_note'),false);
+            assert.equal(Object.hasOwn(row,'reference_no'),false);
+            assert.equal(Object.hasOwn(row,'revision'),false);
+        }
+        const deduped = await request('secretary',201,{data:{...data, _expected_owner:2, executive_ids:[3,3],
+            department:'academic', subject:'QA duplicate executive id', start_date:date, end_date:date}});
+        assert.equal(deduped.ids.length,1);
+        await request('secretary',400,{data:{...data, _expected_owner:2, executive_ids:[]}});
+        await request('secretary',400,{data:{...data, _expected_owner:2, executive_ids:'1,3'}});
+        await request('secretary',422,{data:{...data, _expected_owner:2, executive_ids:[1,3],
+            department:'director', subject:'QA invalid mixed department', start_date:date, end_date:date}});
     });
     await check('validates month, dates, clock, executive and role at the API', async () => {
         for (const query of ['?month=2026-13','?month[]=2026-11']) await request('secretary',400,{query});
@@ -136,7 +164,7 @@ async function run() {
         await request('secretary',409,{data:edit});
         assert.ok(!(await request('deputy',200)).today_entries.some(row => row.id === travelId));
         fixture('revoke');
-        await request('secretary',403);
+        assert.equal((await request('secretary',200)).can_manage,false,'revoked managers keep public read access only');
         await request('secretary',403,{data:{...edit,revision:2,status:'cancelled'}});
         fixture('departed');
         await request('admin',200,{data:{...edit,_expected_owner:1,revision:2,status:'cancelled'}});

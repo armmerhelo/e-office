@@ -186,8 +186,7 @@ function sidebarParityChecks() {
         assert.equal(el('group_ai_settings').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_audit_logs').style.display,user?.status==='Admin'?'block':'none');
         assert.equal(el('group_menu_request_room').style.display,user?'block':'none');
-        assert.equal(el('group_menu_official_travel').hidden,!(user && (user.status==='Admin' ||
-            user.permissions?.includes('official_travel') || ['director','deputy_director'].includes(user.position))));
+        assert.equal(el('group_menu_official_travel').hidden,false);
         for(const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
             assert.equal(el(id).style.display,'none',`${id} should stay hidden for every role`);
         }
@@ -220,7 +219,7 @@ const context = {
     MODULE_ROUTES: Object.freeze(Object.fromEntries([...Object.entries(routes).map(([key,[,path]]) => [key,path]), ['room_booking2','room_booking/new_room.html']])),
     restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance',siya_news:'siya_news',siya_news_studio:'news_producer'})[view],
     eofficeCan:permission => permission==='siya_news'?Boolean(context.window.eofficeUser?.permissions.some(role=>['news_submit','news_editor','news_producer'].includes(role))):Boolean(context.window.eofficeUser?.permissions.includes(permission)),
-    eofficeCanViewOfficialTravel:()=>{const user=context.window.eofficeUser;return !!user&&(user.status==='Admin'||user.permissions?.includes('official_travel')||['director','deputy_director'].includes(user.position));},
+    eofficeCanViewOfficialTravel:()=>true,
     getCookie:() => context.window.eofficeUser ? 'session' : null,
     setSidebarOpen(){}, display_style:(id,display) => { el(id).style.display = display; },
     localStorage:{getItem:key => values.get(key),setItem:(key,value) => values.set(key,value)},
@@ -252,8 +251,11 @@ context.window.eofficeUser={permissions:[]};
 context.showView('members','load');
 assert.equal(context.loaded,'received');
 context.window.eofficeUser={status:'User',position:'staff',permissions:[]};
-context.showView('official_travel','load');
-assert.equal(context.loaded,'received','staff without the travel grant cannot open the calendar');
+context.navigated=null;context.showView('official_travel','load');
+assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'staff can read the public calendar without a travel grant');
+context.window.eofficeUser=null;
+context.navigated=null;context.showView('official_travel','load');
+assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'guests can open the public calendar');
 context.window.eofficeUser={status:'User',position:'deputy_director',permissions:[]};
 context.navigated=null;context.showView('official_travel','load');
 assert.equal(context.navigated,context.MODULE_ROUTES.official_travel,'deputy directors may open the calendar without manage permission');
@@ -289,6 +291,12 @@ for (const view of Object.keys(context.MODULE_ROUTES)) {
     context.window.eofficeUser=null;
     context.window.location.href=`http://localhost/index.php?view=${view}`;
     context.showView(view,'load');
+    if (view === 'official_travel') {
+        assert.equal(context.navigated,context.MODULE_ROUTES[view],'guests open the public calendar without a login detour');
+        assert.equal(sessionValues.has('eoffice-login-view'),false);
+        context.showView('public','load');
+        continue;
+    }
     assert.equal(context.loaded,'public');
     assert.equal(sessionValues.get('eoffice-login-view'),view,'guest module target must survive canonicalization');
     // Guest startup displays public again after opening its login modal.
@@ -382,7 +390,7 @@ async function navigationChecks() {
     window.eofficeUser=admin;firstUser(admin);await tick();
     assert.equal(window.eofficeUser,null,'late initial security assignment must not replace the latest accepted session');
     assert.deepEqual(sessions,[null],'only the accepted refresh may publish a session update');
-    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,1,'a late initial session must not restore logged-out menus');
+    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,2,'guest sees only public links');
     events.focus();events.focus();
     const lastPendingRevision=window.eofficeSessionState.revision;
     const older=pending.shift(),latest=pending.shift();
@@ -390,7 +398,7 @@ async function navigationChecks() {
     older({ok:true,json:async()=>({user:admin})});await tick();
     assert.equal(sessionStates.at(-1).status,'guest');assert.ok(sessionStates.at(-1).revision>lastPendingRevision);
     assert.ok(sessions.every(user=>user===null),'stale session responses must not restart draft ownership');
-    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,1,'an older refresh must not restore revoked menus');
+    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,2,'an older refresh must not restore revoked menus');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     assert.equal(JSON.stringify(sessions.at(-1)),JSON.stringify(admin),'successful refresh should publish the recovered session');
     assert.equal(JSON.stringify(window.eofficeSessionState.user),JSON.stringify(admin),'the latest accepted session is replayable to late consumers');
@@ -448,8 +456,8 @@ async function navigationChecks() {
     assert.ok(restoredWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'an untouched restored draft must still warn before logout');
     restored.hidden=true;
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,9,'basic users must not see staff/admin links or the restricted calendar');
-    assert.ok(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden);
+    assert.equal(links.filter(link=>!link.hidden).length,10,'basic users see public links and login-only modules');
+    assert.equal(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden,false);
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',position:'deputy_director',permissions:[]}})});await tick();
     assert.equal(links.filter(link=>!link.hidden).length,10,'deputy directors may see the calendar link');
     assert.equal(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden,false);

@@ -4,9 +4,8 @@ function eofficeCan(permission) {
     return !!window.eofficeUser?.permissions?.includes(permission);
 }
 
-function eofficeCanViewOfficialTravel(user = window.eofficeUser) {
-    return !!user && (user.status === 'Admin' || user.permissions?.includes('official_travel') ||
-        ['director','deputy_director'].includes(user.position));
+function eofficeCanViewOfficialTravel() {
+    return true;
 }
 
 function applyPermissionMenus() {
@@ -32,7 +31,7 @@ function applyPermissionMenus() {
     const requestRoom = document.getElementById('group_menu_request_room');
     if (requestRoom) requestRoom.style.display = window.eofficeUser ? 'block' : 'none';
     const travelMenu = document.getElementById('group_menu_official_travel');
-    if (travelMenu) travelMenu.hidden = !eofficeCanViewOfficialTravel();
+    if (travelMenu) travelMenu.hidden = false;
     for (const id of ['group_menu_memo','menu-memo','group_siya_news_studio','menu-siya-news-studio']) {
         const node = document.getElementById(id);
         if (node) node.style.display = 'none';
@@ -119,6 +118,7 @@ const MODULE_ROUTES = Object.freeze({
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
+const PUBLIC_MODULE_VIEWS = new Set(['official_travel']);
 const LOGIN_VIEW_KEY = 'eoffice-login-view';
 
 function requestedViewFromUrl() {
@@ -314,6 +314,7 @@ window.onload = async () => {
     applyPermissionMenus();
     const loginView = takeLoginView();
     const requestedView = requestedViewFromUrl();
+    const publicTravelRequested = requestedView === 'official_travel';
     if (id && getCookie("User_Token")) {
         showView('received', "load", '1');
     } else if (requestedView && requestedView !== 'public') {
@@ -352,11 +353,16 @@ window.onload = async () => {
         display_style('menu-bookdocnumber','none');
         display_style('group_menu_members','none');
         display_style('li_menu_received','none');
-        display_style('other_menu_group','none');
+        display_style('other_menu_group','block');
         display_style('group_menu_send_table_1','none');
         display_style('group_menu_send_table_2','none');
         display_style('group_menu_bookingroom','none');
+        display_style('group_menu_request_room','none');
         display_style('group_menu_edit_room_booking','none');
+        for (const id of ['group_maintenance','group_maintenance_admin','group_siya_news_studio','group_send_email','group_audit_logs','group_ai_settings','group_menu_updates']) display_style(id,'none');
+        display_style('group_menu_official_travel','block');
+        const officialTravelMenu = document.getElementById('group_menu_official_travel');
+        if (officialTravelMenu) officialTravelMenu.hidden = false;
         display_style('group_menu_logout','none');
 
 
@@ -366,9 +372,10 @@ window.onload = async () => {
         //components_pagination.style.display = "none";
         content_received.innerHTML = `<div id="loop_receive">กรุณาเข้าสู่ระบบ หรือ ไม่พบข้อมูล<br></div>`;
         //search_menu.style.display = "none";
-        modal.classList.add("active"); // ค่อยๆ แสดง (Fade In)
-
-        showView('public', 'load');
+        if (!publicTravelRequested) {
+            modal.classList.add("active"); // ค่อยๆ แสดง (Fade In)
+            showView('public', 'load');
+        }
     }
 
 
@@ -574,7 +581,8 @@ function showView(showViews, page , page_number) {
     if (!Object.hasOwn(MODULE_ROUTES, showViews) && !DOCUMENT_VIEWS.includes(showViews)) {
         showViews = window.eofficeUser ? 'received' : 'public';
     }
-    if (Object.hasOwn(MODULE_ROUTES, showViews) && !window.eofficeUser) {
+    const publicModule = PUBLIC_MODULE_VIEWS.has(showViews);
+    if (Object.hasOwn(MODULE_ROUTES, showViews) && !window.eofficeUser && !publicModule) {
         sessionStorage.setItem(LOGIN_VIEW_KEY, showViews);
         showViews = 'public';
     } else if (page !== 'load' && page !== 'history') {
@@ -582,14 +590,17 @@ function showView(showViews, page , page_number) {
     }
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
-    if (showViews === 'official_travel' && !eofficeCanViewOfficialTravel()) showViews = window.eofficeUser ? 'received' : 'public';
     if (['ai_settings','audit_logs'].includes(showViews) && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
 
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;
     if (moduleRoute) {
-        if (!window.eofficeUser || getCookie('User_Token') === null) {
+        if (!publicModule && (!window.eofficeUser || getCookie('User_Token') === null)) {
             showViews = 'public';
         } else {
+            if (showViews === 'official_travel') {
+                document.getElementById('modalOverlay')?.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
             if (window.eofficeModuleRouter) {
                 id = null;
                 invalidateDocumentRequests();

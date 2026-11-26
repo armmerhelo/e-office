@@ -1,12 +1,8 @@
 <?php
 require_once __DIR__.'/../config/bootstrap.php';
 require_once __DIR__.'/../config/profile-photo.php';
-require_once __DIR__.'/../config/official-travel.php';
 app_method('GET');
-$user = app_user();
-if (!app_can($user, 'members') && !app_official_travel_can_view($user)) {
-    app_fail('คุณไม่มีสิทธิ์ดูรูปโปรไฟล์นี้', 403);
-}
+$user = app_user(false);
 $id = (int)($_GET['user_id'] ?? 0);
 if ($id <= 0) app_fail('ผู้ใช้ไม่ถูกต้อง');
 $version = $_GET['v'] ?? null;
@@ -14,11 +10,11 @@ if ($version !== null && (!is_string($version) || !preg_match('/^\d{1,10}$/D', $
     app_fail('เวอร์ชันรูปไม่ถูกต้อง');
 }
 $pdo = app_pdo();
-if (!app_can($user, 'members')) {
+if (!$user || !app_can($user, 'members')) {
     $q = $pdo->prepare('SELECT User_Position FROM t_user WHERE User_Id=?');
     $q->execute([$id]);
     if (!in_array($q->fetchColumn(), ['director', 'deputy_director'], true)) {
-        app_fail('คุณไม่มีสิทธิ์ดูรูปโปรไฟล์นี้', 403);
+        app_fail('คุณไม่มีสิทธิ์ดูรูปโปรไฟล์นี้', $user ? 403 : 401);
     }
 }
 $photo = app_profile_photo_state($pdo, $id);

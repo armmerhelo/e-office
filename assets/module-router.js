@@ -53,14 +53,17 @@
         const bodyStyle=body.style;
         ctx.fetch=async(input,options={})=>{
             const method=String(options.method||(input instanceof Request?input.method:'GET')).toUpperCase(),read=['GET','HEAD'].includes(method);
+            const targetUrl=input instanceof Request?new URL(input.url):new URL(String(input),url);
+            const publicTravelRead=view==='official_travel' && read && targetUrl.origin===appRoot.origin &&
+                targetUrl.pathname===new URL('api/official-travel.php',appRoot).pathname;
             if(read && window.eofficeSessionState?.status==='pending')await new Promise((resolve,reject)=>{
                 const finish=()=>{if(window.eofficeSessionState?.status==='pending'&&!ctx.disposed)return;cleanup();ctx.disposed?reject(new DOMException('Module disposed','AbortError')):resolve();};
                 const cleanup=()=>{window.removeEventListener('eoffice:session-updated',finish);abort.signal.removeEventListener('abort',finish);};
                 window.addEventListener('eoffice:session-updated',finish);abort.signal.addEventListener('abort',finish,{once:true});finish();
             });
-            if(ctx.disposed || ctx.permissionStale || ctx.owner!==String(window.eofficeUser?.id) ||
-                window.eofficeFormOwner?.hasConflict() || window.eofficeSessionState?.status!=='authenticated')throw new DOMException('บัญชีหรือสิทธิ์เปลี่ยนแล้ว กรุณาโหลดโมดูลใหม่','AbortError');
-            const response=await fetch(input instanceof Request?input:absolute(String(input),url),{...options,
+            if(ctx.disposed || (!publicTravelRead && (ctx.permissionStale || ctx.owner!==String(window.eofficeUser?.id) ||
+                window.eofficeFormOwner?.hasConflict() || window.eofficeSessionState?.status!=='authenticated')))throw new DOMException('บัญชีหรือสิทธิ์เปลี่ยนแล้ว กรุณาโหลดโมดูลใหม่','AbortError');
+            const response=await fetch(input instanceof Request?input:targetUrl,{...options,
                 signal:options.signal && AbortSignal.any?AbortSignal.any([options.signal,abort.signal]):options.signal||abort.signal});
             if(!read && response.ok) {
                 const result=await response.clone().json().catch(()=>null);
@@ -312,12 +315,16 @@
         return ctx;
         } catch(error) {ctx.dispose();throw error;}
     }
-    const allowed=view=>window.eofficeUser && !window.eofficeFormOwner?.hasConflict() && window.eofficeSessionState?.status==='authenticated' && (['ai_settings','audit_logs'].includes(view)?window.eofficeUser.status==='Admin':
-        view==='official_travel' ? window.eofficeUser.status==='Admin' || window.eofficeUser.permissions?.includes('official_travel') || ['director','deputy_director'].includes(window.eofficeUser.position) :
-        view==='siya_news' ? ['news_submit','news_editor','news_producer'].some(permission=>window.eofficeUser.permissions?.includes(permission)) :
-        view==='siya_news_studio' ? window.eofficeUser.permissions?.includes('news_producer') :
-        !({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]) ||
-        window.eofficeUser.permissions?.includes({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]));
+    const allowed=view=>{
+        if(window.eofficeFormOwner?.hasConflict())return false;
+        if(view==='official_travel')return window.eofficeSessionState?.status!=='pending';
+        if(!window.eofficeUser || window.eofficeSessionState?.status!=='authenticated')return false;
+        return ['ai_settings','audit_logs'].includes(view)?window.eofficeUser.status==='Admin':
+            view==='siya_news' ? ['news_submit','news_editor','news_producer'].some(permission=>window.eofficeUser.permissions?.includes(permission)) :
+            view==='siya_news_studio' ? window.eofficeUser.permissions?.includes('news_producer') :
+            !({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]) ||
+            window.eofficeUser.permissions?.includes({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance'}[view]);
+    };
     const approve=()=>window.eofficeApproveDocumentLeaving?.(false,true)!==false;
     const waitForSession=()=>window.eofficeSessionState?.status!=='pending'?Promise.resolve():new Promise(resolve=>{
         const accepted=()=>{if(window.eofficeSessionState?.status==='pending')return;window.removeEventListener('eoffice:session-updated',accepted);resolve();};

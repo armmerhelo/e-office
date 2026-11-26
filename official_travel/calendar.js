@@ -306,14 +306,74 @@
         get('edit').hidden = !snapshot.can_manage || !row.revision;
         detail.showModal();
     }
+    function selectedExecutives() {
+        if (editing) {
+            const id = Number(field('executive_id').value);
+            const person = snapshot?.executives.find(row => Number(row.id) === id);
+            if (person) return [person];
+            if (editing.executive_id === id) {
+                return [{id, name:editing.executive_name, position:editing.department === 'director' ? 'director' : 'deputy_director'}];
+            }
+            return [];
+        }
+        return [...get('executive-checkboxes').querySelectorAll('input[type=checkbox]:checked')].map(input => {
+            const id = Number(input.value);
+            return snapshot?.executives.find(row => Number(row.id) === id) || {id, name:'', position:'deputy_director'};
+        });
+    }
     function updateDepartments(preferred = field('department').value) {
-        const id = Number(field('executive_id').value);
-        const position = editing?.executive_id === id
-            ? (editing.department === 'director' ? 'director' : 'deputy_director')
-            : snapshot?.executives.find(row => Number(row.id) === id)?.position;
-        const list = Object.entries(snapshot?.departments || {}).filter(([key]) =>
-            position && (key === 'director') === (position === 'director'));
-        options(field('department'), position === 'director' ? list : [['','เลือกฝ่าย'], ...list], preferred);
+        const people = selectedExecutives();
+        const hasDirector = people.some(person => person.position === 'director');
+        const hasDeputy = people.some(person => person.position === 'deputy_director');
+        const all = Object.entries(snapshot?.departments || {});
+        let list;
+        if (hasDeputy) list = all.filter(([key]) => key !== 'director');
+        else if (hasDirector) list = all.filter(([key]) => key === 'director');
+        else list = all;
+        const needsChoice = hasDeputy || !people.length;
+        options(field('department'), needsChoice ? [['','เลือกฝ่าย'], ...list] : list, preferred);
+        const hint = get('department-hint');
+        hint.hidden = !hasDeputy;
+        hint.textContent = hasDirector
+            ? 'ผอ. ใช้ฝ่ายผู้อำนวยการอัตโนมัติ · ฝ่ายที่เลือกใช้กับรอง ผอ.'
+            : 'เลือกฝ่ายของรอง ผอ.';
+    }
+    function renderExecutiveChoices(row = null) {
+        const container = get('executive-checkboxes');
+        const select = field('executive_id');
+        const people = [...(snapshot?.executives || [])];
+        if (row && !people.some(person => Number(person.id) === Number(row.executive_id))) {
+            people.unshift({
+                id: row.executive_id,
+                name: row.executive_name,
+                position: row.department === 'director' ? 'director' : 'deputy_director',
+            });
+        }
+        if (row) {
+            container.replaceChildren();
+            container.hidden = true;
+            select.hidden = false;
+            select.disabled = false;
+            options(select, people.map(person => [person.id, person.name]), String(row.executive_id));
+            get('executive-help').textContent = 'แก้ไขกำหนดการได้ครั้งละหนึ่งคน';
+            return;
+        }
+        select.hidden = true;
+        select.disabled = true;
+        select.replaceChildren();
+        container.hidden = false;
+        container.replaceChildren(...people.map(person => {
+            const label = element('label', '', 'travel-executive-option');
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.name = 'executive_ids';
+            input.value = String(person.id);
+            const text = element('span', '', 'travel-executive-option-text');
+            text.append(element('strong', person.name), element('span', person.position === 'director' ? 'ผอ.' : 'รอง ผอ.', 'travel-executive-role'));
+            label.append(input, text);
+            return label;
+        }));
+        get('executive-help').textContent = 'เลือกได้มากกว่าหนึ่งคนเมื่อไปราชการวันเดียวกัน';
     }
     function times() {
         for (const key of ['start','end']) {
@@ -335,9 +395,7 @@
         message(get('form-message'), '');
         get('editor-title').textContent = row ? 'แก้ไขกำหนดการ' : 'เพิ่มกำหนดการ';
         get('status').hidden = !row;
-        const people = snapshot.executives.map(person => [person.id, person.name]);
-        if (row && !people.some(([id]) => Number(id) === row.executive_id)) people.unshift([row.executive_id, row.executive_name]);
-        options(field('executive_id'), [['','เลือกผู้ไปราชการ'], ...people], row ? String(row.executive_id) : '');
+        renderExecutiveChoices(row);
         updateDepartments(row?.department || '');
         const today = snapshot.today.startsWith(month) ? snapshot.today : month + '-01';
         for (const key of ['start_date','end_date']) field(key).value = row?.[key] || today;
@@ -357,6 +415,7 @@
     form.addEventListener('input', () => { dirty = true; });
     form.addEventListener('change', () => { dirty = true; });
     field('executive_id').addEventListener('change', () => updateDepartments(''));
+    get('executive-checkboxes').addEventListener('change', () => updateDepartments(''));
     field('all_day').addEventListener('change', times);
     field('start_date').addEventListener('change', () => {
         if (field('end_date').value < field('start_date').value) field('end_date').value = field('start_date').value;
@@ -364,12 +423,30 @@
     form.addEventListener('submit', async event => {
         event.preventDefault();
         if (saving || !snapshot?.can_manage) return;
-        const input = Object.fromEntries(new FormData(form));
-        input.executive_id = Number(input.executive_id);
+        const data = new FormData(form);
+        const input = Object.fromEntries(data);
         input.all_day = field('all_day').checked;
         input.id = editing?.id || 0;
         input.revision = editing?.revision || 0;
         input._expected_owner = owner;
+        if (editing) {
+            input.executive_id = Number(field('executive_id').value);
+            if (!input.executive_id) {
+                message(get('form-message'), 'กรุณาเลือกผู้ไปราชการ', true);
+                return;
+            }
+        } else {
+            input.executive_ids = data.getAll('executive_ids').map(Number);
+            delete input.executive_id;
+            if (!input.executive_ids.length) {
+                message(get('form-message'), 'กรุณาเลือกผู้ไปราชการอย่างน้อยหนึ่งคน', true);
+                return;
+            }
+        }
+        if (!input.department) {
+            message(get('form-message'), 'กรุณาเลือกฝ่าย', true);
+            return;
+        }
         if (editing?.status !== 'cancelled' && input.status === 'cancelled' && !window.confirm('ยืนยันยกเลิกกำหนดการนี้หรือไม่?')) return;
         saving = true;
         for (const item of form.elements) item.disabled = true;

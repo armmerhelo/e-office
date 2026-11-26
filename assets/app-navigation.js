@@ -29,7 +29,7 @@
         {label:'คำสั่งของฉัน', path:'email_send/my_dashboard.html', login:true, group:'ทะเบียนเอกสาร', icon:'▤'},
         {label:'หนังสือส่งถึง', path:'index.php?view=received', login:true, group:'ทะเบียนเอกสาร', icon:'inbox'},
         {label:'ทะเบียนหนังสือรับ', path:'index.php?view=send_table', login:true, group:'ทะเบียนเอกสาร', icon:'▥'},
-        {label:'ปฏิทินไปราชการ', path:'official_travel/index.html', login:true, travelAccess:true, group:'อื่น ๆ', icon:'calendar'},
+        {label:'ปฏิทินไปราชการ', path:'official_travel/index.html', group:'อื่น ๆ', icon:'calendar'},
         {label:'จองห้องประชุม', path:'room_booking/index.html', login:true, group:'อื่น ๆ', icon:'▦'},
         {label:'ขอใช้สถานที่', path:'room_booking/new_room.html', login:true, group:'อื่น ๆ', icon:'+'},
         {label:'รายการจองห้องของฉัน', path:'room_booking/edit_room_booking.html', login:true, group:'อื่น ๆ', icon:'edit'},
@@ -103,7 +103,6 @@
         if (item.permissionAny) link.dataset.permissionAny = item.permissionAny.join(',');
         if (item.login) link.dataset.requiresLogin = 'true';
         if (item.admin) link.dataset.requiresAdmin = 'true';
-        if (item.travelAccess) link.dataset.travelAccess = 'true';
         if (new URL(link.href).pathname === location.pathname) {link.setAttribute('aria-current','page');link.classList.add('is-current');}
         list.append(link); groups[groups.length - 1].links.push(link);
     }
@@ -180,8 +179,6 @@
             (link.dataset.requiresLogin && !user) ||
             (link.dataset.permission && !user?.permissions?.includes(link.dataset.permission)) ||
             (link.dataset.permissionAny && !link.dataset.permissionAny.split(',').some(permission=>user?.permissions?.includes(permission))) ||
-            (link.dataset.travelAccess && user?.status !== 'Admin' && !user?.permissions?.includes('official_travel') &&
-                !['director','deputy_director'].includes(user?.position)) ||
             (link.dataset.requiresAdmin && user?.status !== 'Admin'));
         for (const group of groups) group.heading.hidden = group.links.every(link=>link.hidden);
         logout.hidden=!user;login.hidden=!!user;userName.textContent=user?.name || '';

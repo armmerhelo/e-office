@@ -67,8 +67,12 @@ module.exports = async ({base,tokens,month,today}) => {
         await send('Runtime.enable');
         await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
         await send('Page.navigate',{url:base+'/index.php?view=official_travel'});
-        await until("window.eofficeSessionState?.status === 'guest' && location.search === '?view=public'");
-        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),true);
+        await until(`window.eofficeSessionState?.status === 'guest' && location.search === '?view=official_travel' && ${el('presence-list')}?.querySelectorAll('.travel-presence-person').length === 3`);
+        await until(`[...${el('presence-list')}.querySelectorAll('img')].every(image => image.complete && image.naturalWidth > 0)`);
+        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'guests see the public calendar link');
+        assert.equal(await evalPage(`document.querySelector('#modalOverlay')?.classList.contains('active')`),false,'the login modal must stay closed on the public calendar');
+        assert.equal(await evalPage(`${el('new')}.hidden`),true,'guests cannot add schedules');
+        assert.equal(await evalPage(`${el('presence-list')}.querySelectorAll('.travel-presence-person').length`),3);
         await session('secretary');
         await send('Page.navigate',{url:base+'/index.php?view=official_travel'});
         await until(`${el('new')}?.checkVisibility() && !${el('new')}.disabled`);
@@ -78,6 +82,7 @@ module.exports = async ({base,tokens,month,today}) => {
         await until(`${el('new')}?.checkVisibility() && !${el('new')}.disabled`);
         assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'travel secretary sees the calendar link');
         assert.equal(await evalPage(`${el('grid')}.checkVisibility()`),true);
+        assert.ok(await evalPage(`${el('presence-list')}.querySelector('.travel-presence-avatar-wrap').getBoundingClientRect().width`) >= 47,'desktop executive avatars are enlarged');
         const todayCell = `${el('grid')}.querySelector('[data-date="${today}"]')`;
         const todayCount = today === `${month}-01` ? 4 : 3;
         assert.equal(await evalPage(`${el('selected-date')}.dateTime`),today);
@@ -267,6 +272,7 @@ module.exports = async ({base,tokens,month,today}) => {
                     selected:${el('selected-items')}.checkVisibility(),
                     presence:${el('presence')}.checkVisibility(),
                     presenceHeight:${el('presence')}.getBoundingClientRect().height,
+                    avatarWidth:${el('presence-list')}.querySelector('.travel-presence-avatar-wrap')?.getBoundingClientRect().width || 0,
                     sideBySide:selected.left>=calendar.right-1 && selected.top<calendar.bottom,
                     stacked:selected.top>=calendar.bottom-1,
                     calendarHeight:calendar.height,
@@ -286,6 +292,7 @@ module.exports = async ({base,tokens,month,today}) => {
             assert.equal(layout.agenda,false,`monthly list remains hidden in calendar view at ${viewport.width}px`);
             assert.equal(layout.selected,true,`selected-day agenda at ${viewport.width}px`);
             assert.equal(layout.presence,true,`selected-day executive photos at ${viewport.width}px`);
+            if (viewport.width <= 390) assert.ok(layout.avatarWidth >= 38,`mobile executive avatars are enlarged at ${viewport.width}px: ${JSON.stringify(layout)}`);
             assert.equal(layout.sideBySide,viewport.sideBySide,`calendar/selected-day placement at ${viewport.width}px`);
             if (!viewport.sideBySide) assert.equal(layout.stacked,true,`selected date panel below calendar at ${viewport.width}px`);
             assert.ok(layout.headerHeight <= 46,`page header stays compact at ${viewport.width}px`);
@@ -329,15 +336,27 @@ module.exports = async ({base,tokens,month,today}) => {
         await until(`${el('editor')}?.open === true`);
         await evalPage(`(() => {
             const f=${el('form')};
-            const person=f.elements.namedItem('executive_id');
-            person.value='1'; person.dispatchEvent(new Event('change',{bubbles:true}));
-            if (f.elements.namedItem('department').value !== 'director') throw Error('Director department not selected');
+            const boxes=[...${el('executive-checkboxes')}.querySelectorAll('input[type=checkbox]')];
+            for (const value of ['1','3']) {
+                const box=boxes.find(input=>input.value===value);
+                box.checked=true;box.dispatchEvent(new Event('change',{bubbles:true}));
+            }
+            const department=f.elements.namedItem('department');
+            if (![...department.options].some(option=>option.value==='academic')) throw Error('Deputy departments are unavailable');
+            department.value='academic';department.dispatchEvent(new Event('change',{bubbles:true}));
             f.elements.namedItem('subject').value='ทดสอบบันทึกจากหน้าเว็บ';
             f.elements.namedItem('place').value='ห้องทดสอบ';
             f.requestSubmit();
         })()`);
         await until(`${el('feedback')}?.textContent === 'บันทึกกำหนดการแล้ว'`);
-        assert.match(await evalPage(`${el('selected-items')}.textContent`),/ทดสอบบันทึกจากหน้าเว็บ/);
+        assert.equal(await evalPage(`[...${el('selected-items')}.querySelectorAll('.travel-entry')].filter(entry=>entry.textContent.includes('ทดสอบบันทึกจากหน้าเว็บ')).length`),2,'one add form creates both selected executives');
+        await evalPage(`[...${el('selected-items')}.querySelectorAll('.travel-entry')].find(entry=>entry.textContent.includes('ทดสอบบันทึกจากหน้าเว็บ')).click()`);
+        await until(`${el('detail')}?.open === true`);
+        await evalPage(`${el('edit')}.click()`);
+        await until(`${el('editor')}?.open === true`);
+        assert.equal(await evalPage(`${el('executive-checkboxes')}.hidden && !${el('executive-select')}.hidden && ${el('executive-select')}.value !== ''`),true,'edit mode uses one selected executive');
+        await press('Escape',27);
+        await until(`${el('editor')}?.open === false`);
         await evalPage(`(() => {const filter=${el('department')}; filter.value='academic'; filter.dispatchEvent(new Event('change',{bubbles:true}));})()`);
         assert.equal(await evalPage(`${el('selected-items')}.querySelectorAll('button[data-department=director]').length`),0);
         assert.ok(await evalPage(`${el('selected-items')}.querySelectorAll('button[data-department=academic]').length`));
@@ -347,9 +366,11 @@ module.exports = async ({base,tokens,month,today}) => {
         assert.equal(await evalPage(`${el('selected-items')}.checkVisibility() && document.documentElement.scrollWidth<=innerWidth`),true);
         await session('reader');
         await send('Page.navigate',{url:base+'/official_travel/index.html'});
-        await until(`window.eofficeUser?.id === 4 && location.search === '?view=received'`);
-        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),true,'staff without calendar access cannot see the navigation link');
-        assert.equal(await evalPage(`fetch('/api/official-travel.php?month=${month}').then(r=>r.status===403)`),true,'staff without calendar access cannot read the API');
+        await until(`window.eofficeUser?.id === 4 && location.search === '?view=official_travel' && ${el('presence-list')}?.querySelectorAll('.travel-presence-person').length === 3`);
+        assert.equal(await evalPage("document.querySelector('#group_menu_official_travel').hidden"),false,'staff without manage permission can see the public calendar link');
+        assert.equal(await evalPage("document.querySelector('#modalOverlay')?.classList.contains('active')"),false,'signed-in staff still see the calendar without the login modal');
+        assert.equal(await evalPage(`${el('new')}.hidden`),true,'staff without manage permission cannot add schedules');
+        assert.equal(await evalPage(`fetch('/api/official-travel.php?month=${month}').then(r=>r.ok)`),true,'staff can read the public calendar API');
         await session('deputy');
         await send('Page.navigate',{url:base+'/official_travel/index.html'});
         await until(`window.eofficeUser?.id === 3 && location.search === '?view=official_travel' && !!${el('selected-items')}?.querySelector('button[data-department=academic]')`);
