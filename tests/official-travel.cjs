@@ -85,8 +85,10 @@ async function run() {
     await check('one create request can add several executives to the same schedule', async () => {
         const month = `${nextYear}-08`;
         const date = `${month}-12`;
-        const multi = await request('secretary',201,{data:{...data, _expected_owner:2, executive_ids:[1,3,5],
-            department:'academic', subject:'QA multi executive', place:'QA multi venue',
+        const noDepartment = {...data};
+        delete noDepartment.department;
+        const multi = await request('secretary',201,{data:{...noDepartment, _expected_owner:2, executive_ids:[1,3,5],
+            subject:'QA multi executive', place:'QA multi venue',
             start_date:date, end_date:date, status:'scheduled'}});
         assert.equal(multi.ids.length,3);
         assert.equal(multi.id,multi.ids[0]);
@@ -101,13 +103,11 @@ async function run() {
             assert.equal(Object.hasOwn(row,'reference_no'),false);
             assert.equal(Object.hasOwn(row,'revision'),false);
         }
-        const deduped = await request('secretary',201,{data:{...data, _expected_owner:2, executive_ids:[3,3],
-            department:'academic', subject:'QA duplicate executive id', start_date:date, end_date:date}});
+        const deduped = await request('secretary',201,{data:{...noDepartment, _expected_owner:2, executive_ids:[3,3],
+            subject:'QA duplicate executive id', start_date:date, end_date:date}});
         assert.equal(deduped.ids.length,1);
-        await request('secretary',400,{data:{...data, _expected_owner:2, executive_ids:[]}});
-        await request('secretary',400,{data:{...data, _expected_owner:2, executive_ids:'1,3'}});
-        await request('secretary',422,{data:{...data, _expected_owner:2, executive_ids:[1,3],
-            department:'director', subject:'QA invalid mixed department', start_date:date, end_date:date}});
+        await request('secretary',400,{data:{...noDepartment, _expected_owner:2, executive_ids:[]}});
+        await request('secretary',400,{data:{...noDepartment, _expected_owner:2, executive_ids:'1,3'}});
     });
     await check('validates month, dates, clock, executive and role at the API', async () => {
         for (const query of ['?month=2026-13','?month[]=2026-11']) await request('secretary',400,{query});
@@ -116,7 +116,6 @@ async function run() {
             await request('secretary',400,{data:{...data,...change}});
         }
         await request('secretary',422,{data:{...data,executive_id:4}});
-        await request('secretary',422,{data:{...data,department:'director'}});
     });
     await check('today summary, multi-month overlap, restricted fields and idempotent migration', async () => {
         ({id:travelId} = await request('secretary',201,{data}));

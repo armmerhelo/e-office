@@ -341,15 +341,14 @@ module.exports = async ({base,tokens,month,today}) => {
                 const box=boxes.find(input=>input.value===value);
                 box.checked=true;box.dispatchEvent(new Event('change',{bubbles:true}));
             }
-            const department=f.elements.namedItem('department');
-            if (![...department.options].some(option=>option.value==='academic')) throw Error('Deputy departments are unavailable');
-            department.value='academic';department.dispatchEvent(new Event('change',{bubbles:true}));
+            if (f.elements.namedItem('department')) throw Error('Department selection must not remain in the editor');
             f.elements.namedItem('subject').value='ทดสอบบันทึกจากหน้าเว็บ';
             f.elements.namedItem('place').value='ห้องทดสอบ';
             f.requestSubmit();
         })()`);
         await until(`${el('feedback')}?.textContent === 'บันทึกกำหนดการแล้ว'`);
         assert.equal(await evalPage(`[...${el('selected-items')}.querySelectorAll('.travel-entry')].filter(entry=>entry.textContent.includes('ทดสอบบันทึกจากหน้าเว็บ')).length`),2,'one add form creates both selected executives');
+        assert.match(await evalPage(`${el('selected-items')}.textContent`),/รอง ผอ\. · กลุ่มบริหารวิชาการ/,'deputy department is derived from member groups');
         await evalPage(`[...${el('selected-items')}.querySelectorAll('.travel-entry')].find(entry=>entry.textContent.includes('ทดสอบบันทึกจากหน้าเว็บ')).click()`);
         await until(`${el('detail')}?.open === true`);
         await evalPage(`${el('edit')}.click()`);

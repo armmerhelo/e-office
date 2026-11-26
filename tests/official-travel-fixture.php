@@ -24,9 +24,13 @@ switch ($action) {
         $pdo->exec("CREATE TABLE t_user (User_Id INT PRIMARY KEY, User_Name VARCHAR(255), User_Status VARCHAR(20), User_Position VARCHAR(30)) ENGINE=InnoDB");
         $pdo->exec("CREATE TABLE eoffice_sessions (token_hash CHAR(64) PRIMARY KEY, User_Id INT, expires_at DATETIME) ENGINE=InnoDB");
         $pdo->exec("CREATE TABLE eoffice_permissions (User_Id INT, permission VARCHAR(50), PRIMARY KEY(User_Id,permission)) ENGINE=InnoDB");
+        $pdo->exec("CREATE TABLE t_department (Department_Id INT PRIMARY KEY, Department_Name VARCHAR(255)) ENGINE=InnoDB");
+        $pdo->exec("CREATE TABLE t_user_department (User_Id INT, Department_Id INT, PRIMARY KEY(User_Id,Department_Id)) ENGINE=InnoDB");
         $pdo->exec("INSERT INTO t_user VALUES (1,'ผู้บริหารทดสอบ','Admin','director'), (2,'เลขานุการทดสอบ','User','staff'),
             (3,'รองทดสอบ','User','deputy_director'), (4,'บุคลากรทดสอบ','User','staff'),
             (5,'ผู้อำนวยการทดสอบ','User','director'), (6,'Admin ทดสอบ','Admin','staff')");
+        $pdo->exec("INSERT INTO t_department VALUES (1,'บริหารทั่วไป'),(2,'บริหารงานบุคคล'),(3,'บริหารวิชาการ'),(4,'บริหารงานงบประมาณ')");
+        $pdo->exec("INSERT INTO t_user_department VALUES (3,3)");
         $pdo->exec("INSERT INTO eoffice_permissions VALUES (2, 'official_travel')");
         app_official_travel_migrate($pdo);
         app_profile_photo_migrate($pdo);

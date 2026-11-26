@@ -12,6 +12,20 @@ function app_official_travel_departments(): array {
     ];
 }
 
+function app_official_travel_department_for(PDO $pdo, int $userId, string $position): string {
+    if ($position === 'director') return 'director';
+    $q = $pdo->prepare('SELECT d.Department_Name FROM t_user_department ud
+        JOIN t_department d ON d.Department_Id=ud.Department_Id
+        WHERE ud.User_Id=? ORDER BY d.Department_Id');
+    $q->execute([$userId]);
+    foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $name) {
+        foreach (['วิชาการ'=>'academic','บุคคล'=>'personnel','งบประมาณ'=>'budget','ทั่วไป'=>'general'] as $needle => $department) {
+            if (mb_strpos((string)$name, $needle) !== false) return $department;
+        }
+    }
+    return 'general';
+}
+
 function app_official_travel_read(PDO $pdo, ?array $user): never {
     $today = date('Y-m-d');
     $month = $_GET['month'] ?? substr($today, 0, 7);
@@ -73,11 +87,9 @@ function app_official_travel_write(PDO $pdo, array $user, array $input): never {
     $id = $input['id'] ?? 0;
     $revision = $input['revision'] ?? 0;
     $executiveIdsInput = $input['executive_ids'] ?? (array_key_exists('executive_id', $input) ? [$input['executive_id']] : null);
-    $department = $input['department'] ?? null;
     $status = $input['status'] ?? null;
     if (!is_int($id) || $id < 0 || !is_int($revision) || ($id ? $revision < 1 : $revision !== 0)
         || !is_array($executiveIdsInput) || !$executiveIdsInput || count($executiveIdsInput) > 20
-        || !is_string($department) || !isset(app_official_travel_departments()[$department])
         || !in_array($status, $id ? ['scheduled','postponed','cancelled'] : ['scheduled'], true)) {
         app_fail('ข้อมูลกำหนดการไม่ถูกต้อง');
     }
@@ -141,6 +153,7 @@ function app_official_travel_write(PDO $pdo, array $user, array $input): never {
                     'id' => $executiveId,
                     'name' => $old['executive_name'],
                     'position' => $old['department'] === 'director' ? 'director' : 'deputy_director',
+                    'department' => $old['department'],
                 ];
                 continue;
             }
@@ -150,18 +163,18 @@ function app_official_travel_write(PDO $pdo, array $user, array $input): never {
                 $pdo->rollBack();
                 app_fail('กรุณาเลือก ผอ. หรือรอง ผอ. จากรายชื่อผู้บริหาร', 422);
             }
-            $people[] = ['id'=>$executiveId, 'name'=>$person['User_Name'], 'position'=>$person['User_Position']];
-        }
-        $hasDeputy = (bool)array_filter($people, fn($person) => $person['position'] === 'deputy_director');
-        if (($hasDeputy && $department === 'director') || (!$hasDeputy && $department !== 'director')) {
-            $pdo->rollBack();
-            app_fail('ฝ่ายที่เลือกไม่ตรงกับตำแหน่งผู้ไปราชการ', 422);
+            $people[] = [
+                'id'=>$executiveId,
+                'name'=>$person['User_Name'],
+                'position'=>$person['User_Position'],
+                'department'=>app_official_travel_department_for($pdo,$executiveId,$person['User_Position']),
+            ];
         }
         $createdIds = [];
         if ($id) {
             $person = $people[0];
             $q = $pdo->prepare('UPDATE eoffice_official_travel SET executive_id=?,executive_name=?,department=?,subject=?,place=?,start_date=?,end_date=?,start_time=?,end_time=?,status=?,reference_no=?,private_note=?,revision=revision+1 WHERE id=?');
-            $q->execute([$person['id'],$person['name'],$person['position'] === 'director' ? 'director' : $department,
+            $q->execute([$person['id'],$person['name'],$person['department'],
                 $subject,$place,$start,$end,$startTime,$endTime,$status,$reference,$note,$id]);
             $target = $id;
             $createdIds[] = $id;
@@ -170,8 +183,7 @@ function app_official_travel_write(PDO $pdo, array $user, array $input): never {
         } else {
             $q = $pdo->prepare('INSERT INTO eoffice_official_travel (executive_id,executive_name,department,subject,place,start_date,end_date,start_time,end_time,status,reference_no,private_note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
             foreach ($people as $person) {
-                $rowDepartment = $person['position'] === 'director' ? 'director' : $department;
-                $q->execute([$person['id'],$person['name'],$rowDepartment,$subject,$place,$start,$end,$startTime,$endTime,$status,$reference,$note]);
+                $q->execute([$person['id'],$person['name'],$person['department'],$subject,$place,$start,$end,$startTime,$endTime,$status,$reference,$note]);
                 $target = (int)$pdo->lastInsertId();
                 $createdIds[] = $target;
                 app_audit('official_travel.create', $lockedUser, $target);
