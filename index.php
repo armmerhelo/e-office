@@ -375,20 +375,20 @@ window.addEventListener('load', function() {
 
           <p id="home-feedback" class="home-feedback" role="status" aria-live="polite"></p>
 
-          <section id="home-guest" class="home-guest" aria-label="ข้อมูลสาธารณะ">
-            <aside class="home-panel home-presence-panel home-presence-panel--strip" aria-labelledby="home-presence-title">
-              <div class="home-panel__head home-presence-head">
-                <div>
-                  <p class="home-kicker">จากปฏิทินไปราชการ</p>
-                  <h2 id="home-presence-title">ผู้บริหารในวันนี้</h2>
-                </div>
-                <span id="home-presence-summary" class="home-presence-summary" aria-live="polite"></span>
+          <aside class="home-panel home-presence-panel home-presence-panel--strip" aria-labelledby="home-presence-title">
+            <div class="home-panel__head home-presence-head">
+              <div>
+                <p class="home-kicker">จากปฏิทินไปราชการ</p>
+                <h2 id="home-presence-title">ผู้บริหารในวันนี้</h2>
               </div>
-              <div id="home-presence-feedback" class="home-panel__feedback" role="status" aria-live="polite">กำลังตรวจสอบกำหนดการ…</div>
-              <ul id="home-presence-list" class="home-presence-list"></ul>
-              <p class="home-presence-note">สถานะ “อยู่” หมายถึงไม่มีกำหนดการไปราชการในวันนี้ · <a href="official_travel/index.html" onclick="return navigateView(event, 'official_travel');">ดูปฏิทิน</a></p>
-            </aside>
+              <span id="home-presence-summary" class="home-presence-summary" aria-live="polite"></span>
+            </div>
+            <div id="home-presence-feedback" class="home-panel__feedback" role="status" aria-live="polite">กำลังตรวจสอบกำหนดการ…</div>
+            <ul id="home-presence-list" class="home-presence-list"></ul>
+            <p class="home-presence-note">สถานะ “อยู่” หมายถึงไม่มีกำหนดการไปราชการในวันนี้ · <a href="official_travel/index.html" onclick="return navigateView(event, 'official_travel');">ดูปฏิทิน</a></p>
+          </aside>
 
+          <section id="home-guest" class="home-guest" aria-label="ข้อมูลสาธารณะ">
             <div class="home-guest__grid">
               <section class="home-panel home-public-panel" aria-labelledby="home-public-title">
                 <div class="home-panel__head">

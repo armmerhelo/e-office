@@ -223,12 +223,26 @@
         setFeedback(presenceFeedback, '');
     }
 
-    async function loadGuest(ticket, signal, year) {
-        renderLoading(publicList, 'กำลังโหลดคำสั่ง…');
-        setFeedback(publicFeedback, 'กำลังโหลดคำสั่ง…');
+    async function loadPresence(ticket, signal) {
         setFeedback(presenceFeedback, 'กำลังตรวจสอบกำหนดการ…');
         presenceList.replaceChildren();
         presenceSummary.textContent = '';
+        try {
+            const data = await request(`api/official-travel.php?month=${encodeURIComponent(currentMonth())}`, {method: 'GET'}, signal);
+            if (ticket !== sequence) return;
+            if (data?.status !== 'success') throw new Error(data?.message || 'รูปแบบข้อมูลกำหนดการไม่ถูกต้อง');
+            renderPresence(data);
+        } catch (error) {
+            if (ticket !== sequence || error?.name === 'AbortError') return;
+            presenceSummary.textContent = '';
+            presenceList.replaceChildren();
+            panelError(presenceFeedback, 'โหลดสถานะผู้บริหารไม่สำเร็จ', () => refresh());
+        }
+    }
+
+    async function loadGuest(ticket, signal, year) {
+        renderLoading(publicList, 'กำลังโหลดคำสั่ง…');
+        setFeedback(publicFeedback, 'กำลังโหลดคำสั่ง…');
         const publicTask = (async () => {
             const rows = await request('api/get_data_public.php', {
                 method: 'POST',
@@ -245,18 +259,7 @@
             publicList.replaceChildren();
             panelError(publicFeedback, 'โหลดคำสั่งไม่สำเร็จ', () => refresh());
         });
-        const presenceTask = (async () => {
-            const data = await request(`api/official-travel.php?month=${encodeURIComponent(currentMonth())}`, {method: 'GET'}, signal);
-            if (ticket !== sequence) return;
-            if (data?.status !== 'success') throw new Error(data?.message || 'รูปแบบข้อมูลกำหนดการไม่ถูกต้อง');
-            renderPresence(data);
-        })().catch(error => {
-            if (ticket !== sequence || error?.name === 'AbortError') return;
-            presenceSummary.textContent = '';
-            presenceList.replaceChildren();
-            panelError(presenceFeedback, 'โหลดสถานะผู้บริหารไม่สำเร็จ', () => refresh());
-        });
-        await Promise.allSettled([publicTask, presenceTask]);
+        await Promise.allSettled([publicTask]);
     }
 
     function renderStats(counts) {
@@ -354,9 +357,11 @@
         loading = true;
         refreshButton.disabled = true;
         setFeedback(feedback, 'กำลังอัปเดตข้อมูล…');
+        const signal = controller.signal;
+        const presenceTask = loadPresence(ticket, signal);
         try {
-            if (isAuthenticated()) await loadMember(ticket, controller.signal, year);
-            else await loadGuest(ticket, controller.signal, year);
+            if (isAuthenticated()) await Promise.all([loadMember(ticket, signal, year), presenceTask]);
+            else await Promise.all([loadGuest(ticket, signal, year), presenceTask]);
             if (ticket === sequence) {
                 setFeedback(feedback, '');
                 refreshButton.title = `อัปเดตล่าสุด ${new Date().toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit'})} น.`;

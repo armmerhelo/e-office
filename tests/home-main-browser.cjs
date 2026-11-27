@@ -200,10 +200,13 @@ async function run(){
         await until("document.getElementById('document-modal').classList.contains('hidden')");
     });
     await until("document.getElementById('home-pending-list').children.length===2");
+    await until("document.getElementById('home-presence-list').children.length===5");
     await until("document.getElementById('home-stat-total').textContent==='8'");
 
     await check('authenticated main switches to personal summary and pending documents',async()=>{
         assert.equal(await evaluate("document.getElementById('home-guest').checkVisibility()"),false);
+        assert.equal(await evaluate("document.getElementById('home-presence-summary').textContent"),'อยู่ 2 · ไม่อยู่ 3');
+        assert.equal(await evaluate("document.querySelectorAll('#home-presence-list .home-presence-person').length"),5);
         assert.equal(await evaluate("document.getElementById('home-stat-pending').textContent"),'5');
         assert.equal(await evaluate("document.getElementById('home-stat-urgent').textContent"),'2');
         assert.equal(await evaluate("document.getElementById('home-stat-completed').textContent"),'3');
