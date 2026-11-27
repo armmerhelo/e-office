@@ -233,6 +233,7 @@ const context = {
 for (const name of ['components_pagination','search_menu','send_email','menu_maintenance','menu_maintenance_admin','my_public','menu_members','menu_groups','menu_send','menu_send_table','menu_received','menu_bookdocnumber','menu_public','menu_bookingroom','menu_edit_room_booking','current_view_title','sub_head','content_received','add_doc_btn','load_data']) context[name] = el(name);
 vm.createContext(context);
 vm.runInContext(main.slice(main.indexOf('const DOCUMENT_VIEWS'),main.indexOf("window.addEventListener('eoffice:permissions-changed'")),context);
+context.window.eofficeOpenLoginModal=()=>{context.loginModalOpened=true;};
 vm.runInContext(router, context);
 vm.runInContext(main.slice(main.indexOf('function restoreReceivedFilter('),main.indexOf('function read_show(')),context);
 for (const [view,path] of Object.entries(context.MODULE_ROUTES)) {
@@ -247,6 +248,12 @@ for (const view of ['constructor','toString','__proto__','missing','received','s
     assert.equal(context.loaded,['received','send','public','send_table','main'].includes(view)?view:'main');
     assert.equal(new URL(context.window.location.href).searchParams.get('view'),context.loaded);
 }
+context.window.eofficeUser=null;
+sessionValues.clear();
+context.showView('received','load');
+assert.equal(context.loaded,'main','guests opening a private inbox route must land on the public main');
+assert.equal(sessionValues.get('eoffice-login-view'),'received','the private route must be resumed after sign-in');
+assert.equal(context.loginModalOpened,true,'the login prompt must open for a private inbox route');
 context.window.eofficeUser={permissions:[]};
 context.showView('members','load');
 assert.equal(context.loaded,'received');

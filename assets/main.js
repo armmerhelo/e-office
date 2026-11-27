@@ -120,6 +120,7 @@ const MODULE_ROUTES = Object.freeze({
 });
 
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
+const PRIVATE_DOCUMENT_VIEWS = new Set(['received', 'send', 'send_table']);
 const PUBLIC_MODULE_VIEWS = new Set(['official_travel']);
 const LOGIN_VIEW_KEY = 'eoffice-login-view';
 const HOME_VIEW = 'main';
@@ -134,7 +135,7 @@ function takeLoginView() {
     if (!window.eofficeUser) return null;
     const pending = sessionStorage.getItem(LOGIN_VIEW_KEY);
     sessionStorage.removeItem(LOGIN_VIEW_KEY);
-    return Object.hasOwn(MODULE_ROUTES, pending) ? pending : null;
+    return Object.hasOwn(MODULE_ROUTES, pending) || PRIVATE_DOCUMENT_VIEWS.has(pending) ? pending : null;
 }
 
 function takePostLoginAction() {
@@ -633,6 +634,12 @@ function showView(showViews, page , page_number) {
     const permission = restrictedViewPermission(showViews);
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
     if (['ai_settings','audit_logs'].includes(showViews) && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
+
+    if (!window.eofficeUser && PRIVATE_DOCUMENT_VIEWS.has(showViews)) {
+        sessionStorage.setItem(LOGIN_VIEW_KEY, showViews);
+        showViews = HOME_VIEW;
+        window.eofficeOpenLoginModal?.();
+    }
 
     if (showViews !== HOME_VIEW) window.eofficeHome?.leave();
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;

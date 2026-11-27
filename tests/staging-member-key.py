@@ -35,7 +35,7 @@ class StagingKeys(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(dir=Path(tempfile.gettempdir())/'opencode',prefix='staging-key-')
         self.root=Path(self.temp.name);(self.root/'config').mkdir()
-        for name in ['bootstrap.php','audit.php','permissions.php','settings.php','member-management.php','member-position.php','sign-routing.php']:
+        for name in ['bootstrap.php','audit.php','permissions.php','settings.php','member-management.php','member-position.php','sign-routing.php','profile-photo.php']:
             shutil.copyfile(ROOT/'config'/name,self.root/'config'/name)
         self.ftp=FTP(self.root)
         self.database={'database':'siyaacth_eoffice_test','user':'synthetic-user','password':'synthetic-password'}
@@ -177,7 +177,7 @@ class StagingKeys(unittest.TestCase):
         missing=self.root/'config/sign-routing.php';missing.unlink()
         manifest=self.root/'config/staging-manifest.json';before_manifest={'files':{'config/member-management.php':'old-helper'}}
         manifest.write_text(json.dumps(before_manifest))
-        names=['config/permissions.php','config/audit.php','config/bootstrap.php','config/member-position.php','config/sign-routing.php','config/member-management.php']
+        names=['config/permissions.php','config/audit.php','config/bootstrap.php','config/member-position.php','config/sign-routing.php','config/profile-photo.php','config/member-management.php']
         files=[(name,(ROOT/name).read_bytes()) for name in names]
         result=self.sync(files,selected=['config/member-management.php'])
         self.assertTrue(missing.is_file())

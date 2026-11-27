@@ -144,6 +144,18 @@ async function run(){
         assert.ok((await evaluate("document.querySelector('#home-presence-list .home-presence-person:last-child .home-presence-role').textContent")).includes('รอง'));
     });
 
+    await check('guest private inbox links fall back to main and resume after sign-in',async()=>{
+        await send('Page.navigate',{url:base+'/index.php?view=received'});
+        await until("location.search==='?view=main' && document.getElementById('home-view').checkVisibility()");
+        await until("document.getElementById('modalOverlay').classList.contains('active')");
+        assert.equal(await evaluate("sessionStorage.getItem('eoffice-login-view')"),'received');
+        await click('#closeIcon');
+        await evaluate("sessionStorage.removeItem('eoffice-login-view')");
+        await send('Page.navigate',{url:base+'/index.php?view=main'});
+        await until("document.getElementById('home-public-list').children.length===2");
+        await until("document.getElementById('home-presence-list').children.length===5");
+    });
+
     await check('guest receive action asks for login and remembers the pending action',async()=>{
         await click('#home-receive');
         await until("document.getElementById('modalOverlay').classList.contains('active')");
