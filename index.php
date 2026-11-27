@@ -68,6 +68,7 @@ window.addEventListener('load', function() {
   <link rel="stylesheet" href="assets/style_main.css?v=<?php echo filemtime(__DIR__.'/assets/style_main.css'); ?>">
   <link rel="stylesheet" href="assets/sidebar.css?v=<?php echo filemtime(__DIR__.'/assets/sidebar.css'); ?>">
   <link rel="stylesheet" href="assets/ui-buttons.css?v=<?php echo filemtime(__DIR__.'/assets/ui-buttons.css'); ?>">
+  <link rel="stylesheet" href="assets/home.css?v=<?php echo filemtime(__DIR__.'/assets/home.css'); ?>">
 
 
   <style>
@@ -127,16 +128,22 @@ window.addEventListener('load', function() {
 
     <nav id="sidebar" data-sidebar-open="false" aria-label="เมนูหลัก" class="bg-indigo-800 text-white shadow-2xl overflow-y-auto">
       <div class="eoffice-app-navigation__identity">
-        <a href="index.php?view=received" class="eoffice-app-navigation__brand"><img src="img/icon_app_xl.png" width="60" height="60" alt="E-Office">
+        <a href="index.php?view=main" class="eoffice-app-navigation__brand"><img src="img/icon_app_xl.png" width="60" height="60" alt="E-Office">
           <strong>ระบบหนังสือราชการ E-Office</strong>
           <span>โรงเรียนศรียานุสรณ์</span>
         </a>
         <p id="user_nameDisplay" class="eoffice-app-navigation__user"></p>
       </div>
 
-
-
-
+        <li class="eoffice-app-navigation__group">เมนูหลัก</li>
+        <li id="group_menu_home">
+          <a href="index.php?view=main" id="menu-home" onclick="return navigateView(event, 'main');" class="menu-item flex items-center p-3 rounded-lg text-indigo-200 hover:bg-indigo-600 transition duration-150">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5M9 21v-6h6v6"></path>
+            </svg>
+            หน้าหลัก
+          </a>
+        </li>
 
         <li id="system_management" class="eoffice-app-navigation__group">จัดการระบบ</li>
         <li id="group_menu_members">
@@ -339,6 +346,135 @@ window.addEventListener('load', function() {
     <div id="main_div" class="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
 
       <main id="main-content-area" class="min-w-0">
+        <div id="home-view">
+          <section class="home-hero" aria-labelledby="home-title">
+            <div class="home-hero__copy">
+              <p class="home-eyebrow">E-Office · โรงเรียนศรียานุสรณ์</p>
+              <h1 id="home-title">ยินดีต้อนรับสู่ E-Office</h1>
+              <p id="home-subtitle">ระบบหนังสือราชการและงานสารบรรณของโรงเรียน</p>
+            </div>
+            <div class="home-hero__actions">
+              <label class="home-year" for="home-year-select">ปี พ.ศ.
+                <select id="home-year-select">
+                  <?php for ($i = (date("Y") + 543); $i >= 2566; $i--): ?>
+                  <option value="<?= $i ?>"><?= $i ?></option>
+                  <?php endfor; ?>
+                </select>
+              </label>
+              <button id="home-refresh" type="button" class="eo-btn eo-btn--secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/></svg>
+                <span>อัปเดต</span>
+              </button>
+              <button id="home-login" type="button" class="eo-btn eo-btn--primary">เข้าสู่ระบบ</button>
+              <button id="home-receive" type="button" class="eo-btn eo-btn--primary" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                <span>รับเอกสารใหม่</span>
+              </button>
+            </div>
+          </section>
+
+          <p id="home-feedback" class="home-feedback" role="status" aria-live="polite"></p>
+
+          <section id="home-guest" class="home-guest" aria-label="ข้อมูลสาธารณะ">
+            <div class="home-guest__grid">
+              <section class="home-panel home-public-panel" aria-labelledby="home-public-title">
+                <div class="home-panel__head">
+                  <div>
+                    <p class="home-kicker">ประกาศและคำสั่ง</p>
+                    <h2 id="home-public-title">คำสั่งล่าสุด</h2>
+                  </div>
+                  <a href="index.php?view=public" class="home-text-link" onclick="return navigateView(event, 'public');">ดูทั้งหมด</a>
+                </div>
+                <div id="home-public-feedback" class="home-panel__feedback" role="status" aria-live="polite">กำลังโหลดคำสั่ง…</div>
+                <div id="home-public-list" class="home-doc-list" aria-busy="true"></div>
+              </section>
+
+              <aside class="home-panel home-presence-panel" aria-labelledby="home-presence-title">
+                <div class="home-panel__head">
+                  <div>
+                    <p class="home-kicker">จากปฏิทินไปราชการ</p>
+                    <h2 id="home-presence-title">ผู้บริหารวันนี้</h2>
+                  </div>
+                  <span id="home-presence-summary" class="home-presence-summary" aria-live="polite"></span>
+                </div>
+                <div id="home-presence-feedback" class="home-panel__feedback" role="status" aria-live="polite">กำลังตรวจสอบกำหนดการ…</div>
+                <ul id="home-presence-list" class="home-presence-list"></ul>
+                <p class="home-presence-note">สถานะ “อยู่” หมายถึงไม่มีกำหนดการไปราชการในวันนี้ · <a href="official_travel/index.html" onclick="return navigateView(event, 'official_travel');">ดูปฏิทิน</a></p>
+              </aside>
+            </div>
+
+            <nav class="home-shortcuts" aria-label="ทางลัด">
+              <a href="index.php?view=public" onclick="return navigateView(event, 'public');" class="home-shortcut">
+                <span class="home-shortcut__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v14H4zM8 9h8M8 13h8M8 17h5"/></svg></span>
+                <span><strong>คำสั่งทั้งหมด</strong><small>เปิดอ่านเอกสารสาธารณะ</small></span>
+              </a>
+              <a href="official_travel/index.html" onclick="return navigateView(event, 'official_travel');" class="home-shortcut">
+                <span class="home-shortcut__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v4m8-4v4M4 10h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg></span>
+                <span><strong>ปฏิทินไปราชการ</strong><small>กำหนดการของผู้บริหาร</small></span>
+              </a>
+              <button id="home-shortcut-login" type="button" class="home-shortcut">
+                <span class="home-shortcut__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z"/></svg></span>
+                <span><strong>สำหรับบุคลากร</strong><small>เข้าสู่ระบบเพื่อดูหนังสือรับ</small></span>
+              </button>
+            </nav>
+          </section>
+
+          <section id="home-member" class="home-member" aria-label="ภาพรวมงานเอกสารของฉัน" hidden>
+            <div class="home-stats" aria-label="สรุปหนังสือรับ">
+              <button class="home-stat" type="button" data-home-received="">
+                <span class="home-stat__label">หนังสือทั้งหมด</span>
+                <strong id="home-stat-total" class="home-stat__value">—</strong>
+                <span class="home-stat__meta">ในปีที่เลือก</span>
+              </button>
+              <button class="home-stat home-stat--pending" type="button" data-home-received="NotRead">
+                <span class="home-stat__label">รอดำเนินการ</span>
+                <strong id="home-stat-pending" class="home-stat__value">—</strong>
+                <span class="home-stat__meta">รออ่านหรือลงนาม</span>
+              </button>
+              <div class="home-stat home-stat--urgent">
+                <span class="home-stat__label">ด่วนรอดำเนินการ</span>
+                <strong id="home-stat-urgent" class="home-stat__value">—</strong>
+                <span class="home-stat__meta">นับเฉพาะที่ยังไม่เสร็จ</span>
+              </div>
+              <button class="home-stat home-stat--done" type="button" data-home-received="Readed">
+                <span class="home-stat__label">ดำเนินการแล้ว</span>
+                <strong id="home-stat-completed" class="home-stat__value">—</strong>
+                <span class="home-stat__meta">อ่านหรือลงนามครบ</span>
+              </button>
+            </div>
+            <p id="home-summary-feedback" class="home-summary-feedback" role="status" aria-live="polite"></p>
+
+            <div class="home-member__grid">
+              <section class="home-panel home-inbox-panel" aria-labelledby="home-pending-title">
+                <div class="home-panel__head">
+                  <div>
+                    <p class="home-kicker">งานที่รอคุณ</p>
+                    <h2 id="home-pending-title">หนังสือรอดำเนินการล่าสุด</h2>
+                  </div>
+                  <button id="home-pending-all" type="button" class="home-text-link">ดูทั้งหมด</button>
+                </div>
+                <div id="home-pending-feedback" class="home-panel__feedback" role="status" aria-live="polite">กำลังโหลดรายการ…</div>
+                <div id="home-pending-list" class="home-doc-list" aria-busy="true"></div>
+              </section>
+
+              <aside class="home-receive-panel" aria-labelledby="home-receive-title">
+                <p class="home-kicker">งานสารบรรณ</p>
+                <h2 id="home-receive-title">รับเอกสารใหม่</h2>
+                <p>ลงทะเบียนหนังสือรับและส่งต่อให้ผู้เกี่ยวข้องในขั้นตอนเดียว</p>
+                <ol class="home-receive-steps">
+                  <li><span>1</span>กรอกเลขรับ วันที่ และผู้ส่ง</li>
+                  <li><span>2</span>แนบไฟล์หรือลิงก์เอกสาร</li>
+                  <li><span>3</span>เลือกผู้รับหรือฝ่ายงาน</li>
+                  <li><span>4</span>บันทึกและแจ้งเตือน</li>
+                </ol>
+                <button id="home-receive-card" type="button" class="eo-btn eo-btn--primary">รับเอกสารใหม่</button>
+                <a class="home-receive-link" href="email_send/my_dashboard.html" onclick="return navigateView(event, 'my_public');">เปิดคำสั่งของฉัน</a>
+              </aside>
+            </div>
+          </section>
+        </div>
+
+        <div id="document-view" hidden>
         <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-4 ">
           <div class="menu-item flex flex-col min-w-0">
 
@@ -496,6 +632,7 @@ window.addEventListener('load', function() {
 
           </div>
         </div>
+        </div>
       </main>
 
 
@@ -521,6 +658,7 @@ window.addEventListener('load', function() {
   <script src="assets/document-file-state.js?v=<?php echo filemtime(__DIR__.'/assets/document-file-state.js'); ?>"></script>
   <script src="assets/module-router.js?v=<?php echo filemtime(__DIR__.'/assets/module-router.js'); ?>"></script>
   <script src="assets/main.js?v=<?php echo filemtime(__DIR__.'/assets/main.js'); ?>"></script>
+  <script src="assets/home.js?v=<?php echo filemtime(__DIR__.'/assets/home.js'); ?>"></script>
   <script src="assets/notifications.js?v=<?php echo filemtime(__DIR__.'/assets/notifications.js'); ?>"></script>
   <script src="assets/system-updates.js?v=<?php echo filemtime(__DIR__.'/assets/system-updates.js'); ?>"></script>
   <script src="assets/modal.js?v=<?php echo filemtime(__DIR__.'/assets/modal.js'); ?>"></script>

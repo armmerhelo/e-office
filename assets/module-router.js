@@ -83,7 +83,7 @@
         const navigateModule=(value,replace=false)=>{
             const target=new URL(value,url),key=Object.keys(routes).find(key=>new URL(routes[key],appRoot).pathname===target.pathname);
             if(target.origin===appRoot.origin && key)return window.showView(key,replace?'load':undefined);
-            if(target.origin===appRoot.origin && target.pathname===new URL('index.php',appRoot).pathname)return window.showView(target.searchParams.get('view')||'received',replace?'load':undefined);
+            if(target.origin===appRoot.origin && target.pathname===new URL('index.php',appRoot).pathname)return window.showView(target.searchParams.get('view')||'main',replace?'load':undefined);
             if(window.eofficeApproveDocumentLeaving?.()!==false)window.location[replace?'replace':'assign'](target.href);
         };
         const moduleLocation={
@@ -309,7 +309,7 @@
             const target=new URL(link.href),key=Object.keys(routes).find(k=>new URL(routes[k],appRoot).pathname===target.pathname);
             if(key && target.origin===appRoot.origin){event.preventDefault();window.showView(key);}
             else if(target.origin===appRoot.origin && target.pathname===new URL('index.php',appRoot).pathname && !target.searchParams.has('id')) {
-                event.preventDefault();window.showView(target.searchParams.get('view') || (window.eofficeUser?'received':'public'));
+                event.preventDefault();window.showView(target.searchParams.get('view') || 'main');
             }
         });
         return ctx;
@@ -474,7 +474,7 @@
         const target=new URL(link.href),view=Object.keys(routes).find(key=>new URL(routes[key],appRoot).pathname===target.pathname);
         if(view && target.origin===appRoot.origin){event.preventDefault();window.showView(view);}
         else if(target.origin===appRoot.origin && target.pathname===new URL('index.php',appRoot).pathname && !target.searchParams.has('id')) {
-            event.preventDefault();window.showView(target.searchParams.get('view') || (window.eofficeUser?'received':'public'));
+            event.preventDefault();window.showView(target.searchParams.get('view') || 'main');
         }
     });
 })();

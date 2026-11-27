@@ -85,7 +85,9 @@ async function refreshPermissionMenus() {
             if (data.user?.id && current === 'received') {
                 get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
             }
+            if (data.user?.id && current === 'main') window.eofficeHome?.refresh();
         }
+        if (current === 'main') window.eofficeHome?.accountChanged(data.user);
         if (restrictedViewPermission(current) && !eofficeCan(restrictedViewPermission(current))) showView(window.eofficeUser ? 'received' : 'public', 'load');
     } catch (error) {
         if (request !== permissionRefreshSequence) return;
@@ -120,6 +122,8 @@ const MODULE_ROUTES = Object.freeze({
 const DOCUMENT_VIEWS = ['received', 'send', 'public', 'send_table'];
 const PUBLIC_MODULE_VIEWS = new Set(['official_travel']);
 const LOGIN_VIEW_KEY = 'eoffice-login-view';
+const HOME_VIEW = 'main';
+const POST_LOGIN_ACTION_KEY = 'eoffice-post-login-action';
 
 function requestedViewFromUrl() {
     const url = new URL(window.location.href);
@@ -133,6 +137,34 @@ function takeLoginView() {
     return Object.hasOwn(MODULE_ROUTES, pending) ? pending : null;
 }
 
+function takePostLoginAction() {
+    if (!window.eofficeUser) return null;
+    const action = sessionStorage.getItem(POST_LOGIN_ACTION_KEY);
+    sessionStorage.removeItem(POST_LOGIN_ACTION_KEY);
+    return action === 'receive_document' ? action : null;
+}
+
+function openLoginModal(intent = null) {
+    if (intent) sessionStorage.setItem(POST_LOGIN_ACTION_KEY, intent);
+    if (!modal.classList.contains("active")) loginModalPreviousBodyOverflow = document.body.style.overflow;
+    modal.classList.add("active");
+    document.body.style.overflow = "hidden";
+    document.getElementById('login_part').style.display = 'block';
+    document.getElementById('register_part').style.display = 'none';
+    document.getElementById('register_btn').style.display = 'block';
+    document.getElementById('head_login').textContent = 'เข้าสู่ระบบ';
+    display_style('btn_submit_register','block');
+    display_style('detail_agreement','block');
+    display_style('check_agreement','block');
+    display_style('success_modal','none');
+    display_style('registerForm','block');
+    document.getElementById('register_part_text').innerHTML = '';
+    const first = document.getElementById('Username');
+    if (first) setTimeout(() => first.focus(), 0);
+}
+
+window.eofficeOpenLoginModal = openLoginModal;
+
 function navigateView(event, view) {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return true;
     showView(view, '', '1');
@@ -143,7 +175,7 @@ window.addEventListener('popstate', async () => {
     await window.sessionReady;
     id = new URL(window.location.href).searchParams.get('id');
     closeModal();
-    showView(id && window.eofficeUser ? 'received' : (requestedViewFromUrl() || (window.eofficeUser ? 'received' : 'public')), 'history');
+    showView(id && window.eofficeUser ? 'received' : (requestedViewFromUrl() || HOME_VIEW), 'history');
 });
 
 window.addEventListener('eoffice:permissions-changed', () => {
@@ -158,7 +190,13 @@ window.addEventListener('pageshow', event => {
 });
 window.addEventListener('storage', event => {
     if (event.key !== 'read_status_change' && event.key !== null) return;
-    if (window.eofficeSessionState?.status !== 'authenticated' || localStorage.getItem('currentPage') !== 'received') return;
+    if (window.eofficeSessionState?.status !== 'authenticated') return;
+    const current = localStorage.getItem('currentPage');
+    if (current === 'main') {
+        window.eofficeHome?.refresh();
+        return;
+    }
+    if (current !== 'received') return;
     get_data_api_received(localStorage.getItem('page_number'), document.getElementById('search_txt')?.value || '');
 });
 
@@ -203,6 +241,7 @@ const components_pagination = document.getElementById("pagination_html");
 const search_menu = document.getElementById("search_menu");
 const modal = document.getElementById("modalOverlay");
 const openModal = document.getElementById("openModal");
+let loginModalPreviousBodyOverflow = null;
 const closeIcon = document.getElementById("closeIcon");
 const cancelBtn = document.getElementById("cancelBtn");
 const closeDocDetail = document.getElementById("closeDocDetail");
@@ -314,27 +353,19 @@ window.onload = async () => {
     applyPermissionMenus();
     const loginView = takeLoginView();
     const requestedView = requestedViewFromUrl();
-    const publicTravelRequested = requestedView === 'official_travel';
     if (id && getCookie("User_Token")) {
         showView('received', "load", '1');
-    } else if (requestedView && requestedView !== 'public') {
-        showView(requestedView, "load");
     } else if (loginView) {
         showView(loginView, "load");
     } else if (requestedView) {
         showView(requestedView, "load");
-    } else if (Object.hasOwn(MODULE_ROUTES, currentPage)) {
-        // An old saved module used to reopen inside the main page. Start at the document inbox instead.
-        showView(window.eofficeUser ? 'received' : 'public', "load");
-    } else if (currentPage) {
-        // สั่งให้ UI แสดงผล Tab นั้นๆ
-        showView(currentPage, "load");
-    }else if (!User_Status) {
-      showView('public', 'load');
-    }  else {
-
-      showView('received', 'load');
-
+    } else {
+        showView(HOME_VIEW, "load");
+    }
+    if (takePostLoginAction() === 'receive_document') {
+        setTimeout(() => {
+            if (window.eofficeUser) open_create_doc();
+        }, 0);
     }
 
 
@@ -371,11 +402,8 @@ window.onload = async () => {
         menu_edit_room_booking.style.display = "none";
         //components_pagination.style.display = "none";
         content_received.innerHTML = `<div id="loop_receive">กรุณาเข้าสู่ระบบ หรือ ไม่พบข้อมูล<br></div>`;
-        //search_menu.style.display = "none";
-        if (!publicTravelRequested) {
-            modal.classList.add("active"); // ค่อยๆ แสดง (Fade In)
-            showView('public', 'load');
-        }
+        // A direct document link still asks for sign-in; the public Main does not.
+        if (id) openLoginModal();
     }
 
 
@@ -466,7 +494,12 @@ function setSidebarOpen(open) {
 
 sidebarDesktop.addEventListener('change', () => setSidebarOpen(false));
 document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && document.getElementById('sidebar').dataset.sidebarOpen === 'true') setSidebarOpen(false);
+    if (event.key !== 'Escape') return;
+    if (modal.classList.contains('active')) {
+        closeModal();
+        return;
+    }
+    if (document.getElementById('sidebar').dataset.sidebarOpen === 'true') setSidebarOpen(false);
 });
 setSidebarOpen(false);
 
@@ -576,10 +609,19 @@ window.formatDate = formatDate;
 const urlParams = new URLSearchParams(window.location.search);
 var id = urlParams.get('id'); // ได้ค่า "123"
 
+function syncViewUrl(showViews, page) {
+    const viewUrl = new URL(window.location.href);
+    viewUrl.searchParams.set('view', showViews);
+    if (!id) viewUrl.searchParams.delete('id');
+    viewUrl.hash = '';
+    if (viewUrl.href === window.location.href) return;
+    if (page === 'load' || page === 'history') history.replaceState(null, '', viewUrl);
+    else history.pushState(null, '', viewUrl);
+}
 
 function showView(showViews, page , page_number) {
-    if (!Object.hasOwn(MODULE_ROUTES, showViews) && !DOCUMENT_VIEWS.includes(showViews)) {
-        showViews = window.eofficeUser ? 'received' : 'public';
+    if (!Object.hasOwn(MODULE_ROUTES, showViews) && !DOCUMENT_VIEWS.includes(showViews) && showViews !== HOME_VIEW) {
+        showViews = HOME_VIEW;
     }
     const publicModule = PUBLIC_MODULE_VIEWS.has(showViews);
     if (Object.hasOwn(MODULE_ROUTES, showViews) && !window.eofficeUser && !publicModule) {
@@ -592,6 +634,7 @@ function showView(showViews, page , page_number) {
     if (permission && !eofficeCan(permission)) showViews = window.eofficeUser ? 'received' : 'public';
     if (['ai_settings','audit_logs'].includes(showViews) && window.eofficeUser?.status !== 'Admin') showViews = window.eofficeUser ? 'received' : 'public';
 
+    if (showViews !== HOME_VIEW) window.eofficeHome?.leave();
     const moduleRoute = Object.hasOwn(MODULE_ROUTES, showViews) ? MODULE_ROUTES[showViews] : null;
     if (moduleRoute) {
         if (!publicModule && (!window.eofficeUser || getCookie('User_Token') === null)) {
@@ -632,13 +675,40 @@ if (! page_number) {
   console.log('page number:'+page_number);
     localStorage.setItem("currentPage", showViews);
 
-
     if (page != "load") {
         setSidebarOpen(false);
     }
 
+    const homeMenu = document.getElementById('menu-home');
+    if (showViews === HOME_VIEW) {
+        const homeView = document.getElementById('home-view');
+        const documentView = document.getElementById('document-view');
+        if (homeView) homeView.hidden = false;
+        if (documentView) documentView.hidden = true;
+        components_pagination.style.display = 'none';
+        search_menu.style.display = 'none';
+        if (docListCard) docListCard.style.display = 'none';
+        display_style('read_icon_show','none');
+        display_style('sub_head','none');
+        display_style('btn_report','none');
+        load_data.style.display = 'none';
+        for (const item of [send_email, menu_maintenance, menu_maintenance_admin, my_public, menu_members, menu_groups, menu_send, menu_send_table, menu_received, menu_bookdocnumber, menu_public, menu_bookingroom, menu_edit_room_booking, homeMenu]) {
+            if (item) item.className = className_default;
+        }
+        if (homeMenu) homeMenu.className = className_click;
+        window.eofficeHome?.show();
+        syncViewUrl(HOME_VIEW, page);
+        return;
+    }
+
+    const homeView = document.getElementById('home-view');
+    const documentView = document.getElementById('document-view');
+    if (homeView) homeView.hidden = true;
+    if (documentView) documentView.hidden = false;
+
     display_style('btn_report','none');
     send_email.className = className_default;
+    if (homeMenu) homeMenu.className = className_default;
     menu_maintenance.className = className_default;
     menu_maintenance_admin.className = className_default;
     my_public.className = className_default;
@@ -718,15 +788,7 @@ if (! page_number) {
     if (getCookie("User_Token") === null && showViews !== 'public') load_data.style.display = "none";
 
     // Keep refresh and links aligned with the document tab that is actually visible.
-    const viewUrl = new URL(window.location.href);
-    viewUrl.searchParams.set('view', showViews);
-    if (!id) viewUrl.searchParams.delete('id');
-    viewUrl.hash = '';
-    if (viewUrl.href !== window.location.href) {
-        if (page === 'load' || page === 'history') history.replaceState(null, '', viewUrl);
-        else history.pushState(null, '', viewUrl);
-    }
-
+    syncViewUrl(showViews, page);
 }
 function view_doc_public(doc_id) {
     const doc = data_save_public.find((item) => String(item.doc_id) === String(doc_id));
@@ -964,11 +1026,7 @@ document.getElementById("loginForm").addEventListener("submit", function (e) {
 
 // ฟังก์ชันเปิด
 openModal.addEventListener("click", () => {
-    //modal.classList.remove('hidden'); // ลบคลาสซ่อนออก
-    modal.classList.add("active"); // ค่อยๆ แสดง (Fade In)
-    document.body.style.overflow = "hidden"; // ล็อคไม่ให้เลื่อนหน้าเว็บด้านหลัง
-    document.getElementById('register_part').style.display = 'none';
-    document.getElementById('register_btn').style.display = 'block';
+    openLoginModal();
     document.getElementById('login_part').style.display = 'block';
     document.getElementById('head_login').innerHTML = 'เข้าสู่ระบบ';
     document.getElementById('register_email').value = '';
@@ -991,7 +1049,10 @@ function closeDocumentOverlays() {
 window.eofficeCloseDocumentOverlays=closeDocumentOverlays;
 const closeModal = () => {
     modal.classList.remove("active"); // ค่อยๆ จางหาย
-    document.body.style.overflow = "auto"; // คืนค่าให้เลื่อนหน้าเว็บได้ปกติ
+    sessionStorage.removeItem(POST_LOGIN_ACTION_KEY);
+    const sidebarOpen = !sidebarDesktop.matches && document.getElementById('sidebar').dataset.sidebarOpen === 'true';
+    document.body.style.overflow = sidebarOpen ? 'hidden' : (loginModalPreviousBodyOverflow ?? 'auto');
+    loginModalPreviousBodyOverflow = null;
     closeDocumentOverlays();
 };
 

@@ -22,6 +22,7 @@
         location.replace(route(`index.php?view=${entryViews[entry]}`));return;
     }
     const modules = [
+        {label:'หน้าหลัก', path:'index.php?view=main', group:'เมนูหลัก', icon:'home'},
         {label:'จัดการสมาชิก', path:'management/user_manage.html', permission:'members', group:'จัดการระบบ', icon:'♙'},
         {label:'จัดการกลุ่มงาน', path:'management/department_manage.html', permission:'departments', group:'จัดการระบบ', icon:'▣'},
         {label:'จองเลขคำสั่ง', path:'external_number_booking/external_number_booking.html', login:true, group:'ทะเบียนเอกสาร', icon:'#'},
@@ -47,6 +48,7 @@
         return node;
     };
     const iconPaths = {
+        'home':'M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5M9 21v-6h6v6',
         '♙':'M15 19a4 4 0 10-8 0m4-8a4 4 0 100-8 4 4 0 000 8zm8-3v6m3-3h-6',
         '▣':'M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z',
         '#':'M7 20l4-16m4 16l4-16M9 9h10M5 15h10',
@@ -79,7 +81,7 @@
     nav.id = 'eoffice-module-sidebar';
     nav.setAttribute('aria-label', 'เมนูหลัก E-Office');
     const brand = make('a', 'eoffice-app-navigation__brand');
-    brand.href = route('index.php?view=received');
+    brand.href = route('index.php?view=main');
     const logo = make('img');
     logo.src = route('img/icon_app_xl.png'); logo.alt = 'E-Office'; logo.width = 60; logo.height = 60;
     const identity = make('div', 'eoffice-app-navigation__identity');
@@ -108,7 +110,7 @@
     }
     const logout = make('button', 'eoffice-app-navigation__logout'); logout.type = 'button';
     appendIcon(logout,'logout');logout.append(make('span','','ออกจากระบบ'));
-    const login = make('a', 'eoffice-app-navigation__link'); login.href = route('index.php?view=received');
+    const login = make('a', 'eoffice-app-navigation__link'); login.href = route('index.php?view=main');
     appendIcon(login,'login');login.append(make('span','','เข้าสู่ระบบ'));
     nav.append(identity, list, make('p', 'eoffice-app-navigation__group', 'ผู้ใช้งาน'), logout, login,
         make('p', 'eoffice-app-navigation__footer', 'พบปัญหาติดต่อ ครูภูธเนศ\nE-OFFICE ศรียานุสรณ์'));

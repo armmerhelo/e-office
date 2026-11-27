@@ -196,7 +196,7 @@ function sidebarParityChecks() {
 sidebarParityChecks();
 
 // Execute the real router without the rest of the document UI or network requests.
-const router = main.slice(main.indexOf('function showView('), main.indexOf('function view_doc_public('));
+const router = main.slice(main.indexOf('function syncViewUrl('), main.indexOf('function view_doc_public('));
 const elements = new Map();
 const el = id => {
     if (!elements.has(id)) elements.set(id, {style:{}, value:'', innerHTML:'',classList:{add(){},remove(){}},setAttribute(){}});
@@ -214,7 +214,7 @@ const recordHistory = (url, push) => {
     context.window.location.href = String(url);
 };
 const context = {
-    window: {...routerWindowEvents,eofficeUser:{status:'Admin',permissions:['members','departments','email','maintenance','news_submit','news_producer']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path}},
+    window: {...routerWindowEvents,eofficeUser:{status:'Admin',permissions:['members','departments','email','maintenance','news_submit','news_producer']},location:{href:'http://localhost/index.php',assign:path => context.navigated = path},eofficeHome:{show:()=>{context.loaded='main';},leave(){},refresh(){},accountChanged(){}}},
     document: {body:{style:{}},getElementById:el},
     MODULE_ROUTES: Object.freeze(Object.fromEntries([...Object.entries(routes).map(([key,[,path]]) => [key,path]), ['room_booking2','room_booking/new_room.html']])),
     restrictedViewPermission:view => ({members:'members',groups:'departments',send_email:'email',maintenance_admin:'maintenance',siya_news:'siya_news',siya_news_studio:'news_producer'})[view],
@@ -240,11 +240,11 @@ for (const [view,path] of Object.entries(context.MODULE_ROUTES)) {
     context.showView(view,'load');
     assert.equal(context.navigated,path,`${view} should navigate without touching an old container`);
 }
-for (const view of ['constructor','toString','__proto__','missing','received','send','public','send_table']) {
+for (const view of ['constructor','toString','__proto__','missing','received','send','public','send_table','main']) {
     context.navigated=null;
     context.showView(view,'load');
     assert.equal(context.navigated,null);
-    assert.equal(context.loaded,['received','send','public','send_table'].includes(view)?view:'received');
+    assert.equal(context.loaded,['received','send','public','send_table','main'].includes(view)?view:'main');
     assert.equal(new URL(context.window.location.href).searchParams.get('view'),context.loaded);
 }
 context.window.eofficeUser={permissions:[]};
@@ -390,7 +390,7 @@ async function navigationChecks() {
     window.eofficeUser=admin;firstUser(admin);await tick();
     assert.equal(window.eofficeUser,null,'late initial security assignment must not replace the latest accepted session');
     assert.deepEqual(sessions,[null],'only the accepted refresh may publish a session update');
-    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,2,'guest sees only public links');
+    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,3,'guest sees the public home, orders and calendar links');
     events.focus();events.focus();
     const lastPendingRevision=window.eofficeSessionState.revision;
     const older=pending.shift(),latest=pending.shift();
@@ -398,7 +398,7 @@ async function navigationChecks() {
     older({ok:true,json:async()=>({user:admin})});await tick();
     assert.equal(sessionStates.at(-1).status,'guest');assert.ok(sessionStates.at(-1).revision>lastPendingRevision);
     assert.ok(sessions.every(user=>user===null),'stale session responses must not restart draft ownership');
-    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,2,'an older refresh must not restore revoked menus');
+    assert.equal(list.children.filter(link=>link.tag==='a' && !link.hidden).length,3,'an older refresh must not restore revoked menus');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     assert.equal(JSON.stringify(sessions.at(-1)),JSON.stringify(admin),'successful refresh should publish the recovered session');
     assert.equal(JSON.stringify(window.eofficeSessionState.user),JSON.stringify(admin),'the latest accepted session is replayable to late consumers');
@@ -416,34 +416,35 @@ async function navigationChecks() {
     assert.equal(window.eofficeSessionState.user,verifiedState.user,'failed checks retain only the old owner boundary, not permission to write');
     events.focus();pending.shift()({ok:true,json:async()=>({user:admin})});await tick();
     const links=list.children.filter(link=>link.tag==='a');
-    assert.equal(links.filter(link=>!link.hidden).length,16);
+    assert.equal(links.filter(link=>!link.hidden).length,17);
     assert.ok(links.some(link=>!link.hidden && link.href.endsWith('/official_travel/index.html')));
-    assert.equal(links[0].attributes['aria-current'],'page');
-    assert.equal(links[0].href,'http://localhost/eoffice/management/user_manage.html');
+    const currentLink=links.find(link=>link.attributes['aria-current']==='page');
+    const otherLink=links.find(link=>!link.hidden && link!==currentLink);
+    assert.equal(currentLink.href,'http://localhost/eoffice/management/user_manage.html');
     toggle.events.click();assert.equal(nav.inert,false);assert.equal(content.inert,true);assert.equal(toggle.attributes['aria-expanded'],'true');
     events.keydown({key:'Escape',preventDefault(){}});assert.equal(nav.inert,true);assert.equal(content.inert,false);assert.equal(toggle.focused,true);
     media.matches=true;media.change();assert.equal(nav.inert,false);assert.equal(content.inert,false);
     const form=new Element('form');body.append(form);events.input({target:form});
     let warned=false;events.beforeunload({preventDefault(){warned=true;}});assert.equal(warned,true,'unsaved form survives a failed submission');
-    let cancelled=false;events.click({target:links[3],button:0,preventDefault(){cancelled=true;},stopImmediatePropagation(){}});assert.equal(cancelled,true);
+    let cancelled=false;events.click({target:otherLink,button:0,preventDefault(){cancelled=true;},stopImmediatePropagation(){}});assert.equal(cancelled,true);
     assert.ok(!lastWarning.includes('บันทึกไว้ในแท็บนี้แล้ว'),'unsupported forms must not promise recovery');
-    form.dataset.eofficeDraftState='pending';events.click({target:links[3],button:0,preventDefault(){},stopImmediatePropagation(){}});
+    form.dataset.eofficeDraftState='pending';events.click({target:otherLink,button:0,preventDefault(){},stopImmediatePropagation(){}});
     assert.ok(!lastWarning.includes('บันทึกไว้ในแท็บนี้แล้ว'),'edits awaiting authentication are not recoverable yet');
     window.eofficeUser={id:7};form.dataset.eofficeDraftUser='7';form.dataset.eofficeDraftState='saved';
-    events.click({target:links[3],button:0,preventDefault(){},stopImmediatePropagation(){}});
+    events.click({target:otherLink,button:0,preventDefault(){},stopImmediatePropagation(){}});
     assert.ok(lastWarning.includes('ร่างข้อความล่าสุดบันทึกไว้ในแท็บนี้แล้ว'),'only successfully persisted drafts may promise text recovery');
-    form.dataset.eofficeDraftState='unavailable';events.click({target:links[3],button:0,preventDefault(){},stopImmediatePropagation(){}});
+    form.dataset.eofficeDraftState='unavailable';events.click({target:otherLink,button:0,preventDefault(){},stopImmediatePropagation(){}});
     assert.ok(!lastWarning.includes('บันทึกไว้ในแท็บนี้แล้ว'),'storage failures must not promise recovery');
-    form.dataset.eofficeDraftState='saved';window.eofficeUser={id:8};events.click({target:links[3],button:0,preventDefault(){},stopImmediatePropagation(){}});
+    form.dataset.eofficeDraftState='saved';window.eofficeUser={id:8};events.click({target:otherLink,button:0,preventDefault(){},stopImmediatePropagation(){}});
     assert.ok(!lastWarning.includes('บันทึกไว้ในแท็บนี้แล้ว'),'another account cannot recover this draft');
     window.eofficeUser={id:7};
     const unsupported=new Element('form');body.append(unsupported);events.input({target:unsupported});
-    events.click({target:links[3],button:0,preventDefault(){},stopImmediatePropagation(){}});
+    events.click({target:otherLink,button:0,preventDefault(){},stopImmediatePropagation(){}});
     assert.ok(!lastWarning.includes('บันทึกไว้ในแท็บนี้แล้ว'),'mixed recoverable and unsupported forms must not promise full recovery');
     events['eoffice:form-saved']({target:unsupported});
     await nav.children.find(node=>node.className==='eoffice-app-navigation__logout').events.click();
     assert.ok(lastWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'logout must warn that it clears even successfully saved drafts');
-    confirmed=true;cancelled=false;events.click({target:links[3],button:0,preventDefault(){cancelled=true;}});assert.equal(cancelled,false);
+    confirmed=true;cancelled=false;events.click({target:otherLink,button:0,preventDefault(){cancelled=true;}});assert.equal(cancelled,false);
     warned=false;events.beforeunload({preventDefault(){warned=true;}});assert.equal(warned,false,'confirmed navigation must not ask twice');
     events['eoffice:form-dirty']({target:form,detail:{replayed:true}});warned=false;events.beforeunload({preventDefault(){warned=true;}});assert.equal(warned,false,'replaying an already approved early edit must not trigger a second departure warning');
     events.input({target:form});warned=false;events.beforeunload({preventDefault(){warned=true;}});assert.equal(warned,true,'new edits must revoke a previous departure approval');
@@ -456,10 +457,10 @@ async function navigationChecks() {
     assert.ok(restoredWarning.includes('ร่างทั้งหมดในแท็บนี้จะถูกล้าง'),'an untouched restored draft must still warn before logout');
     restored.hidden=true;
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,10,'basic users see public links and login-only modules');
+    assert.equal(links.filter(link=>!link.hidden).length,11,'basic users see public links and login-only modules');
     assert.equal(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden,false);
     events.focus();pending.shift()({ok:true,json:async()=>({user:{status:'User',position:'deputy_director',permissions:[]}})});await tick();
-    assert.equal(links.filter(link=>!link.hidden).length,10,'deputy directors may see the calendar link');
+    assert.equal(links.filter(link=>!link.hidden).length,11,'deputy directors may see the calendar link');
     assert.equal(links.find(link=>link.href.endsWith('/official_travel/index.html')).hidden,false);
     console.log('PASS sidebar: document shortcuts, subdirectory URLs, mobile inert/Escape, dirty-form guards and stale session responses');
 }

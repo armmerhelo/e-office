@@ -25,6 +25,7 @@
     "test:amss": "node tests/amss-links.cjs",
     "test:backup": "node tests/backup-ops.cjs",
     "test:drive": "node tests/drive-archive.cjs",
+    "test:home-browser": "node tests/home-main-browser.cjs",
     "test:google": "node tests/google-auth.cjs && node tests/google-signup.cjs",
     "build:css": "tailwindcss -i src/input.css -o assets/tailwind.css --minify",
     "serve:test": "node scripts/serve-test.cjs"
