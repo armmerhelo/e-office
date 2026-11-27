@@ -204,7 +204,7 @@ async function run(){
   assert.equal(await evaluate(`${el('news-message-content')}.hidden`),false);
  });
  await check('upload and approval save both caption edits and article edits',async()=>{
-  await evaluate(`(async()=>{const sample=await fetch('/api/siya-news.php?action=detail&id=1').then(r=>r.json());const blob=await fetch('/'+sample.data.images[0].url).then(r=>r.blob());const files=new DataTransfer();files.items.add(new File([blob],'ux-fixture.png',{type:'image/png'}));const input=${el('news-image-files')};input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await evaluate(`(async()=>{const canvas=document.createElement('canvas');canvas.width=900;canvas.height=600;canvas.getContext('2d').fillRect(0,0,900,600);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));const files=new DataTransfer();files.items.add(new File([blob],'ux-fixture.png',{type:'image/png'}));const input=${el('news-image-files')};input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await until(`!${el('siya-news-app')}.hasAttribute('aria-busy')&&!!${el('news-detail')}.querySelector('[data-caption]')`);
   await check('invalid image metadata blocks all writes before saving article changes',async()=>{
    await fill('news-body','เนื้อหาที่ห้ามบันทึกบางส่วนเมื่อคำบรรยายไม่ถูกต้อง');

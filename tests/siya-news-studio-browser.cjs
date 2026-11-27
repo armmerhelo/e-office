@@ -192,7 +192,7 @@ async function run(){
   await evaluate(`(()=>{${stageExpr}.find('Image')[0].fire('click',{evt:{}},true);})()`);
   await send('Page.captureScreenshot',{format:'png'}).then(r=>fs.writeFileSync(path.join(profile,'studio-decoration.png'),Buffer.from(r.data,'base64')));
  });
- await check('mobile touch pans the image inside a fixed crop frame',async()=>{
+ if(process.env.EOFFICE_QA_DESKTOP_ONLY!=='1')await check('mobile touch pans the image inside a fixed crop frame',async()=>{
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
   await send('Emulation.setPageScaleFactor',{pageScaleFactor:1});
@@ -285,7 +285,7 @@ async function run(){
   await until(`!${el('historyDialog')}.open`);await waitSaved();
   assert.ok(await evaluate(`${q('#stageContainer canvas')}.width>0`));
  });
- await check('mobile canvas and inspector stay usable',async()=>{
+ if(process.env.EOFFICE_QA_DESKTOP_ONLY!=='1')await check('mobile canvas and inspector stay usable',async()=>{
   await send('Emulation.setDeviceMetricsOverride',{width:1024,height:900,deviceScaleFactor:1,mobile:false});
   await evaluate(`${el('safeMargin')}.focus()`);
   await send('Emulation.setDeviceMetricsOverride',{width:1020,height:900,deviceScaleFactor:1,mobile:false});
@@ -295,6 +295,54 @@ async function run(){
     await evaluate(`${q('[data-tab="news"]')}.click()`);await until(`${el('side')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('side')}.inert`),false);await evaluate(`${el('sideClose')}.click()`);await until(`!${el('side')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('side')}.inert`),true);assert.equal(await evaluate(`${q('[data-tab].is-active')}.matches(':focus')`),true);
     await evaluate(`${el('inspectorToggle')}.click()`);await until(`${el('inspector')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('inspector')}.inert`),false);await evaluate(`${el('inspectorClose')}.click()`);await until(`!${el('inspector')}.classList.contains('is-open')`);assert.equal(await evaluate(`${el('inspector')}.inert`),true);assert.equal(await evaluate(`${el('inspectorToggle')}.matches(':focus')`),true);await pause(250);await send('Page.captureScreenshot',{format:'png'}).then(r=>fs.writeFileSync(path.join(profile,'studio-'+width+'.png'),Buffer.from(r.data,'base64')));}
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+ });
+ await check('newsletter template offers five frames, validates overflow and previews the real export',async()=>{
+  await until(`${el('studio-app')}.getAttribute('aria-busy')==='false'`);
+  if(await evaluate(`${q('#pagesStrip .st-page-item')}.getAttribute('aria-current')!=='page'`)){
+   await evaluate(`${q('#pagesStrip .st-page-item')}.click()`);await until(`${q('#pagesStrip .st-page-item')}.getAttribute('aria-current')==='page'`);
+  }
+  await click('[data-tab="templates"]');await click('[data-template="newsletter"]');
+  await until(`${stageExpr}.find('Rect').filter(n=>n.id().startsWith('nl-photo')).length===5`);await waitSaved();
+  let page=(await detail()).document.pages[0];
+  assert.equal(page.format,'a4_portrait');
+  assert.equal(page.elements.filter(e=>/^nl-photo[1-5]-/.test(e.id)&&e.type==='Rect').length,5);
+  assert.ok(page.elements.some(e=>e.name==='หัวกระดาษ'&&e.locked));
+  await click('#checkBtn');await until(`${el('studio-message')}.textContent.includes('กรุณากรอกเลขฉบับ')`);
+  await input('pText','ฉบับที่ 1/2570');
+  await evaluate(`${q('#newsPool .st-news-meta button')}.click()`);
+  await until(`${el('studio-app')}.getAttribute('aria-busy')==='false'&&${el('pName')}.value==='หัวข้อข่าว'`);await waitSaved();
+  page=(await detail()).document.pages[0];
+  const originalBody=page.elements.find(e=>e.id.startsWith('nl-body-')).text;
+  const first=page.elements.find(e=>e.id.startsWith('nl-photo1-'));
+  assert.equal(first.type,'Image');assert.equal(first.width,350);assert.deepEqual(first.cropView,{x:.5,y:.5,zoom:1});
+  await evaluate(`void ${stageExpr}.find('Text').find(n=>n.id().startsWith('nl-body-')).fire('click',{evt:{}},true)`);
+  await input('pText',Array(40).fill('ข้อความทดสอบการล้นกรอบ').join('\n'));
+  await click('#checkBtn');await until(`${el('studio-message')}.textContent.includes('เนื้อข่าวล้นกรอบ')`);
+  await input('pText',originalBody);await waitSaved();
+  const photo2Type=await evaluate(`(()=>{const n=[...${stageExpr}.find('Rect'),...${stageExpr}.find('Image')].find(item=>item.id().startsWith('nl-photo2-'));if(!n)return null;n.fire('click',{evt:{}},true);return n.getClassName();})()`);
+  assert.ok(photo2Type,'newsletter photo frame 2 must exist');
+  if(photo2Type==='Image'){await click('#clearNewsletterImage');await waitSaved();}
+  await click('#chooseNewsletterImage');await evaluate(`${q('#newsPool button.st-news-thumb')}.click()`);
+  await until(`${stageExpr}.find('Image').some(n=>n.id().startsWith('nl-photo2-'))`);await waitSaved();
+  page=(await detail()).document.pages[0];
+  assert.equal(page.elements.find(e=>e.id.startsWith('nl-photo2-')).imageId,first.imageId);
+  await input('cropZoom',2);await waitSaved();
+  assert.equal((await detail()).document.pages[0].elements.find(e=>e.id.startsWith('nl-photo2-')).cropView.zoom,2);
+  await click('#cropReset');await waitSaved();
+  const reset=(await detail()).document.pages[0].elements.find(e=>e.id.startsWith('nl-photo2-'));
+  assert.equal(reset.height,208);assert.equal(reset.cropView.zoom,1);
+  await click('#clearNewsletterImage');await waitSaved();
+  assert.equal((await detail()).document.pages[0].elements.find(e=>e.id.startsWith('nl-photo2-')).type,'Rect');
+  await click('#checkBtn');await until(`${el('studio-message')}.textContent.includes('พร้อมส่งออก · มีข้อควรตรวจ')`);
+  await click('#previewPageBtn');await until(`${el('previewPageDialog')}.open&&${el('previewPageImage')}.naturalWidth===1588`);
+  const preview=await evaluate(`${el('previewPageImage')}.src`);
+  await click('#previewPageClose');
+  await evaluate(`window.__newsletterOriginalClick=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){window.__newsletterPng=this.href;}`);
+  try{
+   await click('#exportPngBtn');await until('!!window.__newsletterPng');
+   assert.equal(await evaluate('window.__newsletterPng'),preview);
+   fs.writeFileSync(path.join(profile,'studio-newsletter.png'),Buffer.from(preview.split(',')[1],'base64'));
+  }finally{await evaluate('HTMLAnchorElement.prototype.click=window.__newsletterOriginalClick');}
  });
  assert.deepEqual(errors,[]);console.log('Screenshots: '+profile);console.log('Studio layout: #'+layoutId);
 }

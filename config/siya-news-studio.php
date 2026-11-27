@@ -204,7 +204,7 @@ function app_siya_news_studio_pool(PDO $pdo,string $search='',int $limit=100): a
     return app_siya_news_studio_pool_rows($q->fetchAll());
 }
 
-function app_siya_news_studio_pool_by_ids(PDO $pdo,array $ids): array {
+function app_siya_news_studio_pool_by_ids(PDO $pdo,array $ids,bool $fullBody=false): array {
     $ids=array_values(array_filter(array_map('intval',$ids),static fn($id)=>$id>0));
     if(!$ids)return [];
     $marks=implode(',',array_fill(0,count($ids),'?'));
@@ -212,10 +212,10 @@ function app_siya_news_studio_pool_by_ids(PDO $pdo,array $ids): array {
         FROM eoffice_siya_news n JOIN eoffice_siya_news_revisions r ON r.news_id=n.id AND r.version=n.approved_version
         WHERE n.status='approved' AND n.id IN ($marks)");
     $q->execute($ids);
-    return app_siya_news_studio_pool_rows($q->fetchAll());
+    return app_siya_news_studio_pool_rows($q->fetchAll(),$fullBody&&count($ids)===1);
 }
 
-function app_siya_news_studio_pool_rows(array $rows): array {
+function app_siya_news_studio_pool_rows(array $rows,bool $fullBody=false): array {
     $out=[];
     foreach($rows as $row){
         $data=json_decode((string)$row['snapshot'],true,32,JSON_THROW_ON_ERROR);
@@ -225,7 +225,7 @@ function app_siya_news_studio_pool_rows(array $rows): array {
             if(!is_array($image)||!is_string($image['id']??null)||!preg_match('/^[a-f0-9]{32}$/D',$image['id']))continue;
             $images[]=['id'=>$image['id'],'caption'=>(string)($image['caption']??''),'credit'=>(string)($image['credit']??''),'original_name'=>(string)($image['original_name']??''),'url'=>'../api/siya-news-image.php?id='.$image['id']];
         }
-        $body=(string)($data['body']??'');if(mb_strlen($body)>4000)$body=mb_substr($body,0,4000).'…';
+        $body=(string)($data['body']??'');if(!$fullBody&&mb_strlen($body)>4000)$body=mb_substr($body,0,4000).'…';
         $out[]=['id'=>(int)$row['id'],'title'=>(string)($data['title']??$row['title']),'event_date'=>$data['event_date']??$row['event_date'],'department'=>(string)($data['department']??$row['department']),'body'=>$body,'version'=>(int)$row['approved_version'],'images'=>$images];
     }
     return $out;

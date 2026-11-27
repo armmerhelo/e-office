@@ -83,6 +83,8 @@
 .st-preview-cover{background:linear-gradient(140deg,#312e81,#4f46e5);color:#fff;font-size:22px;line-height:1.05}
 .st-preview-feature{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-size:20px;line-height:1.1}
 .st-preview-activity{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;font-size:18px}
+.st-preview-newsletter{background:linear-gradient(155deg,#102b65 63%,#e7b643 64% 72%,#fffaf0 73%);color:#fff;font-size:20px}
+.st-page-preview img{display:block;max-width:100%;max-height:calc(100dvh - 100px);margin:auto}
 .st-layer{display:flex;align-items:center;gap:5px;border:1px solid var(--st-line);border-radius:7px;padding:6px 7px;margin-bottom:5px;font-size:11px;cursor:pointer}
 .st-layer.is-active{border-color:#818cf8;background:#eef2ff}
 .st-layer>span:first-child{color:#4f46e5;font-weight:600}

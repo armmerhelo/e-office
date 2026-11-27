@@ -17,7 +17,8 @@ async function run(){
   const editor=(role,id,version)=>apiNews(role,{action:'approve',id,version,review_note:'ตรวจสังเคราะห์สำหรับ Studio'});
   const submit=(role,id,version)=>apiNews(role,{action:'submit',id,version});
   const upload=async(role,id,version,name)=>{const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'),form=new FormData();form.set('action','upload');form.set('id',id);form.set('version',version);form.set('image',new Blob([png],{type:'image/png'}),name);const response=await fetch(base+'/api/siya-news.php',{method:'POST',headers:{Cookie:sessions[role].cookie},body:form});assert.equal(response.status,200);return {png,data:await response.json()};};
-  const draft=await apiNews('submit',{action:'create',title:'Studio source draft',body:'สังเคราะห์'});assert.equal(draft.code,200);
+   const fullBody='ข่าวทดสอบ '.repeat(420)+'จบข่าว';
+   const draft=await apiNews('submit',{action:'create',title:'Studio source draft',body:fullBody});assert.equal(draft.code,200);
   const firstUpload=await upload('submit',draft.data.id,draft.data.version,'studio-one.png');
   let first=(await submit('submit',draft.data.id,firstUpload.data.version)).data;
   first=await editor('editor',draft.data.id,first.version);
@@ -28,7 +29,12 @@ async function run(){
   const draftOnly=(await apiNews('submit',{action:'create',title:'Studio unapproved',body:'ร่างที่ยังไม่ส่งตรวจ'})).data;
   assert.ok(!(await get('producer','?action=pool')).data.data.some(row=>row.id===draftOnly.id));
   const search=await get('producer','?action=pool&q='+encodeURIComponent('Studio source draft'));assert.equal(search.code,200);assert.ok(search.data.data.length>=1);
-  const byIds=await get('producer','?action=pool&ids='+draft.data.id+','+draftOnly.id);assert.equal(byIds.code,200);assert.ok(byIds.data.data.some(row=>row.id===draft.data.id));assert.equal(byIds.data.data.some(row=>row.id===draftOnly.id),false);
+   const byIds=await get('producer','?action=pool&ids='+draft.data.id+','+draftOnly.id);assert.equal(byIds.code,200);assert.ok(byIds.data.data.some(row=>row.id===draft.data.id));assert.equal(byIds.data.data.some(row=>row.id===draftOnly.id),false);
+   assert.ok(firstPool.body.endsWith('…'));
+   const full=await get('producer','?action=pool&full=1&ids='+draft.data.id);
+   assert.equal(full.code,200);assert.equal(full.data.data[0].body,fullBody);
+   assert.deepEqual((await get('producer','?action=pool&full=1&ids='+draftOnly.id)).data.data,[]);
+   assert.equal((await get('editor','?action=pool&full=1&ids='+draft.data.id)).code,403);
   assert.equal((await get('guest','?action=pool')).code,401);
   for(const role of ['none','editor','submit'])assert.equal((await get(role,'?action=pool')).code,403,'pool denied: '+role);
   assert.equal((await post('editor',{action:'create',title:'denied'})).code,403);

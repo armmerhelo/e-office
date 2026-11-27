@@ -73,6 +73,51 @@ async function run() {
     await evaluate(`window.__qaWrites=[];window.__qaFetch=window.fetch;window.fetch=(url,opts)=>{if(opts?.method==='POST')window.__qaWrites.push(String(url));return window.__qaFetch(url,opts);};`);
     await evaluate("showView('send_table')");
     await until("document.getElementById('doc_type_div').checkVisibility()");
+    await check('document type filter selection follows persisted type and All state after reload',async()=>{
+        const hook=await send('Page.addScriptToEvaluateOnNewDocument',{source:`(()=>{
+            const original=window.fetch.bind(window);window.__qaDocTypeRequests=[];window.__qaWrites=[];window.__qaFetch=original;
+            window.fetch=(input,options={})=>{
+                const url=new URL(typeof input==='string'?input:input.url,location.href);
+                if(options.method==='POST')window.__qaWrites.push(String(input));
+                if(url.pathname==='/api/get_data_send.php'&&options.body)window.__qaDocTypeRequests.push(JSON.parse(options.body).doc_type);
+                return original(input,options);
+            };
+        })()`});
+        const verify=async(type)=>{
+            await send('Page.navigate',{url:base+'/index.php?view=send_table'});
+            await until(`window.eofficeSessionState?.status==='authenticated'&&document.getElementById('doc_type_div').checkVisibility()&&document.getElementById('load_data')?.style.display==='none'&&window.__qaDocTypeRequests?.length>0`);
+            const actual=await evaluate(`(()=>({stored:localStorage.getItem('doc_type'),requests:window.__qaDocTypeRequests,buttons:Object.fromEntries([['Internal','internal_btn'],['External','external_btn'],['Stamp','stamp_btn']].map(([type,id])=>[type,document.getElementById(id).classList.contains('opacity-100')])),pressed:Object.fromEntries([['Internal','internal_btn'],['External','external_btn'],['Stamp','stamp_btn']].map(([type,id])=>[type,document.getElementById(id).getAttribute('aria-pressed')==='true']))}))()`);
+            assert.equal(actual.stored,type,`${type}: expected persisted selection`);
+            assert.ok(actual.requests.includes(type),`${type}: the selected/default type must reach the list API: ${JSON.stringify(actual.requests)}`);
+            assert.deepEqual(actual.buttons,{Internal:type==='Internal',External:type==='External',Stamp:type==='Stamp'},`${type}: visible buttons must identify the type used by the API`);
+            assert.deepEqual(actual.pressed,{Internal:type==='Internal',External:type==='External',Stamp:type==='Stamp'},`${type}: accessible pressed state must match the API filter`);
+        };
+        await evaluate("localStorage.setItem('doc_type','External')");
+        await verify('External');
+        await evaluate("document.getElementById('external_btn').click()");
+        await until("localStorage.getItem('doc_type')==='ALL'&&document.getElementById('load_data')?.style.display==='none'");
+        const allState=await evaluate(`(()=>({request:window.__qaDocTypeRequests.at(-1),buttons:['internal_btn','external_btn','stamp_btn'].map(id=>document.getElementById(id).getAttribute('aria-pressed'))}))()`);
+        assert.equal(allState.request,'ALL','clicking the active type clears the category in the list API');
+        assert.deepEqual(allState.buttons,['false','false','false'],'All is represented by no type button being pressed');
+        await evaluate("localStorage.removeItem('doc_type')");
+        await verify('ALL');
+        const beforeSend=await evaluate('window.__qaDocTypeRequests.length');
+        await evaluate("localStorage.setItem('doc_type','Stamp');showView('send')");
+        await until("location.search==='?view=send'&&document.getElementById('doc_type_div').checkVisibility()&&document.getElementById('load_data')?.style.display==='none'");
+        const sendState=await evaluate(`(()=>({requests:window.__qaDocTypeRequests.slice(${beforeSend}),buttons:Object.fromEntries([['Internal','internal_btn'],['External','external_btn'],['Stamp','stamp_btn']].map(([type,id])=>[type,document.getElementById(id).getAttribute('aria-pressed')==='true']))}))()`);
+        assert.ok(sendState.requests.includes('Stamp'),'the send view must pass its persisted type to the list API');
+        assert.deepEqual(sendState.buttons,{Internal:false,External:false,Stamp:true},'the send view must restore the same accessible selection as the table view');
+        for(const width of [768,390,320]){
+            await send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<700});
+            await until(`innerWidth===${width}`);
+            const layout=await evaluate(`(()=>{const r=document.getElementById('doc_type_div').getBoundingClientRect();return {left:r.left,right:r.right,viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth};})()`);
+            assert.ok(layout.left>=0&&layout.right<=width,`document type filters fit ${width}px: ${JSON.stringify(layout)}`);
+            assert.ok(layout.scrollWidth<=layout.viewport,`document list view does not horizontally overflow at ${width}px: ${JSON.stringify(layout)}`);
+        }
+        await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+        await send('Page.removeScriptToEvaluateOnNewDocument',{identifier:hook.identifier});
+        await evaluate('window.__qaDocument=document;window.__qaSidebar=document.getElementById("sidebar")');
+    });
     await check('cold module navigation shows an accessible skeleton inside the persistent shell',async()=>{
         await evaluate(`window.__qaSkeletonTransport=window.fetch;window.__qaReleaseHtml=null;window.fetch=(url,opts)=>new URL(String(url),location.href).pathname==='/management/user_manage.html'?new Promise(resolve=>window.__qaReleaseHtml=()=>resolve(window.__qaSkeletonTransport(url,opts))):window.__qaSkeletonTransport(url,opts);showView('members');`);
         await until("typeof window.__qaReleaseHtml==='function' && !!document.querySelector('#module-viewport .eoffice-skeleton')");
@@ -99,6 +144,7 @@ async function run() {
             if(view==='memo'){
                 await until(`${root}.getElementById('memo-form') && ${root}.getElementById('panel-compose').checkVisibility()`);
                 assert.equal(await evaluate(`${root}.getElementById('signature-file').type`),'file','memo composer should accept a signature image from the current device');
+                await until(`${root}.getElementById('emblem-preview').complete && ${root}.getElementById('emblem-preview').naturalWidth>0`);
                 assert.equal(await evaluate(`${root}.getElementById('emblem-preview').complete && ${root}.getElementById('emblem-preview').naturalWidth>0`),true,'memo default emblem extracted from the reference PDF should load');
                 assert.equal(await evaluate(`${root}.getElementById('memo-paper').ownerDocument.fonts.check('16pt MemoPSK')`),true,'memo preview should load the bundled reference Sarabun font');
                 const paperWidth=await evaluate(`${root}.getElementById('memo-paper').getBoundingClientRect().width`);

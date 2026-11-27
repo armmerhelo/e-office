@@ -19,7 +19,7 @@ try{
             if($ids!==''){
                 $list=array_values(array_unique(array_filter(array_map('intval',explode(',',$ids)),static fn($id)=>$id>0)));
                 if(count($list)>80)app_fail('จำนวนข่าวอ้างอิงเกินกำหนด');
-                $rows=app_siya_news_studio_pool_by_ids($pdo,$list);
+                $rows=app_siya_news_studio_pool_by_ids($pdo,$list,($_GET['full']??null)==='1');
             }else $rows=app_siya_news_studio_pool($pdo,app_text($_GET,'q',100),100);
             app_json(['status'=>'success','data'=>$rows]);
         }

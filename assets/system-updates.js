@@ -1,5 +1,6 @@
 /* Shared release feed and browser-local, account-specific read state. */
 (() => {
+    if (window.eofficeSystemUpdates) return;
     const feedUrl = new URL('../data/system-updates.json', document.currentScript.src);
     const cacheLifetime = 60_000;
     let feed, pending, loadedAt = 0;

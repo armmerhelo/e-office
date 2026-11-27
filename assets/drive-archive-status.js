@@ -1,6 +1,6 @@
 (() => {
     const message=document.getElementById('message'),status=document.getElementById('status'),runs=document.getElementById('runs');
-    function line(text,parent=status){const item=document.createElement('p');item.textContent=text;parent.appendChild(item);}
+    function line(text,parent=status){const item=document.createElement(parent===runs?'li':'p');item.textContent=text;parent.appendChild(item);}
     async function load(){
         status.replaceChildren();runs.replaceChildren();message.textContent='กำลังตรวจสถานะ…';
         try{

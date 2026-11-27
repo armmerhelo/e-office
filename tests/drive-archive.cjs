@@ -1,6 +1,7 @@
 const cp=require('node:child_process'),crypto=require('node:crypto'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
 const php=process.env.PHP_BIN||'C:/laragon/bin/php/php-8.3.33-Win32-vs16-x64/php.exe';
 const base=process.env.TEST_DATABASE||'eoffice_security_test';if(!base.endsWith('_test'))throw Error('Isolated schema source required');
+if(process.argv.includes('--browser'))process.env.DRIVE_ARCHIVE_BROWSER='1';
 const database='drive_archive_'+crypto.randomBytes(6).toString('hex')+'_test',directory=path.join(os.tmpdir(),'opencode',database);
 const port=Number(process.env.DRIVE_TEST_PORT||8108),url=`http://localhost:${port}`;
 const env={...process.env,DB_DATABASE:database,APP_URL:url,EOFFICE_MOCK_SERVICES:'true',EOFFICE_DRIVE_ARCHIVE_ENABLED:'true',EOFFICE_DRIVE_HTTP_FIXTURE:'1',EOFFICE_BACKUP_KEY:crypto.randomBytes(32).toString('base64'),EOFFICE_STORAGE:path.join(directory,'file_document')};let created=false,server;const workers=[],lockers=new Set();
@@ -23,6 +24,7 @@ async function test(){try{
     const partial=await request(route,'reader',{Range:'bytes=0-7'});assert.equal(partial.status,206);assert.equal(await partial.text(),'%PDF-1.4');assert.match(partial.headers.get('Content-Range'),/^bytes 0-7\//);
     assert.equal((await request(route,'reader',{Range:'bytes=999999999-'})).status,416);
     assert.equal((await request('/api/drive_archive_status.php')).status,401);assert.equal((await request('/api/drive_archive_status.php','reader')).status,403);assert.equal((await request('/api/drive_archive_status.php','admin')).status,200);
+    if(process.env.DRIVE_ARCHIVE_BROWSER==='1')await require('./drive-archive-browser.cjs')({url,cookies:fixture.cookies});
     console.log('PASS private cloud-only HTTP reads, revision headers, PDF ranges and Admin-only archive status');
     // Use actual API source with only the external cloud transport substituted.
     // Two independent PHP workers exercise a paused cold-cache restore.

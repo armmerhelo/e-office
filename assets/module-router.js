@@ -100,6 +100,7 @@
                 if (key==='document') return moduleDocument;
                 if (key==='location') return moduleLocation;
                 if (key==='eofficeSessionState' || key==='eofficeUser') return window[key];
+                if (key==='eofficeSystemUpdates') return window.eofficeSystemUpdates ?? target[key];
                 if (key==='eofficeRegisterModuleRefresh') return fn=>refreshers.add(fn);
                 if (key==='eofficeRegisterModuleSuspend') return fn=>suspenders.add(fn);
                 if (key==='eofficeRegisterModuleResume') return fn=>resumers.add(fn);

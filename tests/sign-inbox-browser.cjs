@@ -123,11 +123,26 @@ async function request(route,body,auth=''){
  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','Back preserves pending category');
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'saved stamp leaves pending inbox');
  assert.equal(await evaluate("document.getElementById('received-pending-filter').getAttribute('aria-pressed')"),'true');
- for(const [button,filter,present]of [['received-all-filter','',true],['received-signed-filter','Readed',true],['received-pending-filter','NotRead',false]]){
-  await evaluate(`document.getElementById('${button}').click()`);await until(ready);
-  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),filter);
-  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),present,button);
- }
+  for(const viewport of [{name:'desktop',width:1440},{name:'tablet',width:768},{name:'mobile',width:390}]){
+   await send('Emulation.setDeviceMetricsOverride',{width:viewport.width,height:900,deviceScaleFactor:1,mobile:viewport.width<700});
+   await until(`innerWidth===${viewport.width}&&${ready}`);
+   const controls=await evaluate(`(()=>{const group=document.getElementById('read_icon_show'),r=group.getBoundingClientRect();return {left:r.left,right:r.right,scrollWidth:document.documentElement.scrollWidth,width:innerWidth};})()`);
+   assert.ok(controls.left>=0&&controls.right<=viewport.width,`${viewport.name} inbox filters stay within the viewport: ${JSON.stringify(controls)}`);
+   assert.equal(controls.scrollWidth<=controls.width,true,`${viewport.name} inbox must not overflow horizontally`);
+   for(const [button,filter,present,label]of [['received-all-filter','',true,'ทั้งหมด'],['received-signed-filter','Readed',true,'ดำเนินการแล้ว'],['received-pending-filter','NotRead',false,'รอดำเนินการ']]){
+    await evaluate(`document.getElementById('${button}').click()`);await until(`${ready}&&localStorage.getItem('read_status_change')===${JSON.stringify(filter)}`);
+    assert.equal(await evaluate("document.getElementById('sub_head').textContent"),label,`${viewport.name}/${button} heading`);
+    assert.equal(await evaluate(`document.getElementById('${button}').getAttribute('aria-pressed')`),'true',`${viewport.name}/${button} exposes selected state`);
+    for(const other of ['received-all-filter','received-signed-filter','received-pending-filter'])if(other!==button)
+     assert.equal(await evaluate(`document.getElementById('${other}').getAttribute('aria-pressed')`),'false',`${viewport.name}: only one category is selected`);
+    const rendered=await evaluate(`(()=>{const rows=[...document.querySelectorAll('#loop_receive > div.overflow-x-auto > table tbody tr')],cards=[...document.querySelectorAll('#loop_receive a[onclick^="view_doc_detail("]')];return {contains:data_save.some(row=>Number(row.doc_id)===${doc}),records:data_save.length,rendered:innerWidth>=1300?rows.length:cards.length,table:!!document.querySelector('#loop_receive > div.overflow-x-auto > table'),cards:cards.length};})()`);
+    assert.equal(rendered.contains,present,`${viewport.name}/${button} returns the expected synthetic document`);
+    assert.equal(rendered.rendered,rendered.records,`${viewport.name}/${button} DOM matches the accepted API rows: ${JSON.stringify(rendered)}`);
+    assert.equal(rendered.table,viewport.width>=1300,`${viewport.name} uses the expected table/card layout`);
+   }
+  }
+  await send('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+  await until(`innerWidth===390&&${ready}`);
  await send('Page.navigate',{url:base+'/index.php?view=received&id='+doc});
  await until(ready+"&&document.getElementById('doc_detail').classList.contains('active')");
  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','a direct signed link preserves the pending category');
@@ -246,7 +261,7 @@ async function request(route,body,auth=''){
   assert.ok((await evaluate('document.body.innerText')).includes('ไม่มีสิทธิ์'),'unauthorized signer sees a readable access error');
   assert.equal(await evaluate("typeof window.saveToServer"),'undefined','unauthorized page never loads the signing editor');
  assert.equal(exceptions.length,0,JSON.stringify(exceptions));
- console.log('PASS signing flows, history drawer, responsive toolbar at 1088–320px, icon-only history, no overflow and non-overlapping save feedback');
+  console.log('PASS inbox filters across desktop/tablet/mobile, signing flows, history drawer, responsive toolbar, no overflow and non-overlapping save feedback');
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{
  if(socket)socket.close();if(chrome){const done=new Promise(resolve=>chrome.once('exit',resolve));chrome.kill();await done;}server.kill();
  if(doc)cp.execFileSync(php,['-r',`require 'config/bootstrap.php';$p=app_pdo();$q=$p->prepare('DELETE FROM t_document_upload WHERE Doc_File_Link=?');$q->execute([(string)${doc}]);$q=$p->prepare('DELETE FROM t_document WHERE Doc_Id=?');$q->execute([${doc}]);`],{env,stdio:'ignore'});

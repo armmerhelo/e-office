@@ -763,6 +763,7 @@ if (! page_number) {
 
     } else if (showViews == "send") {
         display_style('doc_type_div','flex');
+        syncDocumentTypeFilter();
         display_style('btn_report','block');
         document.getElementById('search_txt').value = '';
         if (getCookie("User_Token")) get_data_api_send(page_number);
@@ -783,6 +784,7 @@ if (! page_number) {
     }else if (showViews == "send_table") {
         menu_send_table.className = className_click;
         display_style('doc_type_div','flex');
+        syncDocumentTypeFilter();
         display_style('btn_report','block');
         document.getElementById('search_txt').value = '';
         if (getCookie("User_Token")) get_data_api_send_table(page_number);
@@ -1297,6 +1299,17 @@ function syncReceivedFilter(status = localStorage.getItem('read_status_change') 
   }
 }
 
+function syncDocumentTypeFilter(type = localStorage.getItem('doc_type') || 'ALL') {
+  for (const [value, id] of [['Internal', 'internal_btn'], ['External', 'external_btn'], ['Stamp', 'stamp_btn']]) {
+    const button = document.getElementById(id);
+    if (!button) continue;
+    const selected = type === value;
+    button.classList.remove('opacity-100', 'opacity-40');
+    button.classList.add(selected ? 'opacity-100' : 'opacity-40');
+    button.setAttribute('aria-pressed', String(selected));
+  }
+}
+
 function read_status_change(status,api){
   localStorage.setItem('read_status_change', ['NotRead', 'Readed'].includes(status) ? status : '');
   syncReceivedFilter();
@@ -1464,6 +1477,7 @@ function setActiveButton(type) {
         });
         search_find(type);
     }
+    syncDocumentTypeFilter();
 }
 
 async function openReportPage() {

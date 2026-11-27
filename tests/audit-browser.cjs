@@ -31,7 +31,9 @@ async function run(){
         assert.equal(await evaluate("getComputedStyle(document.getElementById('group_audit_logs')).display"),'block');
         assert.equal(await evaluate("document.getElementById('menu-audit-logs').classList.contains('bg-indigo-700')"),true);
         assert.equal(await evaluate('window.eofficeModuleHasChanges()'),false);
-        assert.equal(await evaluate(`${root}.querySelectorAll('#filters select[name=category] option').length`),9);
+        const categories=await evaluate(`fetch('/management/get_audit_logs_api.php').then(response=>response.json()).then(data=>Object.keys(data.categories))`);
+        const options=await evaluate(`${root}.querySelectorAll('#filters select[name=category] option').length?Array.from(${root}.querySelectorAll('#filters select[name=category] option'),option=>option.value):[]`);
+        assert.deepEqual(options,['',...categories],'the category filter should expose every category returned by the API');
         await evaluate(`${root}.querySelector('details summary').click()`);assert.equal(await evaluate(`${root}.querySelector('details').open`),true);
     });
     await check('search/date filters and clearing work without marking the module dirty',async()=>{

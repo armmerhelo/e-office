@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/app-navigation.css?v=20261014-shell">
     <link rel="stylesheet" href="../assets/sidebar.css?v=20261014-sidebar">
-    <link rel="stylesheet" href="studio.css?v=20261111-pool-accessibility">
+    <link rel="stylesheet" href="studio.css?v=20261124-newsletter">
     <link rel="stylesheet" href="../assets/ui-buttons.css?v=20261104-eoffice-theme">
 </head>
 <body class="eoffice-module-page">
@@ -18,7 +18,7 @@
     <script src="../assets/app-navigation.js?v=20261112-hidden-tabs"></script>
     <script src="../assets/vendor/konva.min.js?v=10.9.1" data-eoffice-global></script>
     <script src="../assets/vendor/jspdf.umd.min.js?v=2.5.2" data-eoffice-global></script>
-    <script src="studio.js?v=20261111-pool-accessibility"></script>
+    <script src="studio.js?v=20261124-newsletter"></script>
     <main class="studio-page" id="studio-app" aria-busy="false">
         <header class="st-top">
             <a class="st-back" id="st-back" href="index.html">← SIYA NEWS</a>
@@ -86,6 +86,7 @@
                 </section>
                 <section class="st-panel" id="tab-templates">
                     <h2 class="st-panel-title">เริ่มต้นจากเทมเพลต</h2>
+                    <button class="st-template" type="button" data-template="newsletter"><span class="st-template__preview st-preview-newsletter">SIYA NEWS</span><strong>จดหมายข่าว SIYA NEWS</strong><small>A4 แนวตั้ง · น้ำเงิน–ทอง · 5 กรอบภาพ</small></button>
                     <button class="st-template" type="button" data-template="cover"><span class="st-template__preview st-preview-cover">SIYA<br>NEWS</span><strong>หน้าปกวารสาร</strong><small>หัวข้อเด่น + พื้นหลังสี</small></button>
                     <button class="st-template" type="button" data-template="feature"><span class="st-template__preview st-preview-feature">ข่าว<br>เด่น</span><strong>ข่าวเด่น</strong><small>พื้นที่ภาพและหัวข้อข่าว</small></button>
                     <button class="st-template" type="button" data-template="activity"><span class="st-template__preview st-preview-activity">กิจกรรม</span><strong>กิจกรรมโรงเรียน</strong><small>รูปทรงและข้อความสีสัน</small></button>
@@ -118,6 +119,7 @@
                     <div class="st-workbar-right">
                         <button class="st-btn st-small" id="inspectorToggle" type="button" aria-expanded="false" aria-controls="inspector">ปรับแต่ง</button>
                         <button class="st-btn st-small" id="fitBtn" type="button">พอดีจอ</button>
+                        <button class="st-btn st-small" id="previewPageBtn" type="button">ดูตัวอย่าง</button>
                         <input id="zoomRange" type="range" min="15" max="150" step="5" value="55" aria-label="ซูม">
                         <span id="zoomValue" class="st-meta">55%</span>
                     </div>
@@ -138,6 +140,11 @@
                     <div class="st-field"><label for="pName">ชื่อเลเยอร์</label><input id="pName" type="text" maxlength="80"></div>
                     <div class="st-field" id="pTextWrap"><label for="pText">ข้อความ</label><textarea id="pText" maxlength="10000"></textarea></div>
                     <div class="st-field st-image-note" id="pImageWrap" hidden>ภาพจากข่าวที่ผ่านตรวจ · ใช้ภาพเดิมของข่าวเท่านั้น</div>
+                    <div class="st-field" id="newsletterFrameTools" hidden>
+                        <button class="st-btn st-small" id="chooseNewsletterImage" type="button">เลือก / เปลี่ยนภาพจากคลัง</button>
+                        <button class="st-btn st-small" id="clearNewsletterImage" type="button" hidden>เว้นกรอบนี้</button>
+                        <p class="st-sub">เลือกกรอบ แล้วคลิกภาพย่อจากคลังข่าวเพื่อใส่หรือแทนที่ภาพ</p>
+                    </div>
                     <div class="st-field"><button class="st-btn st-small st-wide" id="lockBtn" type="button" aria-pressed="false">ล็อกวัตถุ</button></div>
                     <div id="objectEditing">
                     <div class="st-field-row"><div class="st-field"><label for="pX">ตำแหน่ง X</label><input id="pX" type="number" step="1"></div><div class="st-field"><label for="pY">ตำแหน่ง Y</label><input id="pY" type="number" step="1"></div></div>
@@ -186,6 +193,10 @@
         <dialog id="historyDialog" class="st-dialog" aria-labelledby="historyTitle">
             <header class="st-dialog-head"><h2 id="historyTitle">ประวัติเวอร์ชัน</h2><button class="st-btn" id="historyClose" type="button">ปิด</button></header>
             <div id="historyList" class="st-history"></div>
+        </dialog>
+        <dialog id="previewPageDialog" class="st-dialog st-page-preview" aria-labelledby="previewPageTitle">
+            <header class="st-dialog-head"><h2 id="previewPageTitle">ตัวอย่างหน้าจดหมายข่าว</h2><button class="st-btn" id="previewPageClose" type="button">ปิด</button></header>
+            <img id="previewPageImage" alt="ภาพตัวอย่างหน้าปัจจุบันโดยไม่แสดงเส้นช่วย">
         </dialog>
         <div class="st-fatal" id="fatal" hidden><b>โหลดตัวแก้ไขไม่สำเร็จ</b><p>ไม่สามารถโหลด Konva หรือ jsPDF จากไฟล์ในระบบได้ กรุณารีเฟรชหน้าใหม่ หรือแจ้งผู้ดูแล E-Office</p></div>
     </main>

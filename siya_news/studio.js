@@ -516,7 +516,7 @@
     }
     function addNodes(nodes){
         if(!nodes.length)return;
-        for(const node of nodes){if(node.getClassName()==='Image')decorateImage(node);node.draggable(true);if(!node.id())node.id(uid());state.contentLayer.add(node);}
+        for(const node of nodes){if(node.getClassName()==='Image')decorateImage(node);node.draggable(!node.getAttr('locked'));if(!node.id())node.id(uid());state.contentLayer.add(node);}
         select(nodes[nodes.length-1]);state.contentLayer.batchDraw();record();renderLayers();closeSideOnMobile();
     }
     function addText(kind='body'){
@@ -536,8 +536,89 @@
         addNodes(nodes);
     }
 
+    // Persist template roles in element IDs, which already survive save/restore.
+    function newsletterRole(id){return /^nl-(issue|title|body|photo[1-5])-/.exec(id||'')?.[1]||'';}
+    function newsletterId(role){return `nl-${role}-${uid()}`;}
+    function isNewsletterFrame(node){return Boolean(node&&newsletterRole(node.id()).startsWith('photo'));}
+    function newsletterFrame(attrs){
+        return new K.Rect({...attrs,fill:'#e8edf7',stroke:'#a9b9d8',strokeWidth:2});
+    }
+    function newsletterArtwork(){
+        const navy='#102b65',gold='#e7b643',cream='#fffaf0';
+        const rect=(x,y,width,height,fill,name)=>new K.Rect({x,y,width,height,fill,name,locked:true});
+        const ribbon=(y,height,angle,fill,name)=>new K.Rect({x:-4,y,width:804,height,rotation:angle,fill,name,locked:true});
+        const text=(role,y,height,value,size,name,extra={})=>new K.Text({
+            ...(role?{id:newsletterId(role),height,fixedHeight:true}:{locked:true}),
+            x:42,y,width:710,text:value,fontFamily:'Prompt',fontSize:size,fill:navy,lineHeight:1.25,wrap:'word',name,...extra
+        });
+        const frames=[[42,598,350,208],[402,598,350,208],[42,816,230,199],[282,816,230,199],[522,816,230,199]];
+        return [
+            rect(0,0,794,245,navy,'หัวกระดาษ'),
+            ribbon(222,21,2,gold,'แถบทองด้านบน'),
+            ribbon(220,10,2,'#244a96','แถบน้ำเงินด้านบน'),
+            text(null,55,65,'SIYA NEWS',56,'ชื่อจดหมายข่าว',{align:'center',fontStyle:'bold',fill:cream}),
+            text(null,119,35,'โรงเรียนศรียานุสรณ์',24,'ชื่อโรงเรียน',{align:'center',fill:'#f8dc90'}),
+            text('issue',164,30,'',19,'เลขฉบับ',{align:'center',fill:cream,fontStyle:'bold'}),
+            text('title',270,76,'',28,'หัวข้อข่าว',{align:'center',fontStyle:'bold'}),
+            text('body',358,224,'',17,'เนื้อข่าว',{fill:'#1e293b',lineHeight:1.48}),
+            ...frames.map(([x,y,width,height],i)=>newsletterFrame({id:newsletterId(`photo${i+1}`),x,y,width,height,name:`กรอบภาพ ${i+1}`})),
+            ribbon(1066,110,-2,gold,'แถบทองด้านล่าง'),
+            ribbon(1078,112,-2,navy,'ท้ายกระดาษ'),
+            text(null,1084,28,'โรงเรียนศรียานุสรณ์  •  siya.ac.th',17,'ข้อมูลติดต่อ',{align:'center',fill:cream}),
+        ];
+    }
+    function frameGeometry(node){
+        return {id:node.id(),name:node.name(),x:node.x(),y:node.y(),width:node.width(),height:node.height(),rotation:node.rotation(),scaleX:node.scaleX(),scaleY:node.scaleY(),visible:node.visible()};
+    }
+    function replaceNewsletterFrame(frame,replacement){
+        const index=frame.zIndex();
+        frame.destroy();state.contentLayer.add(replacement);replacement.zIndex(index);replacement.draggable(!replacement.getAttr('locked'));
+    }
+    async function fillNewsletter(item,imageId){
+        const nodes=editableNodes(),byRole=new Map(nodes.map(node=>[newsletterRole(node.id()),node]));
+        const title=byRole.get('title'),body=byRole.get('body');
+        if(!imageId&&(title?.getClassName()!=='Text'||body?.getClassName()!=='Text')){toast('ไม่พบช่องหัวข้อหรือเนื้อหา กรุณาใช้เทมเพลตอีกครั้ง');return;}
+        if(!imageId&&[title,body].some(node=>node.getAttr('locked'))){toast('ปลดล็อกหัวข้อและเนื้อหาก่อนใส่ข่าว');return;}
+        const frames=nodes.filter(isNewsletterFrame).sort((a,b)=>newsletterRole(a.id()).localeCompare(newsletterRole(b.id())));
+        const selected=isNewsletterFrame(state.selected)?state.selected:null;
+        const targets=imageId?[selected||frames.find(node=>node.getClassName()==='Rect'&&!node.getAttr('locked'))].filter(Boolean):frames;
+        if(imageId&&(!targets.length||targets[0].getAttr('locked'))){toast('เลือกกรอบภาพที่ไม่ได้ล็อกก่อนใส่ภาพ');return;}
+        if(!imageId&&frames.some(node=>node.getAttr('locked'))){toast('ปลดล็อกกรอบภาพก่อนใส่ข่าว');return;}
+        if(!imageId&&(title.text().trim()||body.text().trim()||frames.some(node=>node.getClassName()==='Image'))&&
+            !confirm('แทนที่หัวข้อ เนื้อหา และภาพทั้งชุดด้วยข่าวนี้หรือไม่?'))return;
+        const page=curr(),layout=state.layout;
+        state.mutating=true;setBusy(true);
+        try{
+            const {data}=await request(`${api}?action=pool&ids=${encodeURIComponent(item.id)}&full=1`);
+            const fresh=data.find(row=>Number(row.id)===Number(item.id));
+            if(!fresh)throw Error('ข่าวนี้ไม่ได้อยู่ในคลังข่าวที่ผ่านตรวจแล้ว');
+            const images=imageId?fresh.images.filter(image=>image.id===imageId):fresh.images;
+            if(imageId&&!images.length)throw Error('ภาพนี้ไม่ได้อยู่ในฉบับที่ผ่านตรวจแล้ว');
+            if(!imageId&&fresh.body.length>10000)throw Error('เนื้อข่าวยาวเกินช่องจัดหน้า (10,000 ตัวอักษร) กรุณาย่อข่าวก่อนนำเข้า');
+            const loaded=await Promise.all(images.slice(0,targets.length).map(async photo=>[photo,await loadImage(photo.id)]));
+            if(curr()!==page||state.layout!==layout||!state.stage)return;
+            if(loaded.some(([photo])=>state.imageFailures.has(photo.id))){
+                for(const [photo] of loaded)if(!nodes.some(node=>node.getAttr('imageId')===photo.id))state.imageFailures.delete(photo.id);
+                showMessage('โหลดภาพจากข่าวไม่สำเร็จ · ยังไม่ได้แก้ไขหน้านี้ กรุณาลองใหม่',true);return;
+            }
+            if(!imageId){title.text(fresh.title);body.text(fresh.body);}
+            select(null);
+            const updated=targets.map((frame,i)=>{
+                const geometry=frameGeometry(frame);
+                const node=loaded[i]?decorateImage(new K.Image({...geometry,image:loaded[i][1],imageId:loaded[i][0].id,newsId:item.id,cropView:{x:.5,y:.5,zoom:1}})):newsletterFrame(geometry);
+                if(loaded[i])applyCrop(node);
+                replaceNewsletterFrame(frame,node);return node;
+            });
+            if(!imageId&&frames.length===0)toast('ใส่ข้อความแล้ว · หน้านี้ไม่มีกรอบภาพ');
+            else toast(imageId?'ใส่ภาพในกรอบแล้ว':`ใส่ข่าวและภาพ ${loaded.length} ภาพแล้ว`);
+            select(imageId?updated[0]:title);
+            state.contentLayer.batchDraw();record();showMessage('');
+        }catch(error){showMessage('ใส่ข่าวไม่สำเร็จ: '+error.message,true);}
+        finally{state.mutating=false;setBusy(false);resumeAutosave();}
+    }
     async function insertNews(item,imageId=null){
         if(!state.layout||state.loading||state.exporting||state.mutating||state.restoring)return;
+        if(editableNodes().some(node=>newsletterRole(node.id())))return fillNewsletter(item,imageId);
         syncPage();const page=curr();const {w,h}=dims(page);
         const activeAtStart=page;
         const margin=Math.round(w*.07);const maxW=w-margin*2;
@@ -576,7 +657,11 @@
         if(editableNodes().length&&!confirm('ใช้เทมเพลตแทนองค์ประกอบบนหน้านี้หรือไม่?'))return;
         select(null);state.contentLayer.destroyChildren();const {w,h}=dims(page);const nodes=[];
         const text=(x,y,width,value,size,color,weight='normal',name='ข้อความ')=>new K.Text({x,y,width,text:value,fontFamily:'Prompt',fontSize:size,fontStyle:weight,fill:color,lineHeight:1.2,wrap:'word',name});
-        if(kind==='cover'){
+        if(kind==='newsletter'){
+            page.format='a4_portrait';page.bg='#fffaf0';
+            state.bgRect.size({width:FORMATS.a4_portrait.w,height:FORMATS.a4_portrait.h});
+            nodes.push(...newsletterArtwork());
+        }else if(kind==='cover'){
             page.bg='#312e81';nodes.push(new K.Circle({x:w*.88,y:h*.18,radius:w*.18,fill:'#6366f1',opacity:.75,name:'วงกลมตกแต่ง'}));
             nodes.push(new K.Rect({x:w*.08,y:h*.16,width:w*.16,height:6,fill:'#c7d2fe',name:'เส้นตกแต่ง'}));
             nodes.push(text(w*.08,h*.24,w*.72,'SIYA NEWS',Math.max(14,w*.025),'#c7d2fe','bold','หัวเรื่อง'))
@@ -594,6 +679,11 @@
             nodes.push(text(w*.08,h*.3,w*.72,'เพิ่มรายละเอียดกิจกรรม ภาพบรรยากาศ และข้อมูลที่จำเป็น',Math.max(11,w*.022),'#047857','normal','คำอธิบาย'));
         }
         state.bgRect.fill(page.bg);addNodes(nodes);updatePageLabel();renderPages();
+        if(kind==='newsletter'){
+            state.autoFit=true;fitPage();
+            select(nodes.find(node=>newsletterRole(node.id())==='issue'));setTab('news');
+            showMessage('กรอกเลขฉบับที่ช่องข้อความด้านขวา หรือเลือกข่าวที่ผ่านตรวจจากคลังด้านซ้าย');
+        }
     }
 
     function editTextOverlay(node){
@@ -628,7 +718,7 @@
             const thumbs=document.createElement('div');thumbs.className='st-news-thumbs';
             if(item.images.length){
                 for(const image of item.images){
-                    const button=document.createElement('button');button.type='button';button.className='st-news-thumb';button.title='แทรกเฉพาะภาพนี้';
+                    const button=document.createElement('button');button.type='button';button.className='st-news-thumb';button.title=image.caption||'แทรกเฉพาะภาพนี้';button.setAttribute('aria-label',`แทรกภาพ ${image.caption||image.original_name||item.title}`);
                     const img=document.createElement('img');img.src=image.url;img.alt='';img.loading='lazy';button.append(img);
                     button.addEventListener('click',event=>{event.stopPropagation();insertNews(item,image.id);});
                     thumbs.append(button);
@@ -686,7 +776,7 @@
     async function duplicatePage(){
         syncPage();if(state.pages.length>=40){toast('สูงสุด 40 หน้า');return;}
         const source=curr();const copy={...JSON.parse(JSON.stringify(pageData(source))),id:pageUid(),_hist:[],_hi:-1};
-        copy.elements=copy.elements.map(element=>({...element,id:uid()}));
+        copy.elements=copy.elements.map(element=>({...element,id:newsletterRole(element.id)?newsletterId(newsletterRole(element.id)):uid()}));
         state.pages.splice(state.active+1,0,copy);state.active++;await paintPage();fitPage();markDirty();renderPages();toast('ทำสำเนาหน้าแล้ว');
     }
     async function deletePage(){
@@ -696,6 +786,9 @@
     }
     function applyFormat(format){
         const page=curr();if(!page||!FORMATS[format])return;
+        if(format!=='a4_portrait'&&editableNodes().some(node=>newsletterRole(node.id()))){
+            updatePageLabel();toast('เทมเพลตจดหมายข่าวใช้ A4 แนวตั้ง');return;
+        }
         page.format=format;state.bgRect.size({width:dims(page).w,height:dims(page).h});state.autoFit=true;setZoom(state.zoom);fitPage();record();updatePageLabel();renderPages();
     }
     function setBackground(color){
@@ -716,6 +809,8 @@
         $('noSelection').hidden=on;$('propPanel').hidden=!on;$('pagePanel').hidden=on;
         if(!node)return;
         const locked=!!node.getAttr('locked');
+        $('newsletterFrameTools').hidden=!isNewsletterFrame(node)||locked;
+        $('clearNewsletterImage').hidden=node.getClassName()!=='Image';
         $('objectEditing').inert=locked;$('objectEditing').classList.toggle('is-locked',locked);$('pName').disabled=locked;
         $('pText').disabled=locked;
         $('lockBtn').textContent=locked?'ปลดล็อกวัตถุ':'ล็อกวัตถุ';$('lockBtn').setAttribute('aria-pressed',String(locked));
@@ -725,6 +820,8 @@
         $('pFillWrap').hidden=node.getClassName()==='Image';
         $('pImageWrap').hidden=node.getClassName()!=='Image';
         $('cropPanel').hidden=node.getClassName()!=='Image';$('textExtra').hidden=node.getClassName()!=='Text';
+        $('cropRatio').parentElement.hidden=isNewsletterFrame(node);
+        $('cropReset').textContent=isNewsletterFrame(node)?'คืนครอปกลางกรอบ':'คืนภาพเต็ม';
         $('borderPanel').hidden=node.getClassName()==='Text';$('cornerWrap').hidden=!['Image','Rect'].includes(node.getClassName());
         if(node.getClassName()!=='Text'){$('pStroke').value=node.stroke()||'#1e293b';$('pStrokeWidth').value=node.strokeWidth()||0;if(['Image','Rect'].includes(node.getClassName()))$('pCorner').value=node.cornerRadius()||0;}
         if(node.getClassName()==='Image'){refreshCropProps();$('cropRatio').value='current';}
@@ -817,12 +914,33 @@
         }
     }
 
-    async function checkReady(showSuccess=true){
+    function newsletterReadiness(pages){
+        const issues=[],warnings=[];
+        for(const [index,page] of pages){
+            const elements=page.elements||[];
+            const roles=new Map(elements.map(element=>[newsletterRole(element.id),element]));
+            if(!['issue','title','body','photo1','photo2','photo3','photo4','photo5'].some(role=>roles.has(role)))continue;
+            const prefix=`หน้า ${index+1}: `;
+            for(const [role,label] of [['issue','เลขฉบับ'],['title','หัวข้อข่าว'],['body','เนื้อข่าว']]){
+                const element=roles.get(role);
+                if(element?.type!=='Text'||element.visible===false||!element.text?.trim()){issues.push(prefix+'กรุณากรอก'+label);continue;}
+                const measured=new K.Text({...element,height:'auto',wrap:'word'});
+                try{
+                    if(element.height!==undefined&&measured.height()>element.height+.01)issues.push(prefix+label+'ล้นกรอบ · ลดขนาดหรือระยะบรรทัด หรือขยายกล่องข้อความ');
+                }finally{measured.destroy();}
+            }
+            const count=[1,2,3,4,5].filter(i=>{const e=roles.get(`photo${i}`);return e?.type==='Image'&&e.visible!==false;}).length;
+            if(count<5)warnings.push(prefix+`ใส่ภาพ ${count}/5 กรอบ · ช่องว่างจะไม่แสดงเป็นกรอบในไฟล์`);
+        }
+        return {issues,warnings};
+    }
+    async function checkReady(showSuccess=true,onlyCurrent=false){
         if(!state.layout||state.loading)return false;
         try{
             syncPage();
+            const pages=onlyCurrent?[[state.active,curr()]]:[...state.pages.entries()];
             const refs=[];
-            for(const [index,page] of state.pages.entries())for(const element of page.elements||[])if(element.type==='Image')refs.push({page:index+1,newsId:Number(element.newsId),imageId:element.imageId});
+            for(const [index,page] of pages)for(const element of page.elements||[])if(element.type==='Image')refs.push({page:index+1,newsId:Number(element.newsId),imageId:element.imageId});
             const ids=[...new Set(refs.map(ref=>ref.newsId))];
             if(ids.length){
                 const rows=await fetchReferencedPool(ids);
@@ -831,15 +949,19 @@
                 state.pool=state.pool.filter(item=>!ids.includes(Number(item.id)));
                 mergePool(rows);renderPool();
             }
-            const issues=[];
+            await prepareFonts(pages.map(([,page])=>page));
+            await document.fonts?.ready;
+            const {issues,warnings}=newsletterReadiness(pages);
             for(const ref of refs){
                 const news=state.poolMap.get(ref.newsId);
                 if(!news)issues.push(`หน้า ${ref.page}: ข่าวของภาพไม่ได้ผ่านตรวจหรือถูกนำออกจากคลัง`);
                 else if(!news.images.some(image=>image.id===ref.imageId))issues.push(`หน้า ${ref.page}: ภาพไม่อยู่ในข่าวเวอร์ชันที่ผ่านตรวจ`);
             }
-            if(state.imageFailures.size)issues.push('ภาพบางภาพโหลดจากเซิร์ฟเวอร์ไม่ได้ กรุณารีเฟรชหน้าใหม่ก่อนส่งออก');
+            for(const page of new Set(refs.filter(ref=>state.imageFailures.has(ref.imageId)).map(ref=>ref.page))){
+                issues.push(`หน้า ${page}: ภาพบางภาพโหลดจากเซิร์ฟเวอร์ไม่ได้ กรุณากดลองแสดงหน้าใหม่ก่อนส่งออก`);
+            }
             if(issues.length){showMessage('ยังส่งออกไม่ได้',true,issues);return false;}
-            if(showSuccess)showMessage('ทุกหน้าพร้อมส่งออก · ตรวจข้อความ ภาพ และขนาดหน้าก่อนเผยแพร่',false);
+            if(showSuccess||warnings.length)showMessage(warnings.length?'พร้อมส่งออก · มีข้อควรตรวจ':'ทุกหน้าพร้อมส่งออก · ตรวจข้อความ ภาพ และขนาดหน้าก่อนเผยแพร่',false,warnings);
             return true;
         }catch(error){showMessage('ตรวจความพร้อมไม่สำเร็จ: '+error.message,true);return false;}
     }
@@ -856,9 +978,17 @@
         const container=document.createElement('div');
         const stage=new K.Stage({container,width:w,height:h});
         try{
-            stage.add(state.bgLayer.clone({listening:false}),state.contentLayer.clone({listening:false}));
+            const artwork=state.contentLayer.clone({listening:false});
+            for(const node of artwork.getChildren().slice())if(node.getClassName()==='Rect'&&isNewsletterFrame(node))node.destroy();
+            stage.add(state.bgLayer.clone({listening:false}),artwork);
             stage.draw();return stage.toDataURL({pixelRatio:2,mimeType:'image/png'});
         }finally{stage.destroy();}
+    }
+    function previewPage(){
+        if(!state.layout||state.renderError||state.restoring||state.canvasPage!==curr())return;
+        try{
+            $('previewPageImage').src=renderExport();$('previewPageDialog').showModal();
+        }catch(error){showMessage('แสดงตัวอย่างไม่สำเร็จ: '+error.message,true);}
     }
     async function exportPng(){
         if(state.loading||state.restoring||state.exporting||state.conflict||state.mutating||state.renderError)return;
@@ -866,7 +996,7 @@
         state.exporting=true;setBusy(true);
         try{
             syncPage();state.imageFailures=new Set();await paintPage();
-            if(!await checkReady(false))return;
+            if(!await checkReady(false,true))return;
             state.selected=null;state.transformer.nodes([]);state.contentLayer.batchDraw();
             try{await document.fonts?.ready;}catch{}
             const url=renderExport();
@@ -953,6 +1083,16 @@
         document.querySelectorAll('[data-template]').forEach(button=>button.addEventListener('click',()=>applyTemplate(button.dataset.template)));
         document.querySelectorAll('[data-place]').forEach(button=>button.addEventListener('click',()=>alignSelected(button.dataset.place)));
         $('lockBtn').addEventListener('click',()=>toggleLock());
+        $('chooseNewsletterImage').addEventListener('click',()=>{setTab('news');$('newsSearch').focus();});
+        $('clearNewsletterImage').addEventListener('click',()=>{
+            const frame=state.selected;
+            if(!isNewsletterFrame(frame)||frame.getClassName()!=='Image'||frame.getAttr('locked'))return;
+            const empty=newsletterFrame(frameGeometry(frame));select(null);replaceNewsletterFrame(frame,empty);
+            select(empty);state.contentLayer.batchDraw();record();
+        });
+        $('previewPageBtn').addEventListener('click',previewPage);
+        $('previewPageClose').addEventListener('click',()=>$('previewPageDialog').close());
+        $('previewPageDialog').addEventListener('close',()=>$('previewPageImage').removeAttribute('src'));
         updateAttr('pLineHeight',(node,value)=>node.lineHeight(clamp(Number(value)||1.25,.8,3)));
         updateAttr('pLetterSpacing',(node,value)=>node.letterSpacing(clamp(Number(value)||0,-20,100)));
         $('pUnderline').addEventListener('change',event=>{if(state.selected&&!state.selected.getAttr('locked')){state.selected.textDecoration(event.target.checked?'underline':'');record();state.contentLayer.batchDraw();}});
@@ -979,6 +1119,7 @@
         });
         $('cropReset').addEventListener('click',()=>{
             const node=state.selected;if(!node||node.getAttr('locked'))return;
+            if(isNewsletterFrame(node)){updateCrop({x:.5,y:.5,zoom:1});record();refreshCropProps();return;}
             const image=node.image();node.height(clamp(node.width()*Math.abs(node.scaleX())*(image.naturalHeight||image.height)/(image.naturalWidth||image.width)/Math.abs(node.scaleY()),1,10000));
             node.setAttr('cropView',null);applyCrop(node);record();refreshProps();state.contentLayer.batchDraw();state.transformer.forceUpdate();
         });

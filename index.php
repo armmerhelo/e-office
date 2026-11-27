@@ -513,16 +513,16 @@ window.addEventListener('load', function() {
               <h3 id="sub_head" class="text-xl font-bold  text-left pt-2 pl-2">รายการหนังสือรับเข้า</h3>
             <div id="doc_type_div" class="gap-2 flex" style="display:none;">
 
-            <button id="internal_btn" onclick="setActiveButton('Internal');"
+            <button id="internal_btn" type="button" aria-pressed="false" onclick="setActiveButton('Internal');"
                 class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 หนังสือ
             </button>
 
-            <button id="external_btn" onclick="setActiveButton('External');"
+            <button id="external_btn" type="button" aria-pressed="false" onclick="setActiveButton('External');"
                 class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 คำสั่ง
             </button>
-            <button id="stamp_btn" onclick="setActiveButton('Stamp');"
+            <button id="stamp_btn" type="button" aria-pressed="false" onclick="setActiveButton('Stamp');"
                 class="eo-btn eo-btn--sm eo-doc-filter md:w-auto opacity-40">
                 ประทับตรา
             </button>
