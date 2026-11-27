@@ -389,7 +389,7 @@
             el('home-pending-all').addEventListener('click', () => openReceived('NotRead'));
             yearSelect.addEventListener('change', () => {
                 const year = yearSelect.value;
-                window.setCookie?.('yearSelect', year, 30);
+                if (typeof setCookie === 'function') setCookie('yearSelect', year, 30);
                 const documentYear = el('yearSelect');
                 if (documentYear) documentYear.value = year;
                 refresh();

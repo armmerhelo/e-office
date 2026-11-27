@@ -144,6 +144,15 @@ async function run(){
         assert.ok((await evaluate("document.querySelector('#home-presence-list .home-presence-person:last-child .home-presence-role').textContent")).includes('รอง'));
     });
 
+    await check('guest year change reloads public orders with the selected Buddhist year',async()=>{
+        await evaluate("(()=>{const select=document.getElementById('home-year-select');select.value='2568';select.dispatchEvent(new Event('change',{bubbles:true}))})()");
+        await until("window.__qaHomeRequests.filter(item=>item.kind==='public').at(-1).body.Year==='2568'");
+        assert.equal(await evaluate("document.getElementById('yearSelect').value"),'2568');
+        await evaluate("(()=>{const select=document.getElementById('home-year-select');select.value='2569';select.dispatchEvent(new Event('change',{bubbles:true}))})()");
+        await until("window.__qaHomeRequests.filter(item=>item.kind==='public').at(-1).body.Year==='2569'");
+        assert.equal(await evaluate("document.getElementById('yearSelect').value"),'2569');
+    });
+
     await check('guest private inbox links fall back to main and resume after sign-in',async()=>{
         await send('Page.navigate',{url:base+'/index.php?view=received'});
         await until("location.search==='?view=main' && document.getElementById('home-view').checkVisibility()");
@@ -203,6 +212,15 @@ async function run(){
         assert.equal(received.Read_Status_find,'NotRead');
         assert.equal(received.limit,5);
         await screenshot('member-desktop');
+    });
+
+    await check('member year change reloads summary and pending documents for that year',async()=>{
+        await evaluate("(()=>{const select=document.getElementById('home-year-select');select.value='2568';select.dispatchEvent(new Event('change',{bubbles:true}))})()");
+        await until("window.__qaHomeRequests.filter(item=>item.kind==='summary').at(-1).body.Year==='2568' && window.__qaHomeRequests.filter(item=>item.kind==='received').at(-1).body.Year==='2568'");
+        assert.equal(await evaluate("document.getElementById('yearSelect').value"),'2568');
+        await evaluate("(()=>{const select=document.getElementById('home-year-select');select.value='2569';select.dispatchEvent(new Event('change',{bubbles:true}))})()");
+        await until("window.__qaHomeRequests.filter(item=>item.kind==='summary').at(-1).body.Year==='2569' && window.__qaHomeRequests.filter(item=>item.kind==='received').at(-1).body.Year==='2569'");
+        assert.equal(await evaluate("document.getElementById('yearSelect').value"),'2569');
     });
 
     await check('real summary API matches the existing inbox scope and completion counts',async()=>{
