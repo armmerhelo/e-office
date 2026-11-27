@@ -66,10 +66,13 @@ function fixtures(){
                 return json({status:'success',today:day,month,
                     executives:[
                         {id:1,name:'ผู้อำนวยการ ทดสอบ',position:'director',photo_url:null},
-                        {id:2,name:'รองผู้อำนวยการ ทดสอบ',position:'deputy_director',photo_url:null}
+                        {id:2,name:'รองผู้อำนวยการ หนึ่ง',position:'deputy_director',photo_url:null},
+                        {id:3,name:'รองผู้อำนวยการ สอง',position:'deputy_director',photo_url:null},
+                        {id:4,name:'รองผู้อำนวยการ สาม',position:'deputy_director',photo_url:null},
+                        {id:5,name:'รองผู้อำนวยการ สี่',position:'deputy_director',photo_url:null}
                     ],
-                    entries:[{id:9,executive_id:2,status:'scheduled',start_date:day,end_date:day,start_time:'09:00',end_time:'16:00',subject:'ประชุมทดสอบ',place:'หน่วยงานทดสอบ'}],
-                    today_entries:[{id:9,executive_id:2,status:'scheduled',start_date:day,end_date:day,start_time:'09:00',end_time:'16:00'}]});
+                    entries:[{id:9,executive_id:3,status:'scheduled',start_date:day,end_date:day,start_time:'09:00',end_time:'16:00',subject:'ประชุมทดสอบ',place:'หน่วยงานทดสอบ'}],
+                    today_entries:[3,4,5].map((id,index)=>({id:9+index,executive_id:id,status:'scheduled',start_date:day,end_date:day,start_time:'09:00',end_time:'16:00'}))});
             }
             if(url.pathname.endsWith('/api/inbox_summary.php')){
                 let body={};try{body=JSON.parse(init.body||'{}')}catch{}
@@ -106,7 +109,7 @@ async function run(){
     await send('Page.addScriptToEvaluateOnNewDocument',{source:fixtures()});
     await send('Page.navigate',{url:base+'/index.php'});
     await until("window.eofficeSessionState?.status==='guest' && document.getElementById('home-public-list').children.length===2");
-    await until("document.getElementById('home-presence-list').children.length===2");
+    await until("document.getElementById('home-presence-list').children.length===5");
 
     await check('guest main is the default public landing without a forced login dialog',async()=>{
         assert.equal(await evaluate("location.search"),'?view=main');
@@ -117,6 +120,7 @@ async function run(){
         assert.equal(await evaluate("document.getElementById('home-feedback').textContent"),'');
         const guestStatus=await evaluate("window.__qaHomeOriginalFetch('/api/inbox_summary.php',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({Year:'2569'})}).then(response=>response.status)");
         assert.equal(guestStatus,401,'guests must not read personal inbox totals');
+        await screenshot('guest-desktop');
     });
 
     await check('public orders and current-year request are rendered as safe actionable cards',async()=>{
@@ -132,9 +136,11 @@ async function run(){
     });
 
     await check('executive presence uses scheduled travel for today',async()=>{
-        assert.equal(await evaluate("document.getElementById('home-presence-summary').textContent"),'อยู่ 1 · ไม่อยู่ 1');
+        assert.equal(await evaluate("document.getElementById('home-presence-summary').textContent"),'อยู่ 2 · ไม่อยู่ 3');
+        assert.equal(await evaluate("document.querySelectorAll('#home-presence-list .home-presence-person').length"),5);
         assert.equal(await evaluate("document.querySelector('#home-presence-list .home-presence-person').dataset.presence"),'present');
         assert.equal(await evaluate("document.querySelector('#home-presence-list .home-presence-person:last-child').dataset.presence"),'away');
+        assert.equal(await evaluate("document.querySelector('#home-presence-list .home-presence-person:last-child .home-presence-mark').textContent"),'−');
         assert.ok((await evaluate("document.querySelector('#home-presence-list .home-presence-person:last-child .home-presence-role').textContent")).includes('รอง'));
     });
 

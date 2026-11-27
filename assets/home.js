@@ -198,6 +198,7 @@
             const item = node('li', '', 'home-presence-person');
             item.dataset.presence = person.away ? 'away' : 'present';
             item.title = `${person.name} — ${person.away ? 'ไม่อยู่: มีกำหนดการไปราชการ' : 'อยู่: ไม่มีกำหนดการไปราชการ'}`;
+            const avatarWrap = node('span', '', 'home-presence-avatar-wrap');
             const avatar = node('span', initials(person.name), 'home-presence-avatar');
             if (person.photo_url) {
                 const image = document.createElement('img');
@@ -208,12 +209,15 @@
                 image.addEventListener('error', () => image.remove(), {once: true});
                 avatar.append(image);
             }
+            const mark = node('span', person.away ? '−' : '✓', 'home-presence-mark');
+            mark.setAttribute('aria-hidden', 'true');
+            avatarWrap.append(avatar, mark);
             const copy = node('span', '', 'home-presence-copy');
             copy.append(
                 node('strong', person.name || 'ไม่ระบุชื่อ', 'home-presence-name'),
                 node('span', roles[person.position] || 'ผู้บริหาร', 'home-presence-role'),
             );
-            item.append(avatar, copy, node('span', person.away ? 'ไปราชการ' : 'อยู่', 'home-presence-mark'));
+            item.append(avatarWrap, copy);
             return item;
         }));
         setFeedback(presenceFeedback, '');
