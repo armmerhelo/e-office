@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## แก้ปุ่มย้อนกลับจากหน้าเซ็นเอกสาร — 27 พฤศจิกายน 2026
+
+- เผยแพร่ **5 runtime paths** (`e-sign/e-sign.php`, `assets/utils.js`, `assets/document-file-state.js`, `assets/main.js`, `config/bootstrap.php`) จาก `514845c5ca56bc5c199ef10dfea15149afcf5a12` ด้วย targeted atomic replacement; production e-sign เรียก `app_document_lookup()` ได้หลังซิงก์ bootstrap และตอบ HTTP 200
+- ลิงก์เซ็นจาก `received`, `send`, `send_table`, `main` แนบ `return` ที่ผ่าน allowlist; ปุ่มย้อนกลับและปุ่มหลังบันทึกกลับหน้าต้นทาง พร้อมคง filter/ปี พ.ศ. เดิม; ค่า return ที่ไม่รู้จัก fallback อย่างปลอดภัย
+- Production HTTP smoke ยืนยัน `return=received` แสดงปุ่มกลับ `../index.php?view=received`, success action กลับหน้า received และค่า `https://attacker.example/` ถูก fallback เป็น main
+- Local full suite `npm.cmd test` ผ่าน EXIT 0, home browser **15 checks** และ sign inbox browser ผ่าน; ลบบัญชี/เอกสาร smoke ครบ คงเหลือ **75 / 15,013**
+- Release ID **`deploy-20261127T083224000Z`**; เผยแพร่ feed และตรวจหน้า `index.php?view=updates` แล้ว, checksum **293 paths**, temporary helper **0**
+
 ## แสดงผู้บริหารหลังเข้าสู่ระบบ — 27 พฤศจิกายน 2026
 
 - เผยแพร่ `index.php` และ `assets/home.js` จาก `a23506671315eaee528adfeeebea6fd4ec8e9efa` ด้วย targeted atomic replacement; ไม่เปลี่ยน schema หรือข้อมูล
