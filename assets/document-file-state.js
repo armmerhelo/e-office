@@ -37,7 +37,7 @@
                 const display = old.row.querySelector('[id^="display-"]');
                 if (display) display.textContent = '';
             }
-            const href = `e-sign/e-sign.php?Doc_Id=${encodeURIComponent(result.doc_id)}&File_Path=${encodeURIComponent(item.path)}&Year=${encodeURIComponent(state.year)}`;
+            const href = eofficeSignUrl(result.doc_id, item.path, state.year);
             const link = old.row.querySelector('a[href*="e-sign.php"]');
             if (link) link.href = href;
             else {

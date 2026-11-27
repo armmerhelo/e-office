@@ -6,6 +6,14 @@ $rawDocId=$_GET['Doc_Id']??0;
 $docId=filter_var($rawDocId,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]])?:0;
 $user=app_user(false);
 $doc=null;$error=null;$statusCode=400;$fileName='';$year='';
+$returnViews=['main','received','send','send_table','public'];
+$requestedReturn=$_GET['return']??'';
+$returnView=is_string($requestedReturn)&&in_array($requestedReturn,$returnViews,true)?$requestedReturn:'main';
+$returnUrl='../index.php?view='.$returnView;
+$returnLabels=['main'=>'กลับหน้าหลัก','received'=>'กลับหนังสือส่งถึง','send'=>'กลับทะเบียนหนังสือรับ','send_table'=>'กลับทะเบียนหนังสือรับ','public'=>'กลับหน้าคำสั่ง'];
+$returnLabel=$returnLabels[$returnView]??'กลับหน้าหลัก';
+$returnUrlHtml=htmlspecialchars($returnUrl,ENT_QUOTES,'UTF-8');
+$returnLabelHtml=htmlspecialchars($returnLabel,ENT_QUOTES,'UTF-8');
 
 if(!$user){$error='กรุณาเข้าสู่ระบบใหม่';$statusCode=401;}
 elseif($docId<1){$error='ไม่พบเอกสาร';$statusCode=404;}
@@ -46,7 +54,7 @@ if($error){
         .'.card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 12px 40px #0f172a1a;max-width:480px;padding:28px;text-align:center}'
         .'h1{font-size:20px;margin:0 0 10px;color:#0f172a}p{color:#475569;line-height:1.7;margin:0 0 20px}'
         .'a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600}</style></head>'
-        .'<body><main class="card"><h1>เปิดเอกสารไม่ได้</h1><p>'.$safe.'</p><a href="../index.php">กลับหน้าหลัก</a></main></body></html>';
+        .'<body><main class="card"><h1>เปิดเอกสารไม่ได้</h1><p>'.$safe.'</p><a href="'.$returnUrlHtml.'">'.$returnLabelHtml.'</a></main></body></html>';
     exit;
 }
 
@@ -557,7 +565,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
     <header class="signing-header-wrap">
         <div class="signing-header">
             <div class="signing-brand">
-                <a class="app-back" href="../index.php" aria-label="กลับหน้าหลัก">
+                <a class="app-back" href="<?= $returnUrlHtml ?>" aria-label="<?= $returnLabelHtml ?>">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
@@ -642,7 +650,7 @@ $appVersion=@filemtime(__DIR__.'/../assets/e-sign-app.js')?:'1';
         </div>
         <div class="save-success__actions">
             <button id="success-download" type="button" class="eo-btn eo-btn--secondary eo-btn--sm" onclick="downloadDocument()">ดาวน์โหลดสำเนา</button>
-            <a class="eo-btn eo-btn--primary eo-btn--sm" href="../index.php">กลับหน้าหลัก</a>
+            <a class="eo-btn eo-btn--primary eo-btn--sm" href="<?= $returnUrlHtml ?>"><?= $returnLabelHtml ?></a>
             <button type="button" class="eo-btn eo-btn--ghost eo-btn--icon" onclick="dismissSaveSuccess()" aria-label="ปิด">×</button>
         </div>
     </div>

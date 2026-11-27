@@ -83,7 +83,7 @@ function fixtures(){
                 let body={};try{body=JSON.parse(init.body||'{}')}catch{}
                 window.__qaHomeRequests.push({kind:'received',body});
                 return json([
-                    {doc_id:401,doc_number:'ศธ 200',doc_number_receive:'รับ 44/2569',doc_name:'หนังสือด่วนทดสอบหน้าแรก',doc_date:'27/11/2569 09:30',doc_date_receive:'27 พ.ย. 2569',doc_receive_from:'สำนักงานทดสอบ',send_from:'ผู้ส่งทดสอบ',status:'NotRead',status_urgent:'Urgent',requires_signature:true,is_signed:false,is_completed:false,doc_upload_path:[],doc_url:'',doc_url_name:''},
+                    {doc_id:401,doc_number:'ศธ 200',doc_number_receive:'รับ 44/2569',doc_name:'หนังสือด่วนทดสอบหน้าแรก',doc_date:'27/11/2569 09:30',doc_date_receive:'27 พ.ย. 2569',doc_receive_from:'สำนักงานทดสอบ',send_from:'ผู้ส่งทดสอบ',status:'NotRead',status_urgent:'Urgent',requires_signature:true,is_signed:false,is_completed:false,doc_upload_path:[{path:'fixture.pdf',detail:'PDF'}],doc_url:'',doc_url_name:''},
                     {doc_id:400,doc_number:'ศธ 199',doc_number_receive:'รับ 43/2569',doc_name:'หนังสือทั่วไปทดสอบหน้าแรก',doc_date:'26/11/2569 14:00',doc_date_receive:'26 พ.ย. 2569',doc_receive_from:'ฝ่ายทดสอบ',send_from:'ผู้ส่งทดสอบ',status:'NotRead',status_urgent:'Nomal',requires_signature:false,is_signed:false,is_completed:false,doc_upload_path:[],doc_url:'',doc_url_name:''}
                 ]);
             }
@@ -255,6 +255,7 @@ async function run(){
         await click('#home-pending-list .home-doc-card');
         await until("document.getElementById('doc_detail').classList.contains('active')");
         assert.equal(await evaluate("document.getElementById('doc_row_2').textContent"),'หนังสือด่วนทดสอบหน้าแรก');
+        assert.match(await evaluate("document.querySelector('#Sign_File_API a').href"),/[?&]return=main(?:&|$)/,'signing from main must preserve the main return view');
         await click('#closeDocDetail');
         await until("!document.getElementById('doc_detail').classList.contains('active')");
     });

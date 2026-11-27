@@ -46,7 +46,9 @@ async function request(route,body,auth=''){
  await evaluate("document.getElementById('received-pending-filter').click();document.getElementById('received-pending-filter').click()");
  await until("document.getElementById('sub_head')?.textContent==='รอดำเนินการ'&&document.getElementById('load_data')?.style.display==='none'");
  assert.equal(await evaluate("document.getElementById('received-pending-filter').getAttribute('aria-pressed')"),'true');
- await evaluate(`view_doc_detail(${doc},'received')`);await evaluate("document.querySelector('#Sign_File_API a').click()");
+ await evaluate(`view_doc_detail(${doc},'received')`);
+ assert.match(await evaluate("document.querySelector('#Sign_File_API a').href"),/[?&]return=received(?:&|$)/,'sign link must preserve the inbox view');
+ await evaluate("document.querySelector('#Sign_File_API a').click()");
   await until("typeof window.saveToServer==='function'&&document.querySelector('.drawing-canvas')&&document.getElementById('loading').classList.contains('hidden')&&document.querySelector('#btn-hand')?.classList.contains('active')");
   assert.ok((await evaluate("document.getElementById('doc-number').textContent")).length>0,'document number is shown');
   assert.equal(await evaluate("document.getElementById('btn-save').disabled"),true,'save is disabled before any ink');
@@ -119,8 +121,11 @@ async function request(route,body,auth=''){
     try{await saveToServer();return {result,declared};}finally{window.fetch=original;}
   })()`);
   assert.equal(penSaved.declared,'1');assert.equal(penSaved.result?.status,'success','real pen save must declare pen forwarding');
- await evaluate('history.back()');await until("location.pathname==='/index.php'&&"+ready);
- assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','Back preserves pending category');
+  assert.match(await evaluate("location.search"),/[?&]return=received(?:&|$)/,'e-sign keeps the originating view');
+  assert.equal(await evaluate("document.querySelector('.app-back').getAttribute('href')"),'../index.php?view=received','the back arrow must use the safe return view');
+  await evaluate("document.querySelector('.app-back').click()");await until("location.pathname==='/index.php'&&"+ready);
+  assert.equal(new URL(await evaluate('location.href')).searchParams.get('view'),'received','the back arrow returns to the inbox');
+  assert.equal(await evaluate("localStorage.getItem('read_status_change')"),'NotRead','Back preserves pending category');
  assert.equal(await evaluate(`data_save.some(row=>Number(row.doc_id)===${doc})`),false,'saved stamp leaves pending inbox');
  assert.equal(await evaluate("document.getElementById('received-pending-filter').getAttribute('aria-pressed')"),'true');
   for(const viewport of [{name:'desktop',width:1440},{name:'tablet',width:768},{name:'mobile',width:390}]){

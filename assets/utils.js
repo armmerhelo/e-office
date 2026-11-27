@@ -14,6 +14,23 @@ function deleteAllCookies() {
   }
 }
 
+const EOFFICE_SIGN_RETURN_VIEWS = new Set(['main', 'received', 'send', 'send_table', 'public']);
+function eofficeSignReturnView() {
+  const queryView = new URLSearchParams(window.location.search).get('view');
+  const storedView = localStorage.getItem('currentPage');
+  if (EOFFICE_SIGN_RETURN_VIEWS.has(queryView)) return queryView;
+  return EOFFICE_SIGN_RETURN_VIEWS.has(storedView) ? storedView : 'main';
+}
+function eofficeSignUrl(docId, filePath, year, returnView = eofficeSignReturnView()) {
+  const params = new URLSearchParams({
+    Doc_Id: String(docId),
+    File_Path: String(filePath ?? ''),
+    Year: String(year ?? ''),
+    return: EOFFICE_SIGN_RETURN_VIEWS.has(returnView) ? returnView : 'main',
+  });
+  return `e-sign/e-sign.php?${params.toString()}`;
+}
+
 function getCookie(name) {
   if (name === 'User_Token') return window.eofficeUser ? 'session' : null;
   // 1. สร้างรูปแบบที่ต้องการค้นหา เช่น "user_id="
@@ -50,9 +67,6 @@ function addNewInputFile(name, file_id,doc_id,path,year,userChange=true) {
   const safeName = escapeHtml(name);
   const safeFileId = escapeHtml(file_id);
   const safeFileVersion = escapeHtml(path ?? '');
-  const safeDocId = escapeHtml(doc_id);
-  const safeFilePath = encodeURIComponent(String(path ?? ''));
-  const safeYear = encodeURIComponent(String(year ?? ''));
   var loop_file = "";
   if (name || file_id) {
     loop_file = `
@@ -65,9 +79,10 @@ function addNewInputFile(name, file_id,doc_id,path,year,userChange=true) {
     name = ``;
   }
   if (doc_id && doc_id != '') {
+    const signUrl = escapeHtml(eofficeSignUrl(doc_id, path, year));
     var view_file = `<label
            class="cursor-pointer flex items-center justify-center w-13 h-10 border-2 border-dashed border-indigo-300 rounded-lg bg-indigo-20 hover:bg-indigo-100 flex-shrink-0 transition">
-            <a href="e-sign/e-sign.php?Doc_Id=${safeDocId}&File_Path=${safeFilePath}&Year=${safeYear}">
+            <a href="${signUrl}">
                 <img src="img/e-sign.png" class="w-13 h-10 opacity-50">
             </a>
     </label>`;

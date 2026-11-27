@@ -833,7 +833,7 @@ function view_doc_public(doc_id) {
                     `Index ${i}. ${uploadPaths[i].detail}:${filePath}`,
                 );
                 const Read_File_Path = `${window.location.origin}/api/view_file.php?Doc_Id=${encodeURIComponent(doc.doc_id)}&File_Path=${encodeURIComponent(filePath)}&Year=${encodeURIComponent(doc.doc_year)}`;
-                const Sign_File_Path = `e-sign/e-sign.php?Doc_Id=${encodeURIComponent(doc.doc_id)}&File_Path=${encodeURIComponent(filePath)}&Year=${encodeURIComponent(doc.doc_year)}`;
+                const Sign_File_Path = eofficeSignUrl(doc.doc_id, filePath, doc.doc_year);
 
                 var Read_file_Add = `
 
@@ -937,7 +937,7 @@ function view_doc_detail(doc_id, type) {
                     `Index ${i}. ${uploadPaths[i].detail}:${filePath}`,
                 );
                 const Read_File_Path = `${window.location.origin}/api/view_file.php?Doc_Id=${encodeURIComponent(doc.doc_id)}&File_Path=${encodeURIComponent(filePath)}&Year=${encodeURIComponent(doc.doc_year)}`;
-                const Sign_File_Path = `e-sign/e-sign.php?Doc_Id=${encodeURIComponent(doc.doc_id)}&File_Path=${encodeURIComponent(filePath)}&Year=${encodeURIComponent(doc.doc_year)}`;
+                const Sign_File_Path = eofficeSignUrl(doc.doc_id, filePath, doc.doc_year);
 
                 var Read_file_Add = `
 

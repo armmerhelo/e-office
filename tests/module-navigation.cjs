@@ -1057,7 +1057,8 @@ function documentStructuralEditChecks() {
     form.addEventListener('eoffice:form-dirty',()=>dirty++);
     const el=id=>{if(!nodes.has(id))nodes.set(id,{insertAdjacentHTML(_,html){this.html=html;}});return nodes.get(id);};
     const runtime={document:{getElementById:id=>/^(user|group)_send_\d/.test(id)?null:el(id),querySelector:()=>null},localStorage:{getItem:()=> 'Send'},Event,
-        escapeHtml:value=>String(value??''),safeHttpUrl:value=>String(value??''),console:{log(){}},doc_type:new Element('select')};
+        escapeHtml:value=>String(value??''),safeHttpUrl:value=>String(value??''),eofficeSignUrl:(docId,filePath,year)=>`e-sign/e-sign.php?Doc_Id=${docId}&File_Path=${encodeURIComponent(filePath)}&Year=${year}&return=main`,
+        console:{log(){}},doc_type:new Element('select')};
     vm.createContext(runtime);const source=fs.readFileSync('assets/utils.js','utf8');
     vm.runInContext('let fileIndex=0;'+source.slice(source.indexOf('function notifyDocumentEdit'),source.indexOf('function loop_show_file')),runtime);
     for(const mutate of [()=>runtime.addNewInputFile(),()=>runtime.addNewLink(),()=>runtime.add_user_send(7,'QA'),()=>runtime.add_group_send(8,'QA')]) {
@@ -1082,7 +1083,8 @@ function documentFileReconciliationChecks() {
     const link={connected:true,controls:{doc_url:{value:'https://amss.sesact.go.th/test.pdf'},doc_url_name:{value:'original caption'}},querySelector(selector){return fields(this)(selector.match(/name="([^\[]+)/)[1]);},remove(){this.connected=false;}};
     const form={querySelectorAll:selector=>selector.includes('file_send')?[first,second,deleted]:[link],contains:row=>row.connected};
     const imported=[],window={addNewInputFile:(...args)=>imported.push(args)};
-    vm.runInNewContext(fs.readFileSync('assets/document-file-state.js','utf8'),{window,document:{}});
+    const eofficeSignUrl=(docId,filePath,year)=>`e-sign/e-sign.php?Doc_Id=${docId}&File_Path=${encodeURIComponent(filePath)}&Year=${year}`;
+    vm.runInNewContext(fs.readFileSync('assets/document-file-state.js','utf8'),{window,document:{},eofficeSignUrl});
     const captured=window.captureDocumentFileState(form);first.controls.doc_upload.files=[newer];deleted.connected=false;link.controls.doc_url_name.value='renamed imported caption';
     const response={doc_id:99,files:{year:'2569',entries:[{input_index:0,file_id:42,path:'saved.pdf'},{input_index:1,file_id:100,path:'new.pdf'},{input_index:2,file_id:43,path:'saved2.pdf'}],imported:[{link_index:0,file_id:101,path:'imported.pdf',detail:'original caption'}]}};
     window.reconcileDocumentFiles(form,captured,response);
