@@ -1,5 +1,15 @@
 # Production deployment — E-Office
 
+## หน้า Main ใหม่ จดหมายข่าว SIYA NEWS และ QA — 27 พฤศจิกายน 2026
+
+- เผยแพร่ **14 runtime paths** จาก `530814206cb5549df0f7bb89f9a0c5fb532a59d3`, `d1065402f3974ea57117c153f4e190ab246544d5`, `51b57fd8998c85692e2d31e8ba8bb2e9dfb25b88`, `74adcf0da93524a90e7b727a52f5242ed8dfda36` และ `5ed7841a6519af8ee69b75eaaf0e7b76affe0cc9` ด้วย targeted FTPS atomic replacement ไม่เปลี่ยน schema หรือข้อมูลผู้ใช้
+- หน้า Main เปิดได้ทั้งผู้เข้าชมและสมาชิก แสดงคำสั่งล่าสุด สถานะผู้บริหารจากปฏิทิน สรุปหนังสือรับ รายการรอดำเนินการ และทางลัดรับเอกสาร; แก้ลิงก์หน้าส่วนตัวและเก็บปี พ.ศ. ที่เลือกให้ถูกต้อง
+- SIYA NEWS Studio เพิ่มเทมเพลตจดหมายข่าว A4 ห้ากรอบภาพ รองรับข้อความเต็ม การเลือกภาพจากคลังที่ผ่านตรวจ ตรวจความพร้อม ดูตัวอย่างจริงก่อนส่งออก และคู่มือการใช้งาน
+- Production HTTP smoke **13 checks** ผ่าน, browser smoke **5 checks** ผ่าน รวม Main/Studio/เทมเพลต/Preview และหน้าอัปเดตผ่าน **1 check** ไม่มี uncaught JavaScript exception
+- ลบบัญชี smoke ชั่วคราวและ layout ทดสอบครบ; ผู้ใช้/เอกสารคงเหลือ **75 / 15,010**, temporary helper **0**, checksum ตรง **293 paths**
+- Patch backup ไฟล์เดิม: `C:\Users\arm_m\AppData\Local\Temp\opencode\eoffice-production-patch-before-20261127-122106.tar.gz` SHA-256 `e6f0ed3203883d609fc14c6ba568156a8441bbcdf90e91ecde4444420d02d500`; full DB backup ถูก production ตอบ 500 จึงไม่ได้ใช้ แต่ release นี้ไม่มี migration/ข้อมูลเปลี่ยน
+- Release ID **`deploy-20261127T052610000Z`** เผยแพร่ `data/system-updates.json` เป็น **25 releases** และตรวจหน้า `index.php?view=updates` พร้อม commit ครบทั้ง 5 รายการแล้ว
+
 ## ปฏิทินไปราชการสาธารณะและเพิ่มผู้เดินทางหลายคน — 26 พฤศจิกายน 2569
 
 - เผยแพร่ **9 runtime paths** จาก `cb0d45d61b347dd685d388442f4b43fc72c0a009` และ `815e4c65fc28d1f8a6452abcdf78516407e14a04` เวลา **13:39:27 +07:00** ด้วย targeted atomic replacement; สำรองไฟล์เดิมครบ 9 paths พร้อม manifest SHA-256 `a0db510bad9bf5dd81f777700bbaa36b879248a95aca3b1417ff071e308f131f` และตรวจไฟล์ที่ให้บริการตรงทุกไฟล์
