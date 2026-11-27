@@ -1,5 +1,13 @@
 # Production deployment — E-Office
 
+## แสดงผู้บริหารหลังเข้าสู่ระบบ — 27 พฤศจิกายน 2026
+
+- เผยแพร่ `index.php` และ `assets/home.js` จาก `a23506671315eaee528adfeeebea6fd4ec8e9efa` ด้วย targeted atomic replacement; ไม่เปลี่ยน schema หรือข้อมูล
+- ย้ายแถบผู้บริหารให้อยู่เหนือเนื้อหา Main และแสดงทั้ง Guest และสมาชิก พร้อมโหลดสถานะร่วมกับข้อมูลหนังสือรับหลังเข้าสู่ระบบ
+- Production browser smoke ยืนยันสมาชิกเห็นผู้บริหาร **5 คน**, สรุป **อยู่ 2 · ไม่อยู่ 3**, ไม่มี horizontal overflow หรือ JavaScript error
+- ลบบัญชี smoke ครบ; ผู้ใช้/เอกสารคงเหลือ **75 / 15,010**, checksum ตรง **293 paths**, temporary helper **0**
+- Release ID **`deploy-20261127T053843000Z`**; เผยแพร่ feed และตรวจหน้า `index.php?view=updates` แล้ว
+
 ## หน้า Main ใหม่ จดหมายข่าว SIYA NEWS และ QA — 27 พฤศจิกายน 2026
 
 - เผยแพร่ **14 runtime paths** จาก `530814206cb5549df0f7bb89f9a0c5fb532a59d3`, `d1065402f3974ea57117c153f4e190ab246544d5`, `51b57fd8998c85692e2d31e8ba8bb2e9dfb25b88`, `74adcf0da93524a90e7b727a52f5242ed8dfda36` และ `5ed7841a6519af8ee69b75eaaf0e7b76affe0cc9` ด้วย targeted FTPS atomic replacement ไม่เปลี่ยน schema หรือข้อมูลผู้ใช้
